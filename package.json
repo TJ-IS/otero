@@ -1,0 +1,26 @@
+{
+  "name": "otero",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Zotero-like literature management system in pure JS with SQLite storage.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "cli": "node src/cli/index.js",
+    "serve": "node src/index.js --serve",
+    "migrate": "node src/db/migrate.js",
+    "seed": "node src/db/seed.js",
+    "test": "node --test --test-reporter=spec \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "commander": "^12.1.0",
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "pdfjs-dist": "^4.7.76",
+    "zod": "^3.23.8"
+  }
+}

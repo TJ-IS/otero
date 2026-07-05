@@ -1,0 +1,13 @@
+services:
+  otero:
+    build: .
+    container_name: otero
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - OTERO_PORT=3000
+      - OTERO_HOST=0.0.0.0

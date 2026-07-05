@@ -1,0 +1,11 @@
+node_modules
+.git
+.gitmodules
+data
+test
+docs
+deps
+web/node_modules
+web/dist
+*.md
+.DS_Store

@@ -1,0 +1,3 @@
+[submodule "deps/zotero"]
+	path = deps/zotero
+	url = https://github.com/zotero/zotero.git
