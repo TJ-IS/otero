@@ -8,13 +8,12 @@ import { toast } from 'sonner';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
 import { useAsync } from '@/hooks/useAsync';
 
-export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, onSearch, sidebarVersion = 0, fileInputRef: externalRef }) {
+export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, onSearch, fileInputRef: externalRef }) {
   const internalRef = useRef(null);
   const fileInput = externalRef || internalRef;
   const searchRef = useRef(null);
   const [searchValue, setSearchValue] = useState('');
   const { theme, setTheme } = useTheme();
-  const { data: collections } = useAsync(() => api.listCollections(), [sidebarVersion]);
 
   // Debounced search
   useEffect(() => {
@@ -71,31 +70,28 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
     onSearch('');
   };
 
-  const title = filterTitle(filter, collections);
-
   return (
-    <header className="flex min-h-12 flex-wrap items-center gap-2 border-b bg-background px-4 py-1.5">
-      <div className="font-medium truncate max-w-[200px] sm:max-w-[280px]" title={title}>{title}</div>
-      <div className="ml-auto flex flex-1 items-center justify-end gap-2 min-w-0">
-        <div className="relative flex-1 max-w-xs min-w-[140px]">
-          <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            ref={searchRef}
-            placeholder="搜索标题、作者、DOI..."
-            value={searchValue}
-            onChange={e => setSearchValue(e.target.value)}
-            className="h-8 w-full pl-8 pr-8"
-          />
-          {searchValue && (
-            <button
-              onClick={clearSearch}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              title="清除搜索"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
+      <div className="relative flex h-8 flex-1 max-w-md min-w-[160px] items-center">
+        <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          ref={searchRef}
+          placeholder="搜索标题、作者、DOI..."
+          value={searchValue}
+          onChange={e => setSearchValue(e.target.value)}
+          className="h-8 w-full pl-8 pr-8"
+        />
+        {searchValue && (
+          <button
+            onClick={clearSearch}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            title="清除搜索"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
+      <div className="ml-auto flex items-center gap-1.5">
         <Button
           variant="ghost"
           size="sm"
@@ -123,14 +119,3 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
     </header>
   );
 });
-
-function filterTitle(filter, collections) {
-  if (!filter) return '全部条目';
-  if (filter.search) return `搜索: "${filter.search}"`;
-  if (filter.journal) return filter.journal;
-  if (filter.collection) {
-    const c = collections?.find(c => c.key === filter.collection);
-    return c?.name || '集合视图';
-  }
-  return '全部条目';
-}

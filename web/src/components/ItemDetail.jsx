@@ -6,7 +6,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose,
 } from '@/components/ui/dialog';
@@ -109,6 +108,46 @@ const FIELD_LABELS = {
 };
 
 const CREATOR_TYPES = ['author', 'editor', 'translator', 'contributor'];
+
+// Fields that should span the full row in the two-column grid (long content).
+const FULL_WIDTH_FIELDS = new Set([
+  'title', 'abstractNote', 'extra', 'url',
+  'publicationTitle', 'bookTitle', 'conferenceName', 'proceedingsTitle',
+  'publisher', 'university', 'repository', 'place', 'series',
+]);
+
+const Field = memo(function Field({ name, value, onChange, multiline }) {
+  return (
+    <div className={FULL_WIDTH_FIELDS.has(name) ? 'col-span-2' : ''}>
+      <Label className="text-xs text-muted-foreground">{FIELD_LABELS[name] || name}</Label>
+      {multiline ? (
+        <Textarea
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          className="mt-1 min-h-[100px] text-sm"
+        />
+      ) : (
+        <Input
+          value={value || ''}
+          onChange={e => onChange(e.target.value)}
+          className="mt-1 h-8 text-sm"
+        />
+      )}
+    </div>
+  );
+});
+
+const Section = memo(function Section({ title, action, children }) {
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+});
 
 function ExportModal({ open, onOpenChange, format, content }) {
   const [copied, setCopied] = useState(false);
@@ -327,17 +366,14 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
         <TabsContent value="detail" className="min-h-0 flex-1 overflow-hidden mt-2">
           <ScrollArea className="h-full">
-            <div className="space-y-3 px-3 pb-4">
+            <div className="space-y-4 px-4 pb-6">
               {/* Basic info */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">基本信息</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div>
-                    <Label className="text-xs">类型</Label>
+              <Section title="基本信息">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  <div className="col-span-2">
+                    <Label className="text-xs text-muted-foreground">类型</Label>
                     <Select value={draft.itemType} onValueChange={setItemType}>
-                      <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {ITEM_TYPES.map(t => (
                           <SelectItem key={t} value={t}>{ITEM_TYPE_LABELS[t] || t}</SelectItem>
@@ -346,85 +382,67 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                     </Select>
                   </div>
                   {fields.basic?.map(name => (
-                    <div key={name}>
-                      <Label className="text-xs">{FIELD_LABELS[name] || name}</Label>
-                      <Input
-                        value={draft.fields[name] || ''}
-                        onChange={e => setField(name, e.target.value)}
-                        className="h-8 text-sm mt-1"
-                      />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Publication info */}
-              {fields.publication && fields.publication.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">发表信息</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {fields.publication.map(name => (
-                      <div key={name}>
-                        <Label className="text-xs">{FIELD_LABELS[name] || name}</Label>
-                        <Input
-                          value={draft.fields[name] || ''}
-                          onChange={e => setField(name, e.target.value)}
-                          className="h-8 text-sm mt-1"
-                        />
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Identifiers */}
-              {fields.identifiers && fields.identifiers.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">标识符</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {fields.identifiers.map(name => (
-                      <div key={name}>
-                        <Label className="text-xs">{FIELD_LABELS[name] || name}</Label>
-                        <Input
-                          value={draft.fields[name] || ''}
-                          onChange={e => setField(name, e.target.value)}
-                          className="h-8 text-sm mt-1"
-                        />
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Abstract */}
-              {fields.abstract && fields.abstract.includes('abstractNote') && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">摘要</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Textarea
-                      value={draft.fields.abstractNote || ''}
-                      onChange={e => setField('abstractNote', e.target.value)}
-                      className="min-h-[120px] text-sm"
+                    <Field
+                      key={name}
+                      name={name}
+                      value={draft.fields[name]}
+                      onChange={v => setField(name, v)}
                     />
-                  </CardContent>
-                </Card>
+                  ))}
+                </div>
+              </Section>
+
+              {fields.publication && fields.publication.length > 0 && (
+                <Section title="发表信息">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                    {fields.publication.map(name => (
+                      <Field
+                        key={name}
+                        name={name}
+                        value={draft.fields[name]}
+                        onChange={v => setField(name, v)}
+                      />
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {fields.identifiers && fields.identifiers.length > 0 && (
+                <Section title="标识符">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                    {fields.identifiers.map(name => (
+                      <Field
+                        key={name}
+                        name={name}
+                        value={draft.fields[name]}
+                        onChange={v => setField(name, v)}
+                      />
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {fields.abstract && fields.abstract.includes('abstractNote') && (
+                <Section title="摘要">
+                  <Field
+                    name="abstractNote"
+                    value={draft.fields.abstractNote}
+                    onChange={v => setField('abstractNote', v)}
+                    multiline
+                  />
+                </Section>
               )}
 
               {/* Creators */}
-              <Card>
-                <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-medium">作者</CardTitle>
+              <Section
+                title="作者"
+                action={
                   <Button size="sm" variant="ghost" onClick={addCreator} className="h-7 text-xs">
                     <Plus className="size-3.5" /> 添加
                   </Button>
-                </CardHeader>
-                <CardContent className="space-y-2">
+                }
+              >
+                <div className="space-y-2">
                   {creatorsDraft.map((c, idx) => (
                     <div key={idx} className="flex items-start gap-2">
                       <div className="flex-1 grid grid-cols-2 gap-2">
@@ -490,44 +508,28 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                   {creatorsDraft.length === 0 && (
                     <div className="text-xs text-muted-foreground">暂无作者</div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </Section>
 
-              {/* Extra */}
               {fields.extra && fields.extra.length > 0 && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium">其他</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
+                <Section title="其他">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                     {fields.extra.map(name => (
-                      <div key={name}>
-                        <Label className="text-xs">{FIELD_LABELS[name] || name}</Label>
-                        {name === 'extra' ? (
-                          <Textarea
-                            value={draft.fields[name] || ''}
-                            onChange={e => setField(name, e.target.value)}
-                            className="min-h-[80px] text-sm mt-1"
-                          />
-                        ) : (
-                          <Input
-                            value={draft.fields[name] || ''}
-                            onChange={e => setField(name, e.target.value)}
-                            className="h-8 text-sm mt-1"
-                          />
-                        )}
-                      </div>
+                      <Field
+                        key={name}
+                        name={name}
+                        value={draft.fields[name]}
+                        onChange={v => setField(name, v)}
+                        multiline={name === 'extra'}
+                      />
                     ))}
-                  </CardContent>
-                </Card>
+                  </div>
+                </Section>
               )}
 
               {/* Attachments */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">附件</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1">
+              <Section title="附件">
+                <div className="space-y-1">
                   {(attachments || []).map(a => {
                     const isPdf = (a.contentType || '').includes('pdf');
                     const filename = a.path ? a.path.split('/').pop() : a.key;
@@ -549,8 +551,8 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                   {(attachments || []).length === 0 && (
                     <div className="text-xs text-muted-foreground">无附件</div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </Section>
             </div>
           </ScrollArea>
         </TabsContent>

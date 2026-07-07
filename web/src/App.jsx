@@ -17,7 +17,7 @@ import { ItemDetail } from '@/components/ItemDetail';
 import { TopBar } from '@/components/TopBar';
 import { cn } from '@/lib/utils';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
-import { ChevronRight, ChevronLeft } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 const MIN_SIDEBAR = 180;
 const MAX_SIDEBAR = 360;
@@ -32,11 +32,11 @@ export default function App() {
 
   // Left sidebar
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(220);
+  const [sidebarWidth, setSidebarWidth] = useState(260);
 
   // Right detail panel (persistent, not Sheet)
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detailWidth, setDetailWidth] = useState(400);
+  const [detailWidth, setDetailWidth] = useState(520);
   const [detailDirty, setDetailDirty] = useState(false);
 
   // Confirm switch when dirty
@@ -201,16 +201,22 @@ export default function App() {
   }, []);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen w-screen overflow-hidden bg-background">
       {/* Left sidebar */}
       <div
         className={cn(
           'shrink-0 border-r bg-muted/30 overflow-hidden',
-          isSidebarResizing ? 'transition-none' : 'transition-[width] duration-200',
+          isSidebarResizing ? '' : 'transition-[width] duration-300 ease-out',
         )}
         style={{ width: sidebarOpen ? Math.max(MIN_SIDEBAR, sidebarWidth) : 0 }}
       >
-        <div className="flex h-full w-full" style={{ minWidth: MIN_SIDEBAR }}>
+        <div
+          className={cn(
+            'flex h-full transition-[opacity,transform] duration-300 ease-out',
+            sidebarOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4',
+          )}
+          style={{ minWidth: MIN_SIDEBAR }}
+        >
           <Sidebar
             filter={filter}
             onFilterChange={onFilterChange}
@@ -246,7 +252,6 @@ export default function App() {
           onImported={onImported}
           refreshItems={refreshItems}
           onSearch={onSearch}
-          sidebarVersion={sidebarVersion}
           fileInputRef={fileInputRef}
         />
         <div className="flex-1 overflow-hidden">
@@ -259,48 +264,54 @@ export default function App() {
         </div>
       </main>
 
-      {/* Detail panel resize handle (left edge of detail panel) */}
+      {/* Right detail panel — floats over the main content, does not affect layout */}
       {detailOpen && (
-        <div
-          onMouseDown={startDetailResize}
-          className="w-1 shrink-0 bg-border cursor-col-resize hover:bg-primary/40 active:bg-primary/60 transition-colors"
-        />
-      )}
-
-      {/* Right detail panel */}
-      {detailOpen && (
-        <div
-          className={cn(
-            'shrink-0 border-l bg-background flex flex-col overflow-hidden',
-            isDetailResizing ? 'transition-none' : 'transition-[width] duration-200',
-          )}
-          style={{ width: Math.max(MIN_DETAIL, detailWidth) }}
-        >
-          {/* Detail panel header with collapse button */}
-          <div className="flex h-10 items-center justify-end border-b px-2">
-            <button
-              onClick={() => { setDetailOpen(false); setSelectedKey(null); }}
-              className="rounded p-1 text-muted-foreground hover:text-foreground transition-colors"
-              title="关闭详情"
-            >
-              <ChevronLeft className="size-4" />
-            </button>
+        <>
+          {/* Click-outside scrim: clicking anywhere outside the panel closes it */}
+          <button
+            type="button"
+            aria-label="关闭详情"
+            tabIndex={-1}
+            onClick={() => {
+              if (detailDirty) {
+                toast.message('当前条目有未保存的修改', { description: '请先保存或放弃修改后再关闭。' });
+                return;
+              }
+              setDetailOpen(false);
+              setSelectedKey(null);
+            }}
+            className="absolute inset-0 z-20 cursor-default bg-black/15 animate-in fade-in duration-150"
+          />
+          <div
+            className={cn(
+              'absolute right-3 top-3 bottom-3 z-30 flex rounded-lg',
+              isDetailResizing ? '' : 'transition-[width] duration-200 ease-out',
+            )}
+            style={{ width: Math.max(MIN_DETAIL, detailWidth) }}
+          >
+            {/* Left-edge resize handle */}
+            <div
+              onMouseDown={startDetailResize}
+              className="w-1 shrink-0 cursor-col-resize rounded-l-lg bg-transparent hover:bg-primary/40 active:bg-primary/60 transition-colors"
+            />
+            <div className="relative flex h-full flex-1 flex-col rounded-r-lg border bg-background shadow-2xl overflow-hidden animate-in slide-in-from-right-full duration-200">
+              {selectedKey ? (
+                <div className="min-h-0 flex-1 overflow-hidden">
+                  <ItemDetail
+                    itemKey={selectedKey}
+                    onDeleted={onItemDeleted}
+                    onChanged={refreshItems}
+                    onDirtyChange={setDetailDirty}
+                  />
+                </div>
+              ) : (
+                <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground text-sm">
+                  请在左侧选择一个条目
+                </div>
+              )}
+            </div>
           </div>
-          {selectedKey ? (
-            <div className="flex-1 overflow-hidden">
-              <ItemDetail
-                itemKey={selectedKey}
-                onDeleted={onItemDeleted}
-                onChanged={refreshItems}
-                onDirtyChange={setDetailDirty}
-              />
-            </div>
-          ) : (
-            <div className="flex flex-1 items-center justify-center text-muted-foreground text-sm">
-              请在左侧选择一个条目
-            </div>
-          )}
-        </div>
+        </>
       )}
 
       {/* Confirm switch away from dirty item */}

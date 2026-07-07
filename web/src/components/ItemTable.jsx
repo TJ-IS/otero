@@ -1,11 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
-import { ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle } from '@/lib/items';
+import { ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle, filterTitle } from '@/lib/items';
 import {
   FileText, BookOpen, GraduationCap, BookMarked, Presentation,
   File, ChevronUp, ChevronDown,
@@ -21,6 +21,8 @@ const TYPE_ICONS = {
   report: <File className="size-3.5 shrink-0" />,
   document: <FileText className="size-3.5 shrink-0" />,
 };
+
+const ROW_HEIGHT = 37;
 
 function highlight(text, query) {
   if (!query || !text) return text || '';
@@ -47,10 +49,11 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     () => api.listItems({ type: filter?.type, journal: filter?.journal, collection: filter?.collection, search: filter?.search }),
     [filter?.type, filter?.journal, filter?.collection, filter?.search, version],
   );
+  const { data: collections } = useAsync(() => api.listCollections(), []);
 
   const [sortField, setSortField] = useState('dateModified');
   const [sortDir, setSortDir] = useState('desc');
-  const tableRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const sortedItems = useMemo(() => {
     if (!items) return [];
@@ -74,6 +77,20 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     });
   }, [items, sortField, sortDir]);
 
+  // O(1) key -> index lookup for keyboard nav and scroll-into-view
+  const keyToIndex = useMemo(() => {
+    const m = new Map();
+    for (let i = 0; i < sortedItems.length; i++) m.set(sortedItems[i].key, i);
+    return m;
+  }, [sortedItems]);
+
+  const virtualizer = useVirtualizer({
+    count: sortedItems.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 8,
+  });
+
   const toggleSort = useCallback((field) => {
     setSortField(prev => {
       if (prev === field) {
@@ -88,7 +105,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
   // Keyboard navigation
   const onKeyDown = useCallback((e) => {
     if (!sortedItems.length) return;
-    const current = sortedItems.findIndex(it => it.key === selectedKey);
+    const current = selectedKey != null ? (keyToIndex.get(selectedKey) ?? -1) : -1;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       const next = Math.min(sortedItems.length - 1, current + 1);
@@ -100,14 +117,14 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     } else if (e.key === 'Enter' && selectedKey) {
       e.preventDefault();
     }
-  }, [sortedItems, selectedKey, onSelect]);
+  }, [sortedItems, selectedKey, keyToIndex, onSelect]);
 
-  // Scroll selected row into view
+  // Scroll selected row into view via virtualizer (row may not be mounted)
   useEffect(() => {
-    if (!selectedKey || !tableRef.current) return;
-    const row = tableRef.current.querySelector(`[data-key="${selectedKey}"]`);
-    row?.scrollIntoView({ block: 'nearest' });
-  }, [selectedKey]);
+    if (selectedKey == null) return;
+    const idx = keyToIndex.get(selectedKey);
+    if (idx !== undefined) virtualizer.scrollToIndex(idx, { align: 'auto' });
+  }, [selectedKey, keyToIndex, virtualizer]);
 
   if (error) {
     return <div className="p-4 text-sm text-destructive">加载失败: {error.message}</div>;
@@ -115,35 +132,44 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
 
   const hasActiveFilter = filter?.search || filter?.journal || filter?.collection;
   const searchQuery = filter?.search || '';
+  const title = filterTitle(filter, collections);
 
   const thClass = 'px-3 py-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors';
 
+  const virtualItems = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const paddingBottom = virtualItems.length > 0 ? totalSize - virtualItems[virtualItems.length - 1].end : 0;
+
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b px-4 py-2 text-sm text-muted-foreground">
-        <span>{loading ? '加载中...' : `${sortedItems.length} 个条目`}</span>
+      <div className="flex items-baseline justify-between gap-3 border-b px-4 py-2">
+        <span className="truncate text-sm font-medium" title={title}>{title}</span>
+        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+          {loading ? '加载中...' : `${sortedItems.length} 个条目`}
+        </span>
       </div>
       <div
-        ref={tableRef}
+        ref={scrollRef}
         className="min-h-0 flex-1 overflow-auto outline-none"
         tabIndex={0}
         onKeyDown={onKeyDown}
       >
-        <table className="w-full text-sm">
+        <table className="w-full table-fixed text-sm">
           <thead className="sticky top-0 z-10 bg-background">
             <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <th className={cn(thClass, 'max-w-[420px]')} onClick={() => toggleSort('title')}>
+              <th className={cn(thClass, 'w-auto')} onClick={() => toggleSort('title')}>
                 <span className="inline-flex items-center">
                   标题 <SortIcon field="title" sortField={sortField} sortDir={sortDir} />
                 </span>
               </th>
-              <th className={cn(thClass, 'max-w-[200px]')}>作者</th>
-              <th className={cn(thClass, 'w-20')} onClick={() => toggleSort('date')}>
+              <th className={cn(thClass, 'w-40')}>作者</th>
+              <th className={cn(thClass, 'w-16')} onClick={() => toggleSort('date')}>
                 <span className="inline-flex items-center">
                   年份 <SortIcon field="date" sortField={sortField} sortDir={sortDir} />
                 </span>
               </th>
-              <th className={cn(thClass, 'w-36')} onClick={() => toggleSort('itemType')}>
+              <th className={cn(thClass, 'w-32')} onClick={() => toggleSort('itemType')}>
                 <span className="inline-flex items-center">
                   类型 <SortIcon field="itemType" sortField={sortField} sortDir={sortDir} />
                 </span>
@@ -152,29 +178,46 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
           </thead>
           <tbody>
             {loading && (items || []).length === 0 && <TableSkeleton />}
-            {sortedItems.map(it => {
+            {!loading && sortedItems.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-3 py-16 text-center text-muted-foreground">
+                  {hasActiveFilter
+                    ? '没有匹配的条目，请尝试调整筛选条件'
+                    : '暂无条目，点击右上角"导入 PDF"开始'}
+                </td>
+              </tr>
+            )}
+            {paddingTop > 0 && (
+              <tr key="__pad-top" aria-hidden="true" style={{ height: paddingTop }}>
+                <td colSpan={4} style={{ padding: 0, border: 'none' }} />
+              </tr>
+            )}
+            {virtualItems.map(virtualRow => {
+              const it = sortedItems[virtualRow.index];
               const title = itemTitle(it);
               const authors = creatorsList(it.creators) || '';
               return (
                 <tr
                   key={it.key}
                   data-key={it.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
                   onClick={() => onSelect(it.key)}
                   className={cn(
                     'cursor-pointer border-b transition-colors hover:bg-accent/60',
                     selectedKey === it.key && 'bg-primary/10 text-foreground',
                   )}
                 >
-                  <td className="max-w-[420px] truncate px-3 py-2" title={title}>
+                  <td className="truncate px-3 py-2" title={title}>
                     {highlight(title, searchQuery)}
                   </td>
-                  <td className="max-w-[200px] truncate px-3 py-2 text-muted-foreground" title={authors}>
+                  <td className="w-40 truncate px-3 py-2 text-muted-foreground" title={authors}>
                     {authors ? highlight(authors, searchQuery) : '—'}
                   </td>
-                  <td className="w-20 px-3 py-2 text-muted-foreground tabular-nums">
+                  <td className="w-16 px-3 py-2 text-muted-foreground tabular-nums">
                     {yearOf(it.fields?.date) || '—'}
                   </td>
-                  <td className="w-36 px-3 py-2">
+                  <td className="w-32 px-3 py-2">
                     <Badge variant="secondary" className="inline-flex items-center gap-1 font-normal">
                       {TYPE_ICONS[it.itemType]}
                       {ITEM_TYPE_LABELS[it.itemType] || it.itemType}
@@ -183,13 +226,9 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                 </tr>
               );
             })}
-            {!loading && sortedItems.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-3 py-16 text-center text-muted-foreground">
-                  {hasActiveFilter
-                    ? '没有匹配的条目，请尝试调整筛选条件'
-                    : '暂无条目，点击右上角"导入 PDF"开始'}
-                </td>
+            {paddingBottom > 0 && (
+              <tr key="__pad-bottom" aria-hidden="true" style={{ height: paddingBottom }}>
+                <td colSpan={4} style={{ padding: 0, border: 'none' }} />
               </tr>
             )}
           </tbody>

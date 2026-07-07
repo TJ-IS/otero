@@ -42,3 +42,15 @@ export function yearOf(dateStr) {
 export function itemTitle(item) {
   return item?.fields?.title || '(无标题)';
 }
+
+// Human-readable label for the active list filter.
+export function filterTitle(filter, collections) {
+  if (!filter) return '全部条目';
+  if (filter.search) return `搜索: "${filter.search}"`;
+  if (filter.journal) return filter.journal;
+  if (filter.collection) {
+    const c = collections?.find(c => c.key === filter.collection);
+    return c?.name || '集合视图';
+  }
+  return '全部条目';
+}
