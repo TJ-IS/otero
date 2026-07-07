@@ -8,7 +8,6 @@ import {
   insertItemRow, getItemRow, getItemByKey, listItems as repoListItems,
   setItemField, deleteItemField, getItemFields, getItemField,
   setItemCreators, getItemCreators,
-  setItemTags, getItemTags,
   setItemDeleted, updateItemModifiedDate,
 } from '../repositories/itemRepo.js';
 
@@ -24,10 +23,8 @@ export class Item extends DataObject {
     this._parentItemID = opts.parentItemID ?? null;
     this._fieldValues = opts.fields ?? {};        // name -> string
     this._creators = opts.creators ?? [];         // [{firstName,lastName,fieldMode,creatorType,orderIndex}]
-    this._tags = opts.tags ?? [];                 // [{tag,type}]
     this._changedFields = new Set();
     this._creatorsChanged = !!opts.creators;
-    this._tagsChanged = !!opts.tags;
   }
 
   // ---- type ---------------------------------------------------------------
@@ -76,19 +73,6 @@ export class Item extends DataObject {
     return this;
   }
 
-  // ---- tags ---------------------------------------------------------------
-  get tags() { return this._tags.slice(); }
-  setTags(list) {
-    this._tags = list.map(t => (typeof t === 'string' ? { tag: t, type: 0 } : { tag: t.tag, type: t.type ?? 0 }));
-    this._tagsChanged = true;
-    return this;
-  }
-  addTag(tag, type = 0) {
-    this._tags.push({ tag, type });
-    this._tagsChanged = true;
-    return this;
-  }
-
   // ---- persistence --------------------------------------------------------
   save() {
     if (this._itemTypeID == null) throw new Error('Item.itemType must be set before save');
@@ -111,7 +95,6 @@ export class Item extends DataObject {
           setItemField(id, fid, value);
         }
         if (this._creators.length) setItemCreators(this._id, this._creators.map((c, i) => ({ ...c, orderIndex: c.orderIndex ?? i })));
-        if (this._tags.length) setItemTags(this._id, this._tags);
       } else {
         // Update existing row.
         db.prepare(`UPDATE items SET itemTypeID=?, parentItemID=?, dateModified=datetime('now') WHERE itemID=?`)
@@ -129,13 +112,11 @@ export class Item extends DataObject {
           }
         }
         if (this._creatorsChanged) setItemCreators(this._id, this._creators.map((c, i) => ({ ...c, orderIndex: c.orderIndex ?? i })));
-        if (this._tagsChanged) setItemTags(this._id, this._tags);
         updateItemModifiedDate(this._id);
       }
     });
     this._changedFields.clear();
     this._creatorsChanged = false;
-    this._tagsChanged = false;
     return this;
   }
 
@@ -157,7 +138,6 @@ export class Item extends DataObject {
       parentItemID: this._parentItemID,
       fields: { ...this._fieldValues },
       creators: this._creators,
-      tags: this._tags,
     };
   }
 
@@ -179,7 +159,6 @@ function _rowToItem(row) {
   const fields = {};
   for (const f of getItemFields(row.itemID)) fields[f.name] = f.value;
   const creators = getItemCreators(row.itemID);
-  const tags = getItemTags(row.itemID);
   return new Item({
     id: row.itemID,
     key: row.key,
@@ -192,7 +171,6 @@ function _rowToItem(row) {
     parentItemID: row.parentItemID,
     fields,
     creators,
-    tags,
   });
 }
 

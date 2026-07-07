@@ -4,7 +4,6 @@ import { seed } from '../db/seed.js';
 import { importPdf } from '../services/importService.js';
 import { Items } from '../models/Item.js';
 import { Collections } from '../models/Collection.js';
-import { Tag } from '../models/Tag.js';
 import { closeDb } from '../db/connection.js';
 import { startServer } from '../api/server.js';
 
@@ -61,14 +60,12 @@ program
   .command('list')
   .description('List items in the library')
   .option('--type <type>', 'filter by item type (e.g. journalArticle)')
-  .option('--tag <tag>', 'filter by tag name')
   .option('--collection <key>', 'filter by collection key')
   .option('--include-deleted', 'include soft-deleted items')
   .action((opts) => {
     runMigrations();
     const items = Items.list({
       type: opts.type,
-      tag: opts.tag,
       collection: opts.collection,
       includeDeleted: opts.includeDeleted,
       topLevelOnly: true,
@@ -93,17 +90,6 @@ program
     runMigrations();
     for (const c of Collections.list()) {
       console.log(`${c.key}\t${c.name}`);
-    }
-    closeDb();
-  });
-
-program
-  .command('tags')
-  .description('List tags with item counts')
-  .action(() => {
-    runMigrations();
-    for (const t of Tag.list()) {
-      console.log(`${t.name}\t${t.itemCount}`);
     }
     closeDb();
   });

@@ -55,33 +55,4 @@ export function getCollectionItems(collectionID) {
   `).all(collectionID);
 }
 
-// ---------------------------------------------------------------------------
-// Tags
-// ---------------------------------------------------------------------------
-export function listTags() {
-  return getDb().prepare(`
-    SELECT t.tagID, t.name, COUNT(it.itemID) AS itemCount
-    FROM tags t
-    LEFT JOIN itemTags it ON it.tagID = t.tagID
-    GROUP BY t.tagID, t.name
-    ORDER BY t.name
-  `).all();
-}
 
-export function getTagByName(name) {
-  return getDb().prepare('SELECT * FROM tags WHERE name=?').get(name);
-}
-
-export function getOrCreateTag(name) {
-  const existing = getTagByName(name);
-  if (existing) return existing.tagID;
-  const info = getDb().prepare('INSERT OR IGNORE INTO tags(name) VALUES (?)').run(name);
-  return info.lastInsertRowid ?? getTagByName(name).tagID;
-}
-
-export function deleteTag(tagID) {
-  tx(() => {
-    getDb().prepare('DELETE FROM itemTags WHERE tagID=?').run(tagID);
-    getDb().prepare('DELETE FROM tags WHERE tagID=?').run(tagID);
-  });
-}

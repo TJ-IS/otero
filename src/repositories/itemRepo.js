@@ -112,15 +112,12 @@ export function getItemByKey(key) {
   return getDb().prepare('SELECT * FROM items WHERE key=?').get(key);
 }
 
-export function listItems({ type, tag, collection, includeDeleted = false, topLevelOnly = false } = {}) {
+export function listItems({ type, journal, collection, search, includeDeleted = false, topLevelOnly = false } = {}) {
   const db = getDb();
-  const where = [];
+  const where = ['i.parentItemID IS NULL'];
   const params = [];
   if (!includeDeleted) {
     where.push('i.deleted = 0');
-  }
-  if (topLevelOnly) {
-    where.push('i.parentItemID IS NULL');
   }
   if (type) {
     const typeId = itemTypeIdByName(type);
@@ -128,16 +125,44 @@ export function listItems({ type, tag, collection, includeDeleted = false, topLe
     where.push('i.itemTypeID = ?');
     params.push(typeId);
   }
-  if (tag) {
-    where.push(`EXISTS (SELECT 1 FROM itemTags it JOIN tags t ON t.tagID=it.tagID WHERE it.itemID=i.itemID AND t.name=?)`);
-    params.push(tag);
+  if (journal) {
+    const jfid = fieldIdByName('publicationTitle');
+    if (jfid) {
+      where.push(`EXISTS (SELECT 1 FROM itemData d JOIN itemDataValues v ON v.valueID=d.valueID WHERE d.itemID=i.itemID AND d.fieldID=? AND v.value=?)`);
+      params.push(jfid, journal);
+    }
   }
   if (collection) {
     where.push(`EXISTS (SELECT 1 FROM collectionItems ci JOIN collections c ON c.collectionID=ci.collectionID WHERE ci.itemID=i.itemID AND c.key=?)`);
     params.push(collection);
   }
-  const sql = `SELECT i.* FROM items i ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY i.dateAdded DESC`;
+  if (search && search.trim()) {
+    const like = `%${search.trim()}%`;
+    // Search across title, DOI, publicationTitle, abstract, and author names
+    where.push(`(
+      EXISTS (SELECT 1 FROM itemData d1 JOIN itemDataValues v1 ON v1.valueID=d1.valueID WHERE d1.itemID=i.itemID AND v1.value LIKE ?)
+      OR EXISTS (SELECT 1 FROM itemCreators ic2 JOIN creators c2 ON c2.creatorID=ic2.creatorID WHERE ic2.itemID=i.itemID AND (c2.firstName || ' ' || c2.lastName LIKE ? OR c2.lastName LIKE ? OR c2.firstName LIKE ?))
+    )`);
+    params.push(like, like, like, like);
+  }
+  const sql = `SELECT i.* FROM items i WHERE ${where.join(' AND ')} ORDER BY i.dateAdded DESC`;
   return db.prepare(sql).all(...params);
+}
+
+export function listJournals() {
+  const db = getDb();
+  const jfid = fieldIdByName('publicationTitle');
+  if (!jfid) return [];
+  return db.prepare(`
+    SELECT v.value AS name, COUNT(*) AS itemCount
+    FROM itemData d
+    JOIN itemDataValues v ON v.valueID = d.valueID
+    JOIN items i ON i.itemID = d.itemID
+    WHERE d.fieldID = ? AND i.deleted = 0 AND i.parentItemID IS NULL
+      AND v.value IS NOT NULL AND v.value != ''
+    GROUP BY v.value
+    ORDER BY v.value
+  `).all(jfid);
 }
 
 export function setItemDeleted(itemId, deleted) {
@@ -236,37 +261,6 @@ export function getItemCreators(itemId) {
     JOIN creatorTypes ct ON ct.creatorTypeID = ic.creatorTypeID
     WHERE ic.itemID = ?
     ORDER BY ic.orderIndex
-  `).all(itemId);
-}
-
-// ---------------------------------------------------------------------------
-// tags
-// ---------------------------------------------------------------------------
-export function setItemTags(itemId, tags) {
-  // tags: [{ tag, type }]
-  const db = getDb();
-  tx(() => {
-    db.prepare('DELETE FROM itemTags WHERE itemID=?').run(itemId);
-    const findTag = db.prepare('SELECT tagID FROM tags WHERE name=?');
-    const insTag = db.prepare('INSERT OR IGNORE INTO tags(name) VALUES (?)');
-    const insItemTag = db.prepare('INSERT OR REPLACE INTO itemTags(itemID, tagID, type) VALUES (?, ?, ?)');
-    for (const t of tags) {
-      const name = String(t.tag).trim();
-      if (!name) continue;
-      insTag.run(name);
-      const tagId = findTag.get(name).tagID;
-      insItemTag.run(itemId, tagId, t.type ?? 0);
-    }
-  });
-}
-
-export function getItemTags(itemId) {
-  const db = getDb();
-  return db.prepare(`
-    SELECT t.name AS tag, it.type FROM itemTags it
-    JOIN tags t ON t.tagID = it.tagID
-    WHERE it.itemID = ?
-    ORDER BY t.name
   `).all(itemId);
 }
 

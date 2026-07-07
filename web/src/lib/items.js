@@ -31,9 +31,11 @@ export function creatorsList(creators) {
   return (creators || []).map(creatorDisplay).join('; ');
 }
 
+const YEAR_RE = /\b(1[5-9]|20)\d{2}\b/;
+
 export function yearOf(dateStr) {
   if (!dateStr) return '';
-  const m = String(dateStr).match(/\b(1[5-9]|20)\d{2}\b/);
+  const m = String(dateStr).match(YEAR_RE);
   return m ? m[0] : '';
 }
 

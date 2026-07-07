@@ -62,7 +62,6 @@ export async function importPdf(pdfPath, opts = {}) {
     catch { /* field not in schema or not allowed for this type — skip */ }
   }
   for (const c of mapped.creators) parent.addCreator(c);
-  for (const t of mapped.tags) parent.addTag(t, 1);
   parent.save();
 
   getDb().prepare('UPDATE items SET parentItemID=? WHERE itemID=?').run(parent.id, attachment.id);

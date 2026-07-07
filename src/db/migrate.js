@@ -19,6 +19,12 @@ export function runMigrations() {
   const sql = fs.readFileSync(SCHEMA_PATH, 'utf8');
   db.exec(sql);
 
+  // Migration v1: remove tag tables
+  db.exec(`
+    DROP TABLE IF EXISTS itemTags;
+    DROP TABLE IF EXISTS tags;
+  `);
+
   const row = db.prepare('SELECT version FROM schemaVersion ORDER BY version DESC LIMIT 1').get();
   const current = row?.version ?? 0;
   if (current < TARGET_VERSION) {

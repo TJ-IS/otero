@@ -1,5 +1,5 @@
 /**
- * Base class for Otero data objects (Item, Collection, Tag, ...).
+ * Base class for Otero data objects (Item, Collection, ...).
  * Mirrors the very small subset of Zotero.DataObject that we need:
  * id, key, dateAdded, dateModified, version, deleted.
  */

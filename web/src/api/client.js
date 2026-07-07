@@ -21,14 +21,24 @@ async function req(path, opts = {}) {
 
 export const api = {
   // Items
-  listItems({ type, tag, collection, topLevel = true, includeDeleted = false } = {}) {
+  listItems({ type, journal, collection, search, topLevel = true, includeDeleted = false } = {}) {
     const qs = new URLSearchParams();
     if (type) qs.set('type', type);
-    if (tag) qs.set('tag', tag);
+    if (journal) qs.set('journal', journal);
     if (collection) qs.set('collection', collection);
+    if (search) qs.set('search', search);
     qs.set('topLevel', String(topLevel));
     if (includeDeleted) qs.set('includeDeleted', 'true');
     return req(`/api/items?${qs.toString()}`).then(r => r.items);
+  },
+  async fetchItemExport(key, format = 'bibtex') {
+    const res = await fetch(`/api/items/${key}/export?format=${format}`);
+    if (!res.ok) {
+      let detail;
+      try { detail = (await res.json()).error; } catch { detail = res.statusText; }
+      throw new Error(`${res.status} ${detail || ''}`.trim());
+    }
+    return res.text();
   },
   getItem(key) { return req(`/api/items/${key}`); },
   getItemAttachments(key) { return req(`/api/items/${key}/attachments`).then(r => r.attachments); },
@@ -55,9 +65,8 @@ export const api = {
     });
   },
 
-  // Tags
-  listTags() { return req('/api/tags').then(r => r.tags); },
-  deleteTag(id) { return req(`/api/tags/${id}`, { method: 'DELETE' }); },
+  // Journals
+  listJournals() { return req('/api/journals').then(r => r.journals); },
 
   // Import
   uploadPdf(file) {

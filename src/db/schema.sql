@@ -116,23 +116,6 @@ CREATE TABLE IF NOT EXISTS collectionItems (
 );
 
 -- ---------------------------------------------------------------------------
--- Tags
--- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS tags (
-  tagID INTEGER PRIMARY KEY AUTOINCREMENT,
-  name  TEXT NOT NULL UNIQUE
-);
-
-CREATE TABLE IF NOT EXISTS itemTags (
-  itemID INTEGER NOT NULL REFERENCES items(itemID) ON DELETE CASCADE,
-  tagID  INTEGER NOT NULL REFERENCES tags(tagID) ON DELETE CASCADE,
-  type   INTEGER NOT NULL DEFAULT 0,   -- 0 manual, 1 automatic
-  PRIMARY KEY (itemID, tagID)
-);
-
-CREATE INDEX IF NOT EXISTS itemTags_tag_idx ON itemTags(tagID);
-
--- ---------------------------------------------------------------------------
 -- Attachments / Notes / Annotations
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS itemAttachments (

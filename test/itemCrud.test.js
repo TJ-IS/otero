@@ -6,7 +6,6 @@ import { runMigrations } from '../src/db/migrate.js';
 import { seed } from '../src/db/seed.js';
 import { Item, Items } from '../src/models/Item.js';
 import { Collection, Collections } from '../src/models/Collection.js';
-import { Tag } from '../src/models/Tag.js';
 
 function setup() {
   const db = new Database(':memory:');
@@ -25,7 +24,6 @@ test('Item CRUD: create, load, update, soft delete', () => {
     it.setField('title', 'Test Paper');
     it.setField('DOI', '10.1000/xyz');
     it.addCreator({ firstName: 'Ada', lastName: 'Lovelace', creatorType: 'author' });
-    it.addTag('computing');
     it.save();
     assert.ok(it.id);
     assert.ok(it.key);
@@ -35,7 +33,6 @@ test('Item CRUD: create, load, update, soft delete', () => {
     assert.equal(loaded.getField('DOI'), '10.1000/xyz');
     assert.equal(loaded.creators.length, 1);
     assert.equal(loaded.creators[0].lastName, 'Lovelace');
-    assert.equal(loaded.tags.length, 1);
 
     loaded.setField('date', '2024-01-01').save();
     const reloaded = Item.loadByKey(it.key);
@@ -80,27 +77,6 @@ test('Collection CRUD and addItem', () => {
     const listed = Collections.list();
     assert.equal(listed.length, 1);
     assert.equal(listed[0].name, 'ML');
-  } finally {
-    closeDb();
-  }
-});
-
-test('Tag getOrCreate and list with counts', () => {
-  setup();
-  try {
-    const it = new Item();
-    it.setItemType('journalArticle');
-    it.setField('title', 'Tagged Paper');
-    it.addTag('alpha');
-    it.addTag('beta');
-    it.save();
-
-    const tags = Tag.list();
-    const names = tags.map(t => t.name);
-    assert.ok(names.includes('alpha'));
-    assert.ok(names.includes('beta'));
-    const alpha = tags.find(t => t.name === 'alpha');
-    assert.equal(alpha.itemCount, 1);
   } finally {
     closeDb();
   }

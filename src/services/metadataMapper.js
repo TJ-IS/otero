@@ -1,6 +1,6 @@
 /**
  * Map raw recognizer outputs to a normalized shape consumed by importService:
- *   { itemType, fields: { fieldName: string }, creators: [{firstName,lastName,creatorType}|{name,creatorType}], tags: [string] }
+ *   { itemType, fields: { fieldName: string }, creators: [{firstName,lastName,creatorType}|{name,creatorType}] }
  *
  * Recognizer outputs are keyed by `source`:
  *   - crossref:    CrossRef 'message' object
@@ -60,7 +60,7 @@ function mapCrossref(message) {
   else if (message.type === 'proceedings-article') itemType = 'conferencePaper';
   else if (message.type === 'report') itemType = 'report';
 
-  return { itemType, fields, creators: crossrefAuthors(message), tags: [] };
+  return { itemType, fields, creators: crossrefAuthors(message) };
 }
 
 function mapArxiv(entry) {
@@ -79,7 +79,7 @@ function mapArxiv(entry) {
   const creators = (entry.authors || []).map(name => splitNames(name)).filter(Boolean)
     .map(c => ({ ...c, creatorType: 'author' }));
 
-  return { itemType: 'preprint', fields, creators, tags: [] };
+  return { itemType: 'preprint', fields, creators };
 }
 
 function mapOpenlibrary(entry) {
@@ -104,7 +104,7 @@ function mapOpenlibrary(entry) {
     return splitNames(name);
   }).filter(Boolean).map(c => ({ ...c, creatorType: 'author' }));
 
-  return { itemType: 'book', fields, creators, tags: (entry.subjects || []).slice(0, 5).map(s => s.name || s) };
+  return { itemType: 'book', fields, creators };
 }
 
 function mapFallback(fb) {
@@ -114,7 +114,7 @@ function mapFallback(fb) {
   if (fb.doi) fields.DOI = fb.doi;
   if (fb.abstractNote) fields.abstractNote = fb.abstractNote;
   const creators = (fb.authors || []).map(a => ({ ...a, creatorType: 'author' }));
-  return { itemType: 'document', fields, creators, tags: fb.tags || [], isbn: fb.isbn || null };
+  return { itemType: 'document', fields, creators, isbn: fb.isbn || null };
 }
 
 export function mapRecognized(recognized) {

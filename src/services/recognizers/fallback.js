@@ -16,7 +16,6 @@ export function fromPdfExtraction({ info, firstPageText }) {
   if (info?.author) out.authors = parseInfoAuthors(info.author);
   if (info?.doi) out.doi = info.doi;
   if (info?.subject) out.abstractNote = info.subject;
-  if (info?.keywords) out.tags = String(info.keywords).split(/[;,]/).map(s => s.trim()).filter(Boolean);
 
   // Try identifiers from the first-page text if Info dict didn't have them.
   if (!out.doi) out.doi = extractDoi(text) || null;

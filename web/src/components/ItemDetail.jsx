@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose,
+} from '@/components/ui/dialog';
 import {
   Tabs, TabsList, TabsTrigger, TabsContent,
 } from '@/components/ui/tabs';
@@ -16,95 +20,177 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save, Trash2, FileText, Plus, X, ExternalLink } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { Save, Trash2, FileText, Plus, X, ExternalLink, Download, Copy, Check, ChevronUp, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
-import { ITEM_TYPES, ITEM_TYPE_LABELS } from '@/lib/items';
+import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle } from '@/lib/items';
 
-// Common editable fields, keyed by item type. Mirrors src/db/seed.js.
+// Field definitions by type
 const FIELDS_BY_TYPE = {
-  journalArticle: ['title', 'abstractNote', 'publicationTitle', 'volume', 'issue', 'pages', 'date', 'DOI', 'ISSN', 'url', 'language', 'shortTitle', 'extra'],
-  preprint: ['title', 'abstractNote', 'date', 'DOI', 'url', 'repository', 'extra'],
-  book: ['title', 'abstractNote', 'numPages', 'series', 'volume', 'edition', 'place', 'publisher', 'date', 'ISBN', 'url', 'language', 'extra'],
-  bookSection: ['title', 'abstractNote', 'bookTitle', 'series', 'volume', 'edition', 'place', 'publisher', 'pages', 'date', 'ISBN', 'url', 'extra'],
-  conferencePaper: ['title', 'abstractNote', 'proceedingsTitle', 'conferenceName', 'place', 'publisher', 'pages', 'date', 'DOI', 'url', 'ISBN', 'extra'],
-  thesis: ['title', 'abstractNote', 'thesisType', 'university', 'place', 'date', 'numPages', 'url', 'language', 'extra'],
-  report: ['title', 'abstractNote', 'reportType', 'reportNumber', 'series', 'place', 'publisher', 'pages', 'date', 'url', 'extra'],
-  document: ['title', 'abstractNote', 'date', 'DOI', 'ISBN', 'url', 'language', 'publisher', 'extra', 'numPages', 'pages'],
+  journalArticle: {
+    basic: ['title', 'date', 'shortTitle'],
+    publication: ['publicationTitle', 'volume', 'issue', 'pages'],
+    identifiers: ['DOI', 'ISSN', 'url'],
+    abstract: ['abstractNote'],
+    extra: ['language', 'extra'],
+  },
+  preprint: {
+    basic: ['title', 'date'],
+    publication: ['repository'],
+    identifiers: ['DOI', 'url'],
+    abstract: ['abstractNote'],
+    extra: ['extra'],
+  },
+  book: {
+    basic: ['title', 'date', 'edition'],
+    publication: ['publisher', 'place', 'series', 'volume', 'numPages'],
+    identifiers: ['ISBN', 'url'],
+    abstract: ['abstractNote'],
+    extra: ['language', 'extra'],
+  },
+  bookSection: {
+    basic: ['title', 'date', 'bookTitle'],
+    publication: ['publisher', 'place', 'series', 'volume', 'pages', 'edition'],
+    identifiers: ['ISBN', 'url'],
+    abstract: ['abstractNote'],
+    extra: ['extra'],
+  },
+  conferencePaper: {
+    basic: ['title', 'date', 'conferenceName'],
+    publication: ['proceedingsTitle', 'place', 'publisher', 'pages'],
+    identifiers: ['DOI', 'ISBN', 'url'],
+    abstract: ['abstractNote'],
+    extra: ['extra'],
+  },
+  thesis: {
+    basic: ['title', 'date', 'thesisType'],
+    publication: ['university', 'place', 'numPages'],
+    identifiers: ['url'],
+    abstract: ['abstractNote'],
+    extra: ['language', 'extra'],
+  },
+  report: {
+    basic: ['title', 'date', 'reportType', 'reportNumber'],
+    publication: ['publisher', 'place', 'series', 'pages'],
+    identifiers: ['url'],
+    abstract: ['abstractNote'],
+    extra: ['extra'],
+  },
+  document: {
+    basic: ['title', 'date'],
+    publication: ['publisher', 'numPages', 'pages'],
+    identifiers: ['DOI', 'ISBN', 'url'],
+    abstract: ['abstractNote'],
+    extra: ['language', 'extra'],
+  },
 };
 
 const FIELD_LABELS = {
-  title: '标题',
-  abstractNote: '摘要',
-  publicationTitle: '期刊',
-  publicationTitleAbbrev: '期刊缩写',
-  volume: '卷',
-  issue: '期',
-  pages: '页',
-  date: '日期',
-  DOI: 'DOI',
-  ISBN: 'ISBN',
-  ISSN: 'ISSN',
-  url: 'URL',
-  accessDate: '访问日期',
-  language: '语言',
-  rights: '版权',
-  shortTitle: '短标题',
-  libraryCatalog: '目录库',
-  archive: '归档',
-  archiveLocation: '归档位置',
-  extra: '附加',
-  bookTitle: '书名',
-  conferenceName: '会议',
-  proceedingsTitle: '会议录',
-  place: '地点',
-  publisher: '出版社',
-  numPages: '页数',
-  series: '系列',
-  edition: '版次',
-  thesisType: '学位类型',
-  university: '大学',
-  reportType: '报告类型',
-  reportNumber: '报告号',
+  title: '标题', abstractNote: '摘要', publicationTitle: '期刊',
+  volume: '卷', issue: '期', pages: '页码', date: '日期',
+  DOI: 'DOI', ISBN: 'ISBN', ISSN: 'ISSN', url: 'URL',
+  language: '语言', shortTitle: '短标题', extra: '附加信息',
+  bookTitle: '书名', conferenceName: '会议名称', proceedingsTitle: '会议录',
+  place: '地点', publisher: '出版社', numPages: '页数',
+  series: '系列', edition: '版次', thesisType: '学位类型',
+  university: '大学', reportType: '报告类型', reportNumber: '报告编号',
   repository: '仓库',
-  PMID: 'PMID',
-  PMCID: 'PMCID',
 };
 
-const MULTILINE = new Set(['abstractNote', 'extra']);
+const CREATOR_TYPES = ['author', 'editor', 'translator', 'contributor'];
 
-export function ItemDetail({ itemKey, onDeleted, onChanged }) {
+function ExportModal({ open, onOpenChange, format, content }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast.success('已复制到剪贴板');
+    } catch {
+      toast.error('复制失败');
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>导出 {format === 'bibtex' ? 'BibTeX' : 'RIS'}</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 overflow-auto rounded-md border bg-muted/30 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+          {content || '加载中...'}
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <DialogClose asChild>
+            <Button variant="outline">关闭</Button>
+          </DialogClose>
+          <Button onClick={copy}>
+            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+            {copied ? '已复制' : '复制'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChanged, onDirtyChange }) {
   const { data: item, error, loading, refresh } = useAsync(() => api.getItem(itemKey), [itemKey]);
   const { data: attachments } = useAsync(() => api.getItemAttachments(itemKey), [itemKey]);
 
   const [draft, setDraft] = useState(null);
   const [creatorsDraft, setCreatorsDraft] = useState([]);
-  const [tagsDraft, setTagsDraft] = useState([]);
-  const [newTag, setNewTag] = useState('');
   const [dirty, setDirty] = useState(false);
   const [tab, setTab] = useState('detail');
   const [activePdfKey, setActivePdfKey] = useState(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState('bibtex');
+  const [exportContent, setExportContent] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
-  // Re-seed the editable draft whenever the loaded item changes.
   useEffect(() => {
     if (!item) return;
     setDraft({ fields: { ...item.fields }, itemType: item.itemType });
     setCreatorsDraft(item.creators || []);
-    setTagsDraft(item.tags || []);
     setDirty(false);
     setTab('detail');
-    setActivePdfKey(null);
-  }, [item]);
+    const pdfs = (attachments || []).filter(a => (a.contentType || '').includes('pdf'));
+    setActivePdfKey(pdfs[0]?.key || null);
+  }, [item, attachments]);
+
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty]);
 
   const pdfAttachments = (attachments || []).filter(a => (a.contentType || '').includes('pdf'));
   const previewUrl = activePdfKey ? `/api/attachments/${activePdfKey}/file` : null;
 
-  if (loading) return <div className="p-4 text-sm text-muted-foreground">加载中...</div>;
-  if (error) return <div className="p-4 text-sm text-destructive">加载失败: {error.message}</div>;
-  if (!item) return null;
-  // useEffect seeds `draft` after commit; bail until then to avoid null deref.
-  if (!draft) return null;
+  if (loading) return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">加载中...</div>;
+  if (error) return <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">加载失败: {error.message}</div>;
+  if (!item || !draft) return null;
 
   const setField = (name, value) => {
     setDraft(d => ({ ...d, fields: { ...d.fields, [name]: value } }));
@@ -126,16 +212,12 @@ export function ItemDetail({ itemKey, onDeleted, onChanged }) {
     setCreatorsDraft(list => list.filter((_, i) => i !== idx));
     setDirty(true);
   };
-  const addTag = () => {
-    const name = newTag.trim();
-    if (!name) return;
-    if (tagsDraft.some(t => t.tag === name)) return;
-    setTagsDraft(list => [...list, { tag: name, type: 0 }]);
-    setNewTag('');
-    setDirty(true);
-  };
-  const removeTag = (idx) => {
-    setTagsDraft(list => list.filter((_, i) => i !== idx));
+  const moveCreator = (idx, dir) => {
+    const newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= creatorsDraft.length) return;
+    const arr = [...creatorsDraft];
+    [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+    setCreatorsDraft(arr);
     setDirty(true);
   };
 
@@ -150,7 +232,6 @@ export function ItemDetail({ itemKey, onDeleted, onChanged }) {
         itemType: draft.itemType,
         fields: fieldsPayload,
         creators: creatorsDraft.map((c, i) => ({ ...c, orderIndex: i })),
-        tags: tagsDraft,
       });
       toast.success('已保存');
       setDirty(false);
@@ -161,8 +242,15 @@ export function ItemDetail({ itemKey, onDeleted, onChanged }) {
     }
   };
 
+  const revert = () => {
+    if (!item) return;
+    setDraft({ fields: { ...item.fields }, itemType: item.itemType });
+    setCreatorsDraft(item.creators || []);
+    setDirty(false);
+    toast.info('已恢复');
+  };
+
   const del = async () => {
-    if (!confirm('删除该条目？（移入回收站，可恢复）')) return;
     try {
       await api.deleteItem(item.key);
       onDeleted();
@@ -173,6 +261,19 @@ export function ItemDetail({ itemKey, onDeleted, onChanged }) {
 
   const fields = FIELDS_BY_TYPE[draft.itemType] || FIELDS_BY_TYPE.document;
 
+  const openExport = async (format) => {
+    if (!item) return;
+    setExportFormat(format);
+    setExportContent('');
+    setExportOpen(true);
+    try {
+      const text = await api.fetchItemExport(item.key, format);
+      setExportContent(text);
+    } catch (err) {
+      setExportContent(`导出失败: ${err.message}`);
+    }
+  };
+
   const openPreview = (attKey) => {
     setActivePdfKey(attKey);
     setTab('pdf');
@@ -180,177 +281,297 @@ export function ItemDetail({ itemKey, onDeleted, onChanged }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-start gap-2 border-b p-3">
-        <div className="flex-1">
-          <div className="text-xs text-muted-foreground">{ITEM_TYPE_LABELS[item.itemType] || item.itemType}</div>
-          <div className="text-xs text-muted-foreground">key: {item.key}</div>
+      {/* Dirty indicator bar */}
+      {dirty && (
+        <div className="bg-yellow-500/20 dark:bg-yellow-600/30 border-b border-yellow-500/40 px-3 py-1 text-xs text-yellow-900 dark:text-yellow-100 flex items-center gap-2">
+          <span className="font-medium">未保存的修改</span>
         </div>
-        <Button size="sm" variant="outline" onClick={del}>
-          <Trash2 className="size-4" /> 删除
-        </Button>
-        <Button size="sm" onClick={save} disabled={!dirty}>
-          <Save className="size-4" /> 保存
-        </Button>
+      )}
+
+      {/* Header with actions */}
+      <div className="flex flex-wrap items-start gap-2 border-b p-3">
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium text-sm" title={itemTitle(item)}>{itemTitle(item)}</div>
+          <div className="text-xs text-muted-foreground">
+            {ITEM_TYPE_LABELS[item.itemType] || item.itemType}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button size="sm" variant="outline" onClick={() => openExport('bibtex')} title="导出 BibTeX">
+            <Download className="size-3.5" />
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openExport('ris')} title="导出 RIS">
+            <Download className="size-3.5" />
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)} title="删除">
+            <Trash2 className="size-3.5" />
+          </Button>
+          {dirty && (
+            <Button size="sm" variant="outline" onClick={revert} title="取消">
+              <X className="size-3.5" />
+            </Button>
+          )}
+          <Button size="sm" onClick={save} disabled={!dirty} title="保存">
+            <Save className="size-3.5" />
+          </Button>
+        </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="flex flex-1 flex-col overflow-hidden">
-        <TabsList className="mx-3 mt-3 w-fit">
+      <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <TabsList className="mx-3 mt-2 w-fit">
           <TabsTrigger value="detail">详情</TabsTrigger>
           {pdfAttachments.length > 0 && (
-            <TabsTrigger value="pdf">PDF 预览</TabsTrigger>
+            <TabsTrigger value="pdf">PDF</TabsTrigger>
           )}
         </TabsList>
 
-        <TabsContent value="detail" className="flex-1 overflow-hidden">
+        <TabsContent value="detail" className="min-h-0 flex-1 overflow-hidden mt-2">
           <ScrollArea className="h-full">
-            <div className="space-y-4 p-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <Label className="mb-1 block">类型</Label>
-                  <Select value={draft.itemType} onValueChange={setItemType}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {ITEM_TYPES.map(t => (
-                        <SelectItem key={t} value={t}>{ITEM_TYPE_LABELS[t] || t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {fields.map(name => (
-                  <div key={name} className={MULTILINE.has(name) ? 'col-span-2' : ''}>
-                    <Label className="mb-1 block text-xs">{FIELD_LABELS[name] || name}</Label>
-                    {MULTILINE.has(name) ? (
-                      <Textarea
-                        value={draft.fields[name] || ''}
-                        onChange={e => setField(name, e.target.value)}
-                        className="min-h-[100px]"
-                      />
-                    ) : (
-                      <Input
-                        value={draft.fields[name] || ''}
-                        onChange={e => setField(name, e.target.value)}
-                      />
-                    )}
+            <div className="space-y-3 px-3 pb-4">
+              {/* Basic info */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">基本信息</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div>
+                    <Label className="text-xs">类型</Label>
+                    <Select value={draft.itemType} onValueChange={setItemType}>
+                      <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {ITEM_TYPES.map(t => (
+                          <SelectItem key={t} value={t}>{ITEM_TYPE_LABELS[t] || t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                ))}
-              </div>
+                  {fields.basic?.map(name => (
+                    <div key={name}>
+                      <Label className="text-xs">{FIELD_LABELS[name] || name}</Label>
+                      <Input
+                        value={draft.fields[name] || ''}
+                        onChange={e => setField(name, e.target.value)}
+                        className="h-8 text-sm mt-1"
+                      />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
 
-              <Separator />
+              {/* Publication info */}
+              {fields.publication && fields.publication.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">发表信息</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {fields.publication.map(name => (
+                      <div key={name}>
+                        <Label className="text-xs">{FIELD_LABELS[name] || name}</Label>
+                        <Input
+                          value={draft.fields[name] || ''}
+                          onChange={e => setField(name, e.target.value)}
+                          className="h-8 text-sm mt-1"
+                        />
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
 
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <Label>作者</Label>
-                  <Button size="sm" variant="ghost" onClick={addCreator}>
-                    <Plus className="size-4" /> 添加
+              {/* Identifiers */}
+              {fields.identifiers && fields.identifiers.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">标识符</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {fields.identifiers.map(name => (
+                      <div key={name}>
+                        <Label className="text-xs">{FIELD_LABELS[name] || name}</Label>
+                        <Input
+                          value={draft.fields[name] || ''}
+                          onChange={e => setField(name, e.target.value)}
+                          className="h-8 text-sm mt-1"
+                        />
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Abstract */}
+              {fields.abstract && fields.abstract.includes('abstractNote') && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">摘要</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Textarea
+                      value={draft.fields.abstractNote || ''}
+                      onChange={e => setField('abstractNote', e.target.value)}
+                      className="min-h-[120px] text-sm"
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Creators */}
+              <Card>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                  <CardTitle className="text-sm font-medium">作者</CardTitle>
+                  <Button size="sm" variant="ghost" onClick={addCreator} className="h-7 text-xs">
+                    <Plus className="size-3.5" /> 添加
                   </Button>
-                </div>
-                <div className="space-y-2">
+                </CardHeader>
+                <CardContent className="space-y-2">
                   {creatorsDraft.map((c, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <Input
-                        placeholder="姓"
-                        className="flex-1"
-                        value={c.lastName || ''}
-                        onChange={e => setCreator(idx, { lastName: e.target.value, fieldMode: 0 })}
-                      />
-                      <Input
-                        placeholder="名"
-                        className="flex-1"
-                        value={c.firstName || ''}
-                        onChange={e => setCreator(idx, { firstName: e.target.value, fieldMode: 0 })}
-                      />
-                      <Input
-                        placeholder="角色"
-                        className="w-28"
-                        value={c.creatorType || 'author'}
-                        onChange={e => setCreator(idx, { creatorType: e.target.value })}
-                      />
-                      <Button size="icon" variant="ghost" onClick={() => removeCreator(idx)}>
-                        <X className="size-4" />
-                      </Button>
+                    <div key={idx} className="flex items-start gap-2">
+                      <div className="flex-1 grid grid-cols-2 gap-2">
+                        <Input
+                          placeholder="姓"
+                          value={c.lastName || ''}
+                          onChange={e => setCreator(idx, { lastName: e.target.value, fieldMode: 0 })}
+                          className="h-8 text-sm"
+                        />
+                        <Input
+                          placeholder="名"
+                          value={c.firstName || ''}
+                          onChange={e => setCreator(idx, { firstName: e.target.value, fieldMode: 0 })}
+                          className="h-8 text-sm"
+                        />
+                        <div className="col-span-2">
+                          <Select
+                            value={c.creatorType || 'author'}
+                            onValueChange={v => setCreator(idx, { creatorType: v })}
+                          >
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {CREATOR_TYPES.map(t => (
+                                <SelectItem key={t} value={t}>{t}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => moveCreator(idx, -1)}
+                          disabled={idx === 0}
+                          className="h-6 w-6"
+                          title="上移"
+                        >
+                          <ChevronUp className="size-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => moveCreator(idx, 1)}
+                          disabled={idx === creatorsDraft.length - 1}
+                          className="h-6 w-6"
+                          title="下移"
+                        >
+                          <ChevronDown className="size-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => removeCreator(idx)}
+                          className="h-6 w-6"
+                          title="删除"
+                        >
+                          <X className="size-3" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                   {creatorsDraft.length === 0 && (
                     <div className="text-xs text-muted-foreground">暂无作者</div>
                   )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              <Separator />
+              {/* Extra */}
+              {fields.extra && fields.extra.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-medium">其他</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {fields.extra.map(name => (
+                      <div key={name}>
+                        <Label className="text-xs">{FIELD_LABELS[name] || name}</Label>
+                        {name === 'extra' ? (
+                          <Textarea
+                            value={draft.fields[name] || ''}
+                            onChange={e => setField(name, e.target.value)}
+                            className="min-h-[80px] text-sm mt-1"
+                          />
+                        ) : (
+                          <Input
+                            value={draft.fields[name] || ''}
+                            onChange={e => setField(name, e.target.value)}
+                            className="h-8 text-sm mt-1"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
 
-              <div>
-                <Label className="mb-2 block">标签</Label>
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {tagsDraft.map((t, idx) => (
-                    <Badge key={idx} variant="secondary" className="gap-1">
-                      {t.tag}
-                      <button onClick={() => removeTag(idx)} className="text-muted-foreground hover:text-destructive">
-                        <X className="size-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                  {tagsDraft.length === 0 && (
-                    <span className="text-xs text-muted-foreground">暂无标签</span>
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="新标签..."
-                    value={newTag}
-                    onChange={e => setNewTag(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && addTag()}
-                  />
-                  <Button size="sm" variant="outline" onClick={addTag}>添加</Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <Label className="mb-2 block">附件</Label>
-                <div className="space-y-1">
+              {/* Attachments */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">附件</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1">
                   {(attachments || []).map(a => {
                     const isPdf = (a.contentType || '').includes('pdf');
+                    const filename = a.path ? a.path.split('/').pop() : a.key;
                     return (
                       <button
                         key={a.key}
                         onClick={() => isPdf ? openPreview(a.key) : undefined}
                         disabled={!isPdf}
                         className="flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm transition-colors enabled:hover:bg-accent/60 disabled:cursor-default"
+                        title={filename}
                       >
                         <FileText className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="flex-1 truncate">{a.path}</span>
-                        <Badge variant="secondary">{a.contentType || 'file'}</Badge>
-                        {isPdf && (
-                          <ExternalLink className="size-3.5 text-muted-foreground" />
-                        )}
+                        <span className="flex-1 truncate text-xs">{filename}</span>
+                        <Badge variant="secondary" className="text-[10px]">{a.contentType || 'file'}</Badge>
+                        {isPdf && <ExternalLink className="size-3 text-muted-foreground" />}
                       </button>
                     );
                   })}
                   {(attachments || []).length === 0 && (
                     <div className="text-xs text-muted-foreground">无附件</div>
                   )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           </ScrollArea>
         </TabsContent>
 
         {pdfAttachments.length > 0 && (
-          <TabsContent value="pdf" className="flex-1 overflow-hidden p-3 pt-0">
+          <TabsContent value="pdf" className="min-h-0 flex-1 overflow-hidden p-3 pt-0">
             <div className="flex h-full flex-col gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Label className="text-xs">PDF</Label>
-                <select
-                  className="h-8 rounded-md border bg-background px-2 text-xs"
-                  value={activePdfKey || pdfAttachments[0]?.key || ''}
-                  onChange={e => setActivePdfKey(e.target.value)}
-                >
-                  {pdfAttachments.map(a => (
-                    <option key={a.key} value={a.key}>{a.path}</option>
-                  ))}
-                </select>
+                <Select value={activePdfKey || ''} onValueChange={setActivePdfKey}>
+                  <SelectTrigger className="h-7 max-w-[200px] text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pdfAttachments.map(a => (
+                      <SelectItem key={a.key} value={a.key} className="text-xs">
+                        {a.path ? a.path.split('/').pop() : a.key}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {previewUrl && (
                   <a
                     href={previewUrl}
@@ -358,7 +579,7 @@ export function ItemDetail({ itemKey, onDeleted, onChanged }) {
                     rel="noreferrer"
                     className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                   >
-                    <ExternalLink className="size-3.5" /> 新窗口打开
+                    <ExternalLink className="size-3" /> 新窗口
                   </a>
                 )}
               </div>
@@ -378,6 +599,28 @@ export function ItemDetail({ itemKey, onDeleted, onChanged }) {
           </TabsContent>
         )}
       </Tabs>
+
+      <ExportModal
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        format={exportFormat}
+        content={exportContent}
+      />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>删除该条目？</AlertDialogTitle>
+            <AlertDialogDescription>
+              移入回收站，可恢复。附件与元数据将一并标记为已删除。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={del}>删除</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
-}
+});

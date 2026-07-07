@@ -93,7 +93,6 @@ export class Attachment extends Item {
       itemTypeName: item._itemTypeName,
       fields: item._fieldValues,
       creators: item._creators,
-      tags: item._tags,
       parentItemID: row.parentItemID,
       linkMode: row.linkMode,
       contentType: row.contentType,

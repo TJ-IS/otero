@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { itemsRouter } from './routes/items.js';
 import { collectionsRouter } from './routes/collections.js';
-import { tagsRouter } from './routes/tags.js';
+import { journalsRouter } from './routes/journals.js';
 import { importRouter } from './routes/import.js';
 import { attachmentsRouter } from './routes/attachments.js';
 import { config } from '../config.js';
@@ -24,7 +24,7 @@ export function buildApp() {
 
   app.use('/api/items', itemsRouter);
   app.use('/api/collections', collectionsRouter);
-  app.use('/api/tags', tagsRouter);
+  app.use('/api/journals', journalsRouter);
   app.use('/api/import', importRouter);
   app.use('/api/attachments', attachmentsRouter);
 
