@@ -2,13 +2,13 @@ import { memo, useRef, useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, RefreshCw, Search, X, Moon, Sun } from 'lucide-react';
+import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft } from 'lucide-react';
 import { api } from '@/api/client';
 import { toast } from 'sonner';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
 import { useAsync } from '@/hooks/useAsync';
 
-export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, onSearch, fileInputRef: externalRef }) {
+export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, onSearch, sidebarOpen = false, onToggleSidebar, fileInputRef: externalRef }) {
   const internalRef = useRef(null);
   const fileInput = externalRef || internalRef;
   const searchRef = useRef(null);
@@ -72,6 +72,17 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
+      {onToggleSidebar && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onToggleSidebar}
+          title={sidebarOpen ? '折叠侧栏' : '展开侧栏'}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <PanelLeft className="size-4" />
+        </Button>
+      )}
       <div className="relative flex h-8 flex-1 max-w-md min-w-[160px] items-center">
         <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input

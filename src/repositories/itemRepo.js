@@ -1,4 +1,5 @@
 import { getDb, tx } from '../db/connection.js';
+import { JOURNAL_WHITELIST, UNFILED } from '../services/journalWhitelist.js';
 
 // ---------------------------------------------------------------------------
 // Lookup helpers for schema names <-> IDs
@@ -128,8 +129,15 @@ export function listItems({ type, journal, collection, search, includeDeleted = 
   if (journal) {
     const jfid = fieldIdByName('publicationTitle');
     if (jfid) {
-      where.push(`EXISTS (SELECT 1 FROM itemData d JOIN itemDataValues v ON v.valueID=d.valueID WHERE d.itemID=i.itemID AND d.fieldID=? AND v.value=?)`);
-      params.push(jfid, journal);
+      if (journal === UNFILED) {
+        // Items whose publicationTitle is not in the whitelist (or absent).
+        const placeholders = JOURNAL_WHITELIST.map(() => '?').join(',');
+        where.push(`NOT EXISTS (SELECT 1 FROM itemData d JOIN itemDataValues v ON v.valueID=d.valueID WHERE d.itemID=i.itemID AND d.fieldID=? AND v.value IN (${placeholders}))`);
+        params.push(jfid, ...JOURNAL_WHITELIST);
+      } else {
+        where.push(`EXISTS (SELECT 1 FROM itemData d JOIN itemDataValues v ON v.valueID=d.valueID WHERE d.itemID=i.itemID AND d.fieldID=? AND v.value=?)`);
+        params.push(jfid, journal);
+      }
     }
   }
   if (collection) {
@@ -153,16 +161,37 @@ export function listJournals() {
   const db = getDb();
   const jfid = fieldIdByName('publicationTitle');
   if (!jfid) return [];
-  return db.prepare(`
-    SELECT v.value AS name, COUNT(*) AS itemCount
+
+  // Count per whitelisted journal (exact match on publicationTitle).
+  const countStmt = db.prepare(`
+    SELECT COUNT(*) AS cnt
     FROM itemData d
     JOIN itemDataValues v ON v.valueID = d.valueID
     JOIN items i ON i.itemID = d.itemID
     WHERE d.fieldID = ? AND i.deleted = 0 AND i.parentItemID IS NULL
-      AND v.value IS NOT NULL AND v.value != ''
-    GROUP BY v.value
-    ORDER BY v.value
-  `).all(jfid);
+      AND v.value = ?
+  `);
+  const journals = JOURNAL_WHITELIST.map(name => ({
+    name,
+    itemCount: countStmt.get(jfid, name).cnt,
+  }));
+
+  // "待归档": top-level, non-deleted items whose publicationTitle is not in
+  // the whitelist (or has no publicationTitle at all).
+  const placeholders = JOURNAL_WHITELIST.map(() => '?').join(',');
+  const unfiledRow = db.prepare(`
+    SELECT COUNT(*) AS cnt
+    FROM items i
+    WHERE i.deleted = 0 AND i.parentItemID IS NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM itemData d
+        JOIN itemDataValues v ON v.valueID = d.valueID
+        WHERE d.itemID = i.itemID AND d.fieldID = ? AND v.value IN (${placeholders})
+      )
+  `).get(jfid, ...JOURNAL_WHITELIST);
+  journals.push({ name: UNFILED, itemCount: unfiledRow.cnt });
+
+  return journals;
 }
 
 export function setItemDeleted(itemId, deleted) {

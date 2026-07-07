@@ -49,7 +49,6 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     () => api.listItems({ type: filter?.type, journal: filter?.journal, collection: filter?.collection, search: filter?.search }),
     [filter?.type, filter?.journal, filter?.collection, filter?.search, version],
   );
-  const { data: collections } = useAsync(() => api.listCollections(), []);
 
   const [sortField, setSortField] = useState('dateModified');
   const [sortDir, setSortDir] = useState('desc');
@@ -132,7 +131,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
 
   const hasActiveFilter = filter?.search || filter?.journal || filter?.collection;
   const searchQuery = filter?.search || '';
-  const title = filterTitle(filter, collections);
+  const title = filterTitle(filter);
 
   const thClass = 'px-3 py-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors';
 
