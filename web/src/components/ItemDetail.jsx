@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, Suspense, lazy, useEffect, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,11 +29,16 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { Save, Trash2, FileText, Plus, X, ExternalLink, Download, Copy, Check, ChevronUp, ChevronDown } from 'lucide-react';
+import { Save, Trash2, FileText, Plus, X, ExternalLink, Download, Copy, Check, ChevronUp, ChevronDown, BookOpen, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
 import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle } from '@/lib/items';
+
+// Lazy-load the full-text viewer: it pulls in react-markdown + remark-gfm +
+// remark-math + rehype-katex + katex CSS (~heavy). Only needed when the user
+// opens the "全文" tab.
+const FullTextView = lazy(() => import('./FullTextView').then(m => ({ default: m.FullTextView })));
 
 // Field definitions by type
 const FIELDS_BY_TYPE = {
@@ -189,6 +194,7 @@ function ExportModal({ open, onOpenChange, format, content }) {
 export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChanged, onDirtyChange }) {
   const { data: item, error, loading, refresh } = useAsync(() => api.getItem(itemKey), [itemKey]);
   const { data: attachments } = useAsync(() => api.getItemAttachments(itemKey), [itemKey]);
+  const { data: fulltext, refresh: refreshFulltext } = useAsync(() => api.getFulltext(itemKey), [itemKey]);
 
   const [draft, setDraft] = useState(null);
   const [creatorsDraft, setCreatorsDraft] = useState([]);
@@ -199,6 +205,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   const [exportFormat, setExportFormat] = useState('bibtex');
   const [exportContent, setExportContent] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [parseBusy, setParseBusy] = useState(false);
 
   useEffect(() => {
     if (!item) return;
@@ -318,6 +325,24 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     setTab('pdf');
   };
 
+  const fulltextState = fulltext?.state || 'idle';
+  const fulltextActive = ['submitting', 'pending', 'running', 'converting'].includes(fulltextState);
+  const triggerParse = async () => {
+    if (parseBusy || fulltextActive) return;
+    setParseBusy(true);
+    const force = fulltextState === 'done' || fulltextState === 'failed';
+    try {
+      await api.parseFulltext(itemKey, { force });
+      toast.success('已提交解析任务');
+      setTab('fulltext');
+      refreshFulltext();
+    } catch (err) {
+      toast.error(`提交失败: ${err.message}`);
+    } finally {
+      setParseBusy(false);
+    }
+  };
+
   return (
     <div className="flex h-full flex-col">
       {/* Dirty indicator bar */}
@@ -336,6 +361,22 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          {pdfAttachments.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={triggerParse}
+              disabled={parseBusy || fulltextActive}
+              title={fulltextActive ? '解析进行中' : fulltextState === 'done' ? '重新解析为 Markdown 全文' : fulltextState === 'failed' ? '重新解析' : '解析为 Markdown 全文'}
+            >
+              {fulltextActive || parseBusy
+                ? <Loader2 className="size-3.5 animate-spin" />
+                : <Sparkles className="size-3.5" />}
+              <span className="hidden sm:inline">
+                {fulltextActive ? '解析中' : fulltextState === 'done' ? '重新解析' : fulltextState === 'failed' ? '重试' : '解析全文'}
+              </span>
+            </Button>
+          )}
           <Button size="sm" variant="outline" onClick={() => openExport('bibtex')} title="导出 BibTeX">
             <Download className="size-3.5" />
           </Button>
@@ -361,6 +402,9 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
           <TabsTrigger value="detail">详情</TabsTrigger>
           {pdfAttachments.length > 0 && (
             <TabsTrigger value="pdf">PDF</TabsTrigger>
+          )}
+          {pdfAttachments.length > 0 && (
+            <TabsTrigger value="fulltext">全文</TabsTrigger>
           )}
         </TabsList>
 
@@ -598,6 +642,14 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                 </div>
               )}
             </div>
+          </TabsContent>
+        )}
+
+        {pdfAttachments.length > 0 && (
+          <TabsContent value="fulltext" className="min-h-0 flex-1 overflow-hidden mt-2">
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted-foreground">加载中...</div>}>
+              <FullTextView itemKey={item.key} hasPdf={pdfAttachments.length > 0} />
+            </Suspense>
           </TabsContent>
         )}
       </Tabs>

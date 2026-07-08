@@ -4,6 +4,7 @@ import path from 'node:path';
 import { getDb } from '../../db/connection.js';
 import { config } from '../../config.js';
 import { resolveStoredPath } from '../../services/storageService.js';
+import { resolveFullTextAsset } from '../../services/fulltextService.js';
 
 export const attachmentsRouter = Router();
 
@@ -43,3 +44,34 @@ attachmentsRouter.get('/:key/file', (req, res) => {
   // Stream so we don't buffer large files in memory.
   fs.createReadStream(abs).pipe(res);
 });
+
+/**
+ * Serve a file from an item's extracted full-text directory (MinerU assets:
+ * images, etc.). Path is validated to stay within the fulltext root.
+ * GET /api/attachments/:key/fulltext/*
+ */
+attachmentsRouter.get('/:key/fulltext/*', (req, res) => {
+  const subPath = req.params[0];
+  if (!subPath) return res.status(400).json({ error: 'path required' });
+  const abs = resolveFullTextAsset(req.params.key, subPath);
+  if (!abs) return res.status(404).json({ error: 'not found' });
+
+  const ext = path.extname(abs).toLowerCase();
+  const mime = MIME_BY_EXT[ext] || 'application/octet-stream';
+  res.setHeader('Content-Type', mime);
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  fs.createReadStream(abs).pipe(res);
+});
+
+const MIME_BY_EXT = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.bmp': 'image/bmp',
+  '.svg': 'image/svg+xml',
+  '.json': 'application/json',
+  '.md': 'text/markdown; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+};

@@ -169,6 +169,30 @@ CREATE TABLE IF NOT EXISTS settings (
   value    TEXT
 );
 
+-- ---------------------------------------------------------------------------
+-- Full-text parsing (MinerU)
+-- Tracks per-item async PDF -> Markdown parsing state. Decoupled from import:
+-- triggered on demand. Markdown + assets live under
+-- data/storage/<key[0:2]>/<key>/fulltext/ .
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS itemFullText (
+  itemID          INTEGER PRIMARY KEY REFERENCES items(itemID) ON DELETE CASCADE,
+  state           TEXT NOT NULL DEFAULT 'idle',   -- idle|pending|running|converting|done|failed
+  mineruBatchId   TEXT,                            -- MinerU batch_id (single-file batch upload)
+  modelVersion    TEXT,                            -- vlm / pipeline
+  extractedPages  INTEGER,
+  totalPages      INTEGER,
+  markdownPath    TEXT,                            -- stored-relative path to full.md
+  assetDir        TEXT,                            -- stored-relative path to extracted dir
+  errCode         TEXT,
+  errMsg          TEXT,
+  submittedAt     TEXT,
+  completedAt     TEXT,
+  dateModified    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS itemFullText_state_idx ON itemFullText(state);
+
 CREATE TABLE IF NOT EXISTS schemaVersion (
   version INTEGER PRIMARY KEY,
   appliedAt TEXT NOT NULL DEFAULT (datetime('now'))

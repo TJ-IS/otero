@@ -78,4 +78,16 @@ export const api = {
       return json;
     });
   },
+
+  // Full-text (MinerU)
+  parseFulltext(key, { force = false } = {}) {
+    const qs = force ? '?force=true' : '';
+    return req(`/api/items/${key}/fulltext/parse${qs}`, { method: 'POST' });
+  },
+  getFulltext(key) { return req(`/api/items/${key}/fulltext`); },
+  deleteFulltext(key) { return req(`/api/items/${key}/fulltext`, { method: 'DELETE' }); },
+  parseFulltextBatch(keys) {
+    return req('/api/fulltext/parse-batch', { method: 'POST', body: JSON.stringify({ keys }) });
+  },
+  listFulltextPending() { return req('/api/fulltext/pending').then(r => r.items); },
 };

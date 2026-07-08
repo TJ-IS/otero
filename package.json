@@ -16,6 +16,7 @@
     "test": "node --test --test-reporter=spec \"test/**/*.test.js\""
   },
   "dependencies": {
+    "adm-zip": "^0.5.16",
     "better-sqlite3": "^11.3.0",
     "commander": "^12.1.0",
     "express": "^4.21.0",

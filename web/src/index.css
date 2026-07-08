@@ -58,3 +58,73 @@
     font-feature-settings: 'rlig' 1, 'calt' 1;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Full-text (MinerU markdown) rendering
+ * Scoped under .fulltext-prose so it never leaks into the rest of the app.
+ * ------------------------------------------------------------------------ */
+@layer components {
+  .fulltext-prose {
+    @apply text-sm leading-relaxed text-foreground;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  .fulltext-prose h1 {
+    @apply text-xl font-bold mt-6 mb-3;
+  }
+  .fulltext-prose h2 {
+    @apply text-lg font-semibold mt-5 mb-2;
+  }
+  .fulltext-prose h3 {
+    @apply text-base font-semibold mt-4 mb-2;
+  }
+  .fulltext-prose h4 {
+    @apply text-sm font-semibold mt-3 mb-1;
+  }
+  .fulltext-prose p {
+    @apply my-3;
+  }
+  .fulltext-prose a {
+    @apply text-blue-600 hover:underline;
+  }
+  .fulltext-prose ul {
+    @apply list-disc pl-6 my-3;
+  }
+  .fulltext-prose ol {
+    @apply list-decimal pl-6 my-3;
+  }
+  .fulltext-prose li {
+    @apply my-1;
+  }
+  .fulltext-prose blockquote {
+    @apply border-l-4 border-muted pl-4 italic text-muted-foreground my-3;
+  }
+  .fulltext-prose code {
+    @apply bg-muted px-1.5 py-0.5 rounded text-[0.85em] font-mono;
+  }
+  .fulltext-prose pre {
+    @apply bg-muted p-3 rounded-md overflow-x-auto my-3 text-xs;
+  }
+  .fulltext-prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .fulltext-prose table {
+    @apply w-full border-collapse my-4 text-xs;
+  }
+  .fulltext-prose th,
+  .fulltext-prose td {
+    @apply border border-border px-2 py-1 text-left;
+  }
+  .fulltext-prose th {
+    @apply bg-muted font-semibold;
+  }
+  .fulltext-prose hr {
+    @apply my-6 border-border;
+  }
+  .fulltext-prose img {
+    @apply max-w-full;
+  }
+  /* KaTeX block equations: center and add breathing room. */
+  .fulltext-prose .katex-display {
+    @apply my-4 overflow-x-auto overflow-y-hidden;
+  }
+}

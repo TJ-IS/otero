@@ -2,17 +2,19 @@ import { memo, useRef, useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft } from 'lucide-react';
+import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks } from 'lucide-react';
 import { api } from '@/api/client';
 import { toast } from 'sonner';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
 import { useAsync } from '@/hooks/useAsync';
+import { MineruTaskLog } from './MineruTaskLog';
 
-export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, onSearch, sidebarOpen = false, onToggleSidebar, fileInputRef: externalRef }) {
+export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, onSearch, sidebarOpen = false, onToggleSidebar, fileInputRef: externalRef, onSelectItem }) {
   const internalRef = useRef(null);
   const fileInput = externalRef || internalRef;
   const searchRef = useRef(null);
   const [searchValue, setSearchValue] = useState('');
+  const [logOpen, setLogOpen] = useState(false);
   const { theme, setTheme } = useTheme();
 
   // Debounced search
@@ -106,6 +108,15 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
         <Button
           variant="ghost"
           size="sm"
+          onClick={() => setLogOpen(true)}
+          title="MinerU 解析任务日志"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <ListChecks className="size-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={toggleTheme}
           title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
         >
@@ -127,6 +138,8 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
           onChange={onFileInputChange}
         />
       </div>
+
+      <MineruTaskLog open={logOpen} onOpenChange={setLogOpen} onSelectItem={onSelectItem} />
     </header>
   );
 });

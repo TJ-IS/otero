@@ -6,6 +6,7 @@ import { Items } from '../models/Item.js';
 import { Collections } from '../models/Collection.js';
 import { closeDb } from '../db/connection.js';
 import { startServer } from '../api/server.js';
+import { parseItem, pollOnce, getFullText, listAll } from '../services/fulltextService.js';
 
 const program = new Command();
 
@@ -103,6 +104,84 @@ program
     runMigrations();
     await startServer({ port: Number(opts.port), host: opts.host });
     // Server keeps process alive; do not closeDb.
+  });
+
+program
+  .command('parse')
+  .description('Parse an item\'s PDF to Markdown full text via MinerU')
+  .argument('<key>', 'item key')
+  .option('--force', 're-parse even if already done')
+  .option('--wait', 'block until the task completes (polls locally)')
+  .action(async (key, opts) => {
+    runMigrations();
+    try {
+      const r = await parseItem(key, { force: !!opts.force });
+      console.log(`Submitted: state=${r.state} batchId=${r.mineruBatchId || '-'}`);
+      if (opts.wait) {
+        console.log('Polling until done...');
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
+          await new Promise(r => setTimeout(r, 3000));
+          await pollOnce();
+          const cur = getFullText(key);
+          process.stdout.write(`\rstate=${cur.state}` +
+            (cur.totalPages ? ` ${cur.extractedPages ?? 0}/${cur.totalPages}` : '') +
+            '    ');
+          if (cur.state === 'done' || cur.state === 'failed') {
+            console.log('');
+            if (cur.state === 'failed') console.error(`Failed: ${cur.errMsg}`);
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      console.error(`[FAIL] ${err.message}`);
+      process.exitCode = 1;
+    } finally {
+      closeDb();
+    }
+  });
+
+program
+  .command('parse-all')
+  .description('Submit MinerU full-text parsing for all (top-level) items')
+  .option('--type <type>', 'filter by item type')
+  .option('--force', 're-parse even if already done')
+  .action(async (opts) => {
+    runMigrations();
+    const items = Items.list({ type: opts.type, topLevelOnly: true });
+    let ok = 0, fail = 0;
+    for (const it of items) {
+      try {
+        await parseItem(it.key, { force: !!opts.force });
+        console.log(`[OK]   ${it.key}  ${it.getField('title') ?? ''}`);
+        ok++;
+      } catch (err) {
+        console.error(`[FAIL] ${it.key}  ${err.message}`);
+        fail++;
+      }
+    }
+    console.log(`\nSubmitted: ${ok} ok, ${fail} failed. ` +
+      `Pending tasks will be advanced by the running server's worker.` +
+      (!ok ? '' : ` Run \`otero serve\` or use --wait on \`otero parse\` to advance them.`));
+    closeDb();
+  });
+
+program
+  .command('parse-status')
+  .description('Show MinerU full-text parsing queue status')
+  .action(() => {
+    runMigrations();
+    const all = listAll();
+    if (all.length === 0) {
+      console.log('(no full-text rows)');
+    } else {
+      for (const r of all) {
+        console.log(`${r.itemKey}\t${r.state}\t${r.modelVersion || '-'}\t${r.errMsg || ''}`);
+      }
+    }
+    console.log(`\nTotal: ${all.length}`);
+    closeDb();
   });
 
 // Default: print help.

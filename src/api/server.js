@@ -8,6 +8,9 @@ import { collectionsRouter } from './routes/collections.js';
 import { journalsRouter } from './routes/journals.js';
 import { importRouter } from './routes/import.js';
 import { attachmentsRouter } from './routes/attachments.js';
+import { fulltextRouter } from './routes/fulltext.js';
+import { startFullTextWorker } from '../services/fulltextWorker.js';
+import { recoverSubmittingOnStartup } from '../services/fulltextService.js';
 import { config } from '../config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +30,7 @@ export function buildApp() {
   app.use('/api/journals', journalsRouter);
   app.use('/api/import', importRouter);
   app.use('/api/attachments', attachmentsRouter);
+  app.use('/api', fulltextRouter);
 
   // In production, serve the built Vite frontend if present.
   if (fs.existsSync(WEB_DIST)) {
@@ -58,5 +62,7 @@ export async function startServer({ port, host } = {}) {
   const server = app.listen(listenPort, listenHost, () => {
     console.log(`Otero API listening on http://${listenHost}:${listenPort}`);
   });
+  startFullTextWorker();
+  recoverSubmittingOnStartup();
   return server;
 }

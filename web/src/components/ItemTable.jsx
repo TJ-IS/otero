@@ -8,8 +8,9 @@ import { api } from '@/api/client';
 import { ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle, filterTitle } from '@/lib/items';
 import {
   FileText, BookOpen, GraduationCap, BookMarked, Presentation,
-  File, ChevronUp, ChevronDown,
+  File, ChevronUp, ChevronDown, Sparkles, Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const TYPE_ICONS = {
   journalArticle: <FileText className="size-3.5 shrink-0" />,
@@ -53,6 +54,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
   const [sortField, setSortField] = useState('dateModified');
   const [sortDir, setSortDir] = useState('desc');
   const scrollRef = useRef(null);
+  const [batchParsing, setBatchParsing] = useState(false);
 
   const sortedItems = useMemo(() => {
     if (!items) return [];
@@ -101,6 +103,33 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     });
   }, []);
 
+  const batchParseAll = useCallback(async () => {
+    if (!sortedItems.length || batchParsing) return;
+    const keys = sortedItems.map(it => it.key);
+    setBatchParsing(true);
+    const tid = toast.loading(`正在入队 ${keys.length} 篇全文解析...`);
+    try {
+      const res = await api.parseFulltextBatch(keys);
+      const s = res.summary || {};
+      const parts = [];
+      if (s.queued) parts.push(`${s.queued} 篇已入队`);
+      if (s.skippedDone) parts.push(`${s.skippedDone} 篇已完成跳过`);
+      if (s.skippedRunning) parts.push(`${s.skippedRunning} 篇进行中跳过`);
+      if (s.noPdf) parts.push(`${s.noPdf} 篇无 PDF`);
+      if (s.notFound) parts.push(`${s.notFound} 篇未找到`);
+      const summary = parts.length ? parts.join('，') : '无操作';
+      if (s.queued > 0) {
+        toast.success(`批量解析：${summary}（后台陆续提交到 MinerU）`, { id: tid });
+      } else {
+        toast.info(`批量解析：${summary}`, { id: tid });
+      }
+    } catch (err) {
+      toast.error(`批量解析失败: ${err.message}`, { id: tid });
+    } finally {
+      setBatchParsing(false);
+    }
+  }, [sortedItems, batchParsing]);
+
   // Keyboard navigation
   const onKeyDown = useCallback((e) => {
     if (!sortedItems.length) return;
@@ -144,9 +173,22 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex items-baseline justify-between gap-3 border-b px-4 py-2">
         <span className="truncate text-sm font-medium" title={title}>{title}</span>
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {loading ? '加载中...' : `${sortedItems.length} 个条目`}
-        </span>
+        <div className="flex items-center gap-3">
+          {sortedItems.length > 0 && (
+            <button
+              onClick={batchParseAll}
+              disabled={batchParsing}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+              title="将当前列表中的所有条目提交给 MinerU 解析为 Markdown 全文"
+            >
+              {batchParsing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+              批量解析全文
+            </button>
+          )}
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+            {loading ? '加载中...' : `${sortedItems.length} 个条目`}
+          </span>
+        </div>
       </div>
       <div
         ref={scrollRef}

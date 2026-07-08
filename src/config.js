@@ -1,15 +1,37 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
 
+// Minimal .env loader: parses <projectRoot>/.env if present so commands run
+// without `node --env-file`. Only sets keys not already present in process.env.
+function loadDotEnv() {
+  const envPath = path.join(projectRoot, '.env');
+  let txt;
+  try { txt = fs.readFileSync(envPath, 'utf8'); } catch { return; }
+  for (const raw of txt.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    let val = line.slice(eq + 1).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = val;
+  }
+}
+loadDotEnv();
+
 export const config = {
   projectRoot,
   dataDir: path.join(projectRoot, 'data'),
   dbPath: path.join(projectRoot, 'data', 'otero.db'),
   storageDir: path.join(projectRoot, 'data', 'storage'),
-  schemaVersion: 1,
+  schemaVersion: 2,
   api: {
     port: Number(process.env.OTERO_PORT ?? 3000),
     host: process.env.OTERO_HOST ?? '127.0.0.1',
@@ -21,9 +43,17 @@ export const config = {
     userAgent: 'Otero/0.1 (https://example.com/otero; mailto:otero@example.com)',
     timeoutMs: 15000,
   },
+  mineru: {
+    endpoint: 'https://mineru.net',
+    token: process.env.OTERO_MINERU_TOKEN || '',
+    modelVersion: process.env.OTERO_MINERU_MODEL || 'vlm',
+    pollIntervalMs: Number(process.env.OTERO_MINERU_POLL_MS ?? 15000),
+    maxConcurrent: Number(process.env.OTERO_MINERU_MAX_CONCURRENT ?? 3),
+    enableFormula: process.env.OTERO_MINERU_FORMULA !== 'false',
+    enableTable: process.env.OTERO_MINERU_TABLE !== 'false',
+    language: process.env.OTERO_MINERU_LANGUAGE || 'ch',
+  },
 };
-
-import fs from 'node:fs';
 
 export function ensureDataDirs() {
   fs.mkdirSync(config.dataDir, { recursive: true });

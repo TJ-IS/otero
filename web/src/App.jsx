@@ -219,6 +219,7 @@ export default function App() {
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(v => !v)}
           fileInputRef={fileInputRef}
+          onSelectItem={onSelect}
         />
         <div className="flex-1 overflow-hidden">
           <ItemTable
