@@ -1,4 +1,4 @@
-import { memo, Suspense, lazy, useEffect, useState } from 'react';
+import { memo, Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,57 +48,57 @@ const FullTextView = lazy(() => import('./FullTextView').then(m => ({ default: m
 const FIELDS_BY_TYPE = {
   journalArticle: {
     basic: ['title', 'date', 'shortTitle'],
-    publication: ['publicationTitle', 'publicationTitleAbbrev', 'volume', 'issue', 'pages'],
-    identifiers: ['DOI', 'ISSN', 'url', 'accessDate'],
+    publication: ['publicationTitle', 'volume', 'issue', 'pages'],
+    identifiers: ['DOI', 'ISSN', 'url'],
     abstract: ['abstractNote'],
     other: ['language', 'rights', 'libraryCatalog', 'archive', 'archiveLocation', 'extra'],
   },
   preprint: {
     basic: ['title', 'date'],
     publication: ['repository'],
-    identifiers: ['DOI', 'arXivID', 'url', 'accessDate'],
+    identifiers: ['DOI', 'arXivID', 'url'],
     abstract: ['abstractNote'],
     other: ['language', 'rights', 'extra'],
   },
   book: {
     basic: ['title', 'date', 'edition', 'shortTitle'],
     publication: ['publisher', 'place', 'series', 'seriesNumber', 'volume', 'numPages'],
-    identifiers: ['ISBN', 'url', 'accessDate'],
+    identifiers: ['ISBN', 'url'],
     abstract: ['abstractNote'],
     other: ['language', 'rights', 'callNumber', 'libraryCatalog', 'extra'],
   },
   bookSection: {
     basic: ['title', 'date', 'bookTitle', 'edition', 'shortTitle'],
     publication: ['publisher', 'place', 'series', 'seriesNumber', 'volume', 'pages'],
-    identifiers: ['ISBN', 'url', 'accessDate'],
+    identifiers: ['ISBN', 'url'],
     abstract: ['abstractNote'],
     other: ['language', 'rights', 'extra'],
   },
   conferencePaper: {
     basic: ['title', 'date', 'conferenceName', 'shortTitle'],
     publication: ['proceedingsTitle', 'place', 'publisher', 'pages'],
-    identifiers: ['DOI', 'ISBN', 'url', 'accessDate'],
+    identifiers: ['DOI', 'ISBN', 'url'],
     abstract: ['abstractNote'],
     other: ['language', 'rights', 'extra'],
   },
   thesis: {
     basic: ['title', 'date', 'thesisType', 'shortTitle'],
     publication: ['university', 'place', 'numPages'],
-    identifiers: ['url', 'accessDate'],
+    identifiers: ['url'],
     abstract: ['abstractNote'],
     other: ['language', 'rights', 'extra'],
   },
   report: {
     basic: ['title', 'date', 'reportType', 'reportNumber', 'shortTitle'],
     publication: ['publisher', 'place', 'series', 'pages'],
-    identifiers: ['url', 'accessDate'],
+    identifiers: ['url'],
     abstract: ['abstractNote'],
     other: ['language', 'rights', 'extra'],
   },
   document: {
     basic: ['title', 'date'],
     publication: ['publisher', 'numPages', 'pages'],
-    identifiers: ['DOI', 'ISBN', 'url', 'accessDate'],
+    identifiers: ['DOI', 'ISBN', 'url'],
     abstract: ['abstractNote'],
     other: ['language', 'rights', 'extra'],
   },
@@ -106,9 +106,9 @@ const FIELDS_BY_TYPE = {
 
 const FIELD_LABELS = {
   title: '标题', abstractNote: '摘要', publicationTitle: '期刊',
-  publicationTitleAbbrev: '期刊缩写', volume: '卷', issue: '期', pages: '页码',
+  volume: '卷', issue: '期', pages: '页码',
   date: '日期', DOI: 'DOI', ISBN: 'ISBN', ISSN: 'ISSN', url: 'URL',
-  accessDate: '引用日期', language: '语言', shortTitle: '短标题', extra: '附加信息',
+  language: '语言', shortTitle: '短标题', extra: '附加信息',
   bookTitle: '书名', conferenceName: '会议名称', proceedingsTitle: '会议录',
   place: '地点', publisher: '出版社', numPages: '页数',
   series: '系列', seriesNumber: '系列编号', edition: '版次', thesisType: '学位类型',
@@ -127,23 +127,48 @@ const FULL_WIDTH_FIELDS = new Set([
   'publisher', 'university', 'repository', 'place', 'series',
 ]);
 
+// Derive an external jump URL for identifier fields (DOI / url). Returns null
+// for fields that have no meaningful external target.
+function fieldHref(name, value) {
+  const v = (value || '').trim();
+  if (!v) return null;
+  if (name === 'DOI') return `https://doi.org/${v}`;
+  if (name === 'url' && /^https?:\/\//i.test(v)) return v;
+  return null;
+}
+
 const Field = memo(function Field({ name, value, onChange, multiline }) {
+  const href = useMemo(() => fieldHref(name, value), [name, value]);
   return (
     <div className={FULL_WIDTH_FIELDS.has(name) ? 'col-span-2' : ''}>
       <Label className="text-xs text-muted-foreground">{FIELD_LABELS[name] || name}</Label>
-      {multiline ? (
-        <Textarea
-          value={value || ''}
-          onChange={e => onChange(e.target.value)}
-          className="mt-1 min-h-[100px] text-sm"
-        />
-      ) : (
-        <Input
-          value={value || ''}
-          onChange={e => onChange(e.target.value)}
-          className="mt-1 h-8 text-sm"
-        />
-      )}
+      <div className="relative mt-1">
+        {multiline ? (
+          <Textarea
+            value={value || ''}
+            onChange={e => onChange(e.target.value)}
+            className={`min-h-[100px] text-sm ${href ? 'pr-8' : ''}`}
+          />
+        ) : (
+          <Input
+            value={value || ''}
+            onChange={e => onChange(e.target.value)}
+            className={`h-8 text-sm ${href ? 'pr-8' : ''}`}
+          />
+        )}
+        {href && (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+            title="跳转"
+            onClick={e => e.stopPropagation()}
+          >
+            <ExternalLink className="size-3.5" />
+          </a>
+        )}
+      </div>
     </div>
   );
 });

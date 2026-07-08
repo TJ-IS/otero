@@ -108,7 +108,7 @@
     @apply bg-transparent p-0;
   }
   .fulltext-prose table {
-    @apply w-full border-collapse my-4 text-xs;
+    @apply border-collapse text-xs;
   }
   .fulltext-prose th,
   .fulltext-prose td {

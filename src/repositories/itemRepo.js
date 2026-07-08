@@ -146,10 +146,28 @@ export function listItems({ type, journal, collection, search, includeDeleted = 
   }
   if (search && search.trim()) {
     const like = `%${search.trim()}%`;
-    // Search across title, DOI, publicationTitle, abstract, and author names
+    // Search across the core bibliographic fields (title, abstractNote,
+    // publicationTitle, DOI) plus author names. Restricted by fieldID so we
+    // don't accidentally match values of unrelated fields (volume, url, ...).
+    // COLLATE NOCASE makes ASCII matching case-insensitive, matching the
+    // frontend highlight() which uses toLowerCase().indexOf().
     where.push(`(
-      EXISTS (SELECT 1 FROM itemData d1 JOIN itemDataValues v1 ON v1.valueID=d1.valueID WHERE d1.itemID=i.itemID AND v1.value LIKE ?)
-      OR EXISTS (SELECT 1 FROM itemCreators ic2 JOIN creators c2 ON c2.creatorID=ic2.creatorID WHERE ic2.itemID=i.itemID AND (c2.firstName || ' ' || c2.lastName LIKE ? OR c2.lastName LIKE ? OR c2.firstName LIKE ?))
+      EXISTS (
+        SELECT 1 FROM itemData d1
+        JOIN itemDataValues v1 ON v1.valueID=d1.valueID
+        JOIN fields f1 ON f1.fieldID=d1.fieldID
+        WHERE d1.itemID=i.itemID
+          AND f1.fieldName IN ('title','abstractNote','publicationTitle','DOI')
+          AND v1.value LIKE ? COLLATE NOCASE
+      )
+      OR EXISTS (
+        SELECT 1 FROM itemCreators ic2
+        JOIN creators c2 ON c2.creatorID=ic2.creatorID
+        WHERE ic2.itemID=i.itemID
+          AND (c2.firstName || ' ' || c2.lastName LIKE ? COLLATE NOCASE
+            OR c2.lastName LIKE ? COLLATE NOCASE
+            OR c2.firstName LIKE ? COLLATE NOCASE)
+      )
     )`);
     params.push(like, like, like, like);
   }
@@ -192,6 +210,51 @@ export function listJournals() {
   journals.push({ name: UNFILED, itemCount: unfiledRow.cnt });
 
   return journals;
+}
+
+/**
+ * List top-level, non-deleted items that are bucketed into UNFILED ("待归档")
+ * AND have a finished MinerU full-text parse (itemFullText.state='done').
+ * Paginated. Used by the batch metadata extraction pipeline.
+ *
+ * Returns { items: [{ key, itemID, itemTypeID, title }], total }.
+ */
+export function listUnfiledWithFulltextDone({ page = 1, pageSize = 100 } = {}) {
+  const db = getDb();
+  const jfid = fieldIdByName('publicationTitle');
+  if (!jfid) return { items: [], total: 0 };
+
+  const placeholders = JOURNAL_WHITELIST.map(() => '?').join(',');
+  const unfiledClause = `NOT EXISTS (
+    SELECT 1 FROM itemData d
+    JOIN itemDataValues v ON v.valueID = d.valueID
+    WHERE d.itemID = i.itemID AND d.fieldID = ? AND v.value IN (${placeholders})
+  )`;
+  const baseParams = [jfid, ...JOURNAL_WHITELIST];
+
+  const total = db.prepare(`
+    SELECT COUNT(*) AS cnt
+    FROM items i
+    JOIN itemFullText ft ON ft.itemID = i.itemID AND ft.state = 'done'
+    WHERE i.deleted = 0 AND i.parentItemID IS NULL AND ${unfiledClause}
+  `).get(...baseParams).cnt;
+
+  const limit = Math.max(1, pageSize);
+  const offset = Math.max(0, (Math.max(1, page) - 1) * limit);
+  const tfid = fieldIdByName('title');
+
+  const rows = db.prepare(`
+    SELECT i.itemID, i.key, i.itemTypeID,
+      (SELECT v.value FROM itemData d JOIN itemDataValues v ON v.valueID=d.valueID
+       WHERE d.itemID=i.itemID AND d.fieldID=?) AS title
+    FROM items i
+    JOIN itemFullText ft ON ft.itemID = i.itemID AND ft.state = 'done'
+    WHERE i.deleted = 0 AND i.parentItemID IS NULL AND ${unfiledClause}
+    ORDER BY i.dateAdded DESC
+    LIMIT ? OFFSET ?
+  `).all(...baseParams, tfid, limit, offset);
+
+  return { items: rows, total };
 }
 
 export function setItemDeleted(itemId, deleted) {

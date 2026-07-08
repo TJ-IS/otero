@@ -10,6 +10,8 @@ import { importRouter } from './routes/import.js';
 import { attachmentsRouter } from './routes/attachments.js';
 import { fulltextRouter } from './routes/fulltext.js';
 import { calibrateRouter } from './routes/calibrate.js';
+import { extractRouter } from './routes/extract.js';
+import { merkleRouter } from './routes/merkle.js';
 import { startFullTextWorker } from '../services/fulltextWorker.js';
 import { recoverSubmittingOnStartup } from '../services/fulltextService.js';
 import { config } from '../config.js';
@@ -33,6 +35,8 @@ export function buildApp() {
   app.use('/api/attachments', attachmentsRouter);
   app.use('/api', fulltextRouter);
   app.use('/api', calibrateRouter);
+  app.use('/api', extractRouter);
+  app.use('/api', merkleRouter);
 
   // In production, serve the built Vite frontend if present.
   if (fs.existsSync(WEB_DIST)) {

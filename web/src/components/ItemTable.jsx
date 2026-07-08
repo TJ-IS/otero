@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle, filterTitle } from '@/lib/items';
+import { highlight } from '@/lib/highlight';
 import {
   FileText, BookOpen, GraduationCap, BookMarked, Presentation,
   File, ChevronUp, ChevronDown, Sparkles, Loader2,
@@ -24,19 +25,6 @@ const TYPE_ICONS = {
 };
 
 const ROW_HEIGHT = 37;
-
-function highlight(text, query) {
-  if (!query || !text) return text || '';
-  const idx = text.toLowerCase().indexOf(query.toLowerCase());
-  if (idx === -1) return text;
-  return (
-    <>
-      {text.slice(0, idx)}
-      <mark className="bg-yellow-200 dark:bg-yellow-800 text-inherit rounded-sm px-0">{text.slice(idx, idx + query.length)}</mark>
-      {text.slice(idx + query.length)}
-    </>
-  );
-}
 
 function SortIcon({ field, sortField, sortDir }) {
   if (sortField !== field) return <ChevronDown className="size-3 opacity-25 ml-0.5" />;

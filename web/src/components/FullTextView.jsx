@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import rehypeRaw from 'rehype-raw';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -134,6 +135,11 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
         {children}
       </a>
     ),
+    table: ({ children, ...rest }) => (
+      <div className="overflow-x-auto my-4">
+        <table {...rest}>{children}</table>
+      </div>
+    ),
   }), [row?.imagesBaseUrl]);
 
   if (loading) {
@@ -235,7 +241,7 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
             <article className="max-w-none px-6 py-4 fulltext-prose">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[rehypeKatex]}
+                rehypePlugins={[rehypeRaw, rehypeKatex]}
                 components={mdComponents}
               >
                 {row.markdown}

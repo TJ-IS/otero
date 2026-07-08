@@ -1,8 +1,9 @@
 import { memo, useRef, useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks } from 'lucide-react';
+import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks, GitBranch } from 'lucide-react';
 import { api } from '@/api/client';
 import { toast } from 'sonner';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
@@ -16,6 +17,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
   const [searchValue, setSearchValue] = useState('');
   const [logOpen, setLogOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const navigate = useNavigate();
 
   // Debounced search
   useEffect(() => {
@@ -34,11 +36,16 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
     }
   }, [filter?.journal, filter?.collection]);
 
+  // Clear the input when the filter's search is reset to null externally
+  // (e.g. by selecting a different journal/collection in the sidebar). We
+  // intentionally do NOT depend on `searchValue` here: depending on it would
+  // wipe out each keystroke during the 300ms debounce window, because at
+  // that moment searchValue is non-empty but filter.search is still null.
   useEffect(() => {
-    if (filter?.search === null && searchValue) {
+    if (filter?.search == null) {
       setSearchValue('');
     }
-  }, [filter?.search, searchValue]);
+  }, [filter?.search]);
 
   const handleFiles = async (files) => {
     for (const file of files) {
@@ -92,6 +99,14 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
           placeholder="搜索标题、作者、DOI..."
           value={searchValue}
           onChange={e => setSearchValue(e.target.value)}
+          onKeyDown={e => {
+            // Enter jumps to the dedicated search page with the typed query,
+            // which offers richer result cards + snippet highlighting.
+            if (e.key === 'Enter' && searchValue.trim()) {
+              e.preventDefault();
+              navigate(`/search?q=${encodeURIComponent(searchValue.trim())}`);
+            }
+          }}
           className="h-8 w-full pl-8 pr-8"
         />
         {searchValue && (
@@ -105,6 +120,30 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
         )}
       </div>
       <div className="ml-auto flex items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          asChild
+          title="打开搜索页"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <Link to="/search">
+            <Search className="size-4" />
+            <span className="hidden sm:inline">搜索</span>
+          </Link>
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          asChild
+          title="Merkle Tree 可视化"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <Link to="/merkle">
+            <GitBranch className="size-4" />
+            <span className="hidden sm:inline">Merkle</span>
+          </Link>
+        </Button>
         <Button
           variant="ghost"
           size="sm"

@@ -48,7 +48,6 @@ function mapCrossref(message) {
   const fields = {};
   if (message.title?.[0]) fields.title = decodeEntities(message.title[0]);
   if (message['container-title']?.[0]) fields.publicationTitle = decodeEntities(message['container-title'][0]);
-  if (message['short-container-title']?.[0]) fields.publicationTitleAbbrev = decodeEntities(message['short-container-title'][0]);
   if (message.volume) fields.volume = message.volume;
   if (message.issue) fields.issue = message.issue;
   if (message.page) fields.pages = message.page;

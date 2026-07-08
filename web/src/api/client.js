@@ -99,4 +99,14 @@ export const api = {
   calibrateItem(key) {
     return req(`/api/items/${key}/calibrate`, { method: 'POST' });
   },
+
+  // Merkle DOI proofs
+  getMerkleRoot() { return req('/api/merkle/root'); },
+  checkMerkleExists(doi) {
+    return req(`/api/merkle/exists?doi=${encodeURIComponent(doi)}`);
+  },
+  verifyMerkleProof(doi, proof) {
+    return req('/api/merkle/verify', { method: 'POST', body: JSON.stringify({ doi, proof }) });
+  },
+  rebuildMerkleTree() { return req('/api/merkle/rebuild', { method: 'POST' }); },
 };
