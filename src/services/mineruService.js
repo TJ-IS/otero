@@ -45,7 +45,10 @@ export async function submitLocalPdf({ filePath, fileName, modelVersion, languag
   });
   const { status, body: rb } = await asJson(res);
   if (!res.ok || rb.code !== 0) {
-    throw new Error(`MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+    const err = new Error(`MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+    err.status = status;
+    err.mineruCode = rb.code ?? null;
+    throw err;
   }
   const { batch_id: batchId, file_urls: urls } = rb.data;
   if (!urls || urls.length === 0) throw new Error('MinerU returned no upload url');
@@ -66,6 +69,78 @@ export async function submitLocalPdf({ filePath, fileName, modelVersion, languag
   return { batchId };
 }
 
+const UPLOAD_CONCURRENCY = 8;
+
+/**
+ * Submit up to 200 local PDFs in a single request to /file-urls/batch,
+ * then PUT-upload each file to its signed OSS URL with bounded concurrency.
+ * MinerU auto-creates one parse task per file, all sharing the same batch_id.
+ *
+ * `files`: [{ filePath, fileName }, ...] (fileName must be unique within the batch)
+ * Returns { batchId }.
+ */
+export async function submitLocalPdfs(files, opts = {}) {
+  if (files.length === 0) throw new Error('submitLocalPdfs: no files');
+  if (files.length > 200) throw new Error(`submitLocalPdfs: ${files.length} files exceeds the 200-file batch limit`);
+  const mv = opts.modelVersion || config.mineru.modelVersion;
+  const body = {
+    files: files.map(f => ({ name: f.fileName, data_id: f.fileName })),
+    model_version: mv,
+    enable_formula: opts.enableFormula ?? config.mineru.enableFormula,
+    enable_table: opts.enableTable ?? config.mineru.enableTable,
+    language: opts.language || config.mineru.language,
+  };
+  const res = await fetch(`${ENDPOINT}/api/v4/file-urls/batch`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  });
+  const { status, body: rb } = await asJson(res);
+  if (!res.ok || rb.code !== 0) {
+    const err = new Error(`MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+    err.status = status;
+    err.mineruCode = rb.code ?? null;
+    throw err;
+  }
+  const { batch_id: batchId, file_urls: urls } = rb.data;
+  if (!urls || urls.length !== files.length) {
+    throw new Error(`MinerU returned ${urls?.length || 0} upload urls for ${files.length} files`);
+  }
+  // Concurrent upload to OSS (separate domain from the API, not rate-limited
+  // by the same per-IP/per-minute cap that triggers HTTP 429).
+  await runConcurrent(
+    files.map((f, i) => () => uploadOne(f.filePath, urls[i])),
+    UPLOAD_CONCURRENCY,
+  );
+  return { batchId };
+}
+
+async function uploadOne(filePath, url) {
+  const stat = fs.statSync(filePath);
+  const src = fs.createReadStream(filePath);
+  const upRes = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Length': String(stat.size) },
+    body: Readable.toWeb(src),
+    duplex: 'half',
+  });
+  if (!upRes.ok) {
+    const t = await upRes.text().catch(() => '');
+    throw new Error(`MinerU OSS upload failed: HTTP ${upRes.status} ${t.slice(0, 200)}`);
+  }
+}
+
+async function runConcurrent(tasks, concurrency) {
+  const queue = tasks.slice();
+  async function worker() {
+    while (queue.length) {
+      const task = queue.shift();
+      await task();
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, tasks.length) }, worker));
+}
+
 /**
  * Query a batch's results. Returns the extract_result array (one entry per file).
  * Each entry: { file_name, state, full_zip_url?, err_msg?, extract_progress? }
@@ -76,7 +151,10 @@ export async function getBatchResult(batchId) {
   });
   const { status, body: rb } = await asJson(res);
   if (!res.ok || rb.code !== 0) {
-    throw new Error(`MinerU query failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+    const err = new Error(`MinerU query failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+    err.status = status;
+    err.mineruCode = rb.code ?? null;
+    throw err;
   }
   return rb.data; // { batch_id, extract_result: [...] }
 }

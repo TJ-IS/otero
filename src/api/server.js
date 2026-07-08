@@ -9,6 +9,7 @@ import { journalsRouter } from './routes/journals.js';
 import { importRouter } from './routes/import.js';
 import { attachmentsRouter } from './routes/attachments.js';
 import { fulltextRouter } from './routes/fulltext.js';
+import { calibrateRouter } from './routes/calibrate.js';
 import { startFullTextWorker } from '../services/fulltextWorker.js';
 import { recoverSubmittingOnStartup } from '../services/fulltextService.js';
 import { config } from '../config.js';
@@ -31,6 +32,7 @@ export function buildApp() {
   app.use('/api/import', importRouter);
   app.use('/api/attachments', attachmentsRouter);
   app.use('/api', fulltextRouter);
+  app.use('/api', calibrateRouter);
 
   // In production, serve the built Vite frontend if present.
   if (fs.existsSync(WEB_DIST)) {

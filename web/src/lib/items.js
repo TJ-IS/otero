@@ -22,6 +22,30 @@ export const ITEM_TYPE_LABELS = {
   document: '文档',
 };
 
+/**
+ * AIS Senior Scholars' Basket of Journals — the 11 journals this system
+ * curates, plus "未归档" for items that cannot be matched to a basket journal.
+ * MUST stay in sync with the backend list in src/services/calibrateService.js.
+ * The publicationTitle field is constrained to these values in the UI.
+ */
+export const AIS_BASKET_JOURNALS = [
+  'MIS Quarterly',
+  'Information Systems Research',
+  'Journal of Management Information Systems',
+  'Journal of the Association for Information Systems',
+  'European Journal of Information Systems',
+  'Information Systems Journal',
+  'Journal of Information Technology',
+  'Journal of Strategic Information Systems',
+  'Information & Management',
+  'Decision Support Systems',
+  'Communications of the ACM',
+];
+
+export const NOT_ARCHIVED = '未归档';
+
+export const ALLOWED_PUBLICATION_TITLES = [...AIS_BASKET_JOURNALS, NOT_ARCHIVED];
+
 export function creatorDisplay(c) {
   if (c.fieldMode === 1 || !c.firstName) return c.lastName || c.name || '';
   return `${c.lastName || ''}, ${c.firstName || ''}`.trim(', ');

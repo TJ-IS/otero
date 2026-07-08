@@ -4,12 +4,24 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, ExternalLink, Loader2, AlertCircle, CheckCircle2, Clock, ListChecks } from 'lucide-react';
+import {
+  RefreshCw, ExternalLink, Loader2, AlertCircle, CheckCircle2, Clock, ListChecks,
+  RotateCcw, ChevronLeft, ChevronRight,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 
 const POLL_MS = 3000;
-const ACTIVE = new Set(['submitting', 'pending', 'running', 'converting']);
+const PAGE_SIZE = 50;
+const ACTIVE_STATES = ['submitting', 'pending', 'running', 'converting'];
+const ACTIVE = new Set(ACTIVE_STATES);
+
+const FILTERS = [
+  { id: 'all',    label: '全部' },
+  { id: 'active', label: '进行中' },
+  { id: 'done',   label: '已完成' },
+  { id: 'failed', label: '失败' },
+];
 
 const STATE_META = {
   idle:        { label: '未解析',   variant: 'secondary', icon: Clock,        pulse: false },
@@ -41,13 +53,27 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busyKey, setBusyKey] = useState(null);
+  const [bulkRetrying, setBulkRetrying] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [counts, setCounts] = useState({});
   const timerRef = useRef(null);
+  // Latest filter/page captured in a ref so the polling interval always
+  // fetches the currently viewed page without re-subscribing each refresh.
+  const viewRef = useRef({ filter, page });
+  viewRef.current = { filter, page };
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const items = await api.listFulltextPending();
-      setRows(Array.isArray(items) ? items : []);
+      const { filter: f, page: p } = viewRef.current;
+      const r = await api.listFulltextPending({ filter: f, page: p, pageSize: PAGE_SIZE });
+      setRows(Array.isArray(r?.items) ? r.items : []);
+      setTotal(r?.total ?? 0);
+      setTotalPages(r?.totalPages ?? 1);
+      setCounts(r?.counts ?? {});
     } catch (err) {
       toast.error(`加载任务列表失败: ${err.message}`);
     } finally {
@@ -55,22 +81,23 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
     }
   }, []);
 
-  // Initial load + auto-poll while there are active tasks.
+  // Fetch whenever the dialog opens or the filter/page changes.
   useEffect(() => {
     if (!open) return;
     refresh();
-  }, [open, refresh]);
+  }, [open, filter, page, refresh]);
 
+  // Auto-poll while there are active tasks anywhere (not just current page).
+  const activeCount = ACTIVE_STATES.reduce((n, s) => n + (counts[s] || 0), 0);
   useEffect(() => {
     if (!open) return;
-    const hasActive = rows.some(r => ACTIVE.has(r.state));
-    if (!hasActive) {
+    if (activeCount === 0) {
       if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
       return;
     }
     timerRef.current = setInterval(refresh, POLL_MS);
     return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
-  }, [open, rows, refresh]);
+  }, [open, activeCount, refresh]);
 
   const retry = useCallback(async (key) => {
     setBusyKey(key);
@@ -85,15 +112,42 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
     }
   }, [refresh]);
 
+  const retryAllFailed = useCallback(async () => {
+    setBulkRetrying(true);
+    try {
+      const r = await api.retryFailedFulltext();
+      const s = r?.summary;
+      if (!s || s.queued === 0) {
+        toast.info('没有可重试的失败任务');
+      } else {
+        toast.success(`已重新入队 ${s.queued} 个失败任务（将按节流速率提交）`);
+      }
+      refresh();
+    } catch (err) {
+      toast.error(`批量重试失败: ${err.message}`);
+    } finally {
+      setBulkRetrying(false);
+    }
+  }, [refresh]);
+
   const viewItem = useCallback((key) => {
     onSelectItem?.(key);
     onOpenChange?.(false);
   }, [onSelectItem, onOpenChange]);
 
-  // Summary counts
-  const counts = rows.reduce((acc, r) => { acc[r.state] = (acc[r.state] || 0) + 1; return acc; }, {});
-  const total = rows.length;
-  const activeCount = ['submitting', 'pending', 'running', 'converting'].reduce((n, s) => n + (counts[s] || 0), 0);
+  const changeFilter = useCallback((f) => {
+    setFilter(f);
+    setPage(1);
+  }, []);
+
+  const goPrev = useCallback(() => setPage(p => Math.max(1, p - 1)), []);
+  const goNext = useCallback(() => setPage(p => Math.min(totalPages, p + 1)), [totalPages]);
+
+  const filterCount = (id) => {
+    if (id === 'all')    return total;
+    if (id === 'active') return activeCount;
+    return counts[id] || 0;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,20 +166,54 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
           </DialogDescription>
         </DialogHeader>
 
+        {/* Filter tabs */}
+        <div className="flex items-center gap-1 px-6 py-2 border-b">
+          {FILTERS.map(f => (
+            <Button
+              key={f.id}
+              size="sm"
+              variant={filter === f.id ? 'default' : 'outline'}
+              className="h-7"
+              onClick={() => changeFilter(f.id)}
+            >
+              {f.label}
+              <span className="ml-1.5 text-xs opacity-70 tabular-nums">{filterCount(f.id)}</span>
+            </Button>
+          ))}
+        </div>
+
         <div className="flex items-center justify-between px-6 py-2 border-b">
           <span className="text-xs text-muted-foreground">
             {loading ? '加载中…' : `最近更新于 ${new Date().toLocaleTimeString()}`}
           </span>
-          <Button size="sm" variant="outline" onClick={refresh} disabled={loading} title="手动刷新">
-            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
-            刷新
-          </Button>
+          <div className="flex items-center gap-2">
+            {counts.failed > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={retryAllFailed}
+                disabled={bulkRetrying || loading}
+                title={`重试全部 ${counts.failed} 个失败任务`}
+              >
+                {bulkRetrying
+                  ? <Loader2 className="size-3.5 animate-spin" />
+                  : <RotateCcw className="size-3.5" />}
+                重试全部失败（{counts.failed}）
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={refresh} disabled={loading} title="手动刷新">
+              <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
+              刷新
+            </Button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto">
-          {total === 0 ? (
+          {rows.length === 0 ? (
             <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-              暂无解析任务。在条目详情页点击"解析全文"或在列表点"批量解析全文"即可创建。
+              {total === 0
+                ? '暂无解析任务。在条目详情页点击"解析全文"或在列表点"批量解析全文"即可创建。'
+                : '当前筛选下没有任务。'}
             </div>
           ) : (
             <table className="w-full text-sm">
@@ -193,6 +281,35 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
             </table>
           )}
         </div>
+
+        {/* Pagination footer */}
+        {total > 0 && (
+          <div className="flex items-center justify-between px-6 py-2 border-t text-xs text-muted-foreground">
+            <span>第 {page} / {totalPages} 页 · 每页 {PAGE_SIZE} 条</span>
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                onClick={goPrev}
+                disabled={page <= 1 || loading}
+                title="上一页"
+              >
+                <ChevronLeft className="size-3.5" />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                onClick={goNext}
+                disabled={page >= totalPages || loading}
+                title="下一页"
+              >
+                <ChevronRight className="size-3.5" />
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

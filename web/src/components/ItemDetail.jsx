@@ -29,87 +29,93 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { Save, Trash2, FileText, Plus, X, ExternalLink, Download, Copy, Check, ChevronUp, ChevronDown, BookOpen, Sparkles, Loader2 } from 'lucide-react';
+import { Save, Trash2, FileText, Plus, X, ExternalLink, Download, Copy, Check, ChevronUp, ChevronDown, BookOpen, Sparkles, Loader2, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
-import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle } from '@/lib/items';
+import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle, ALLOWED_PUBLICATION_TITLES, NOT_ARCHIVED } from '@/lib/items';
+import { CalibratePanel } from './CalibratePanel';
 
 // Lazy-load the full-text viewer: it pulls in react-markdown + remark-gfm +
 // remark-math + rehype-katex + katex CSS (~heavy). Only needed when the user
 // opens the "全文" tab.
 const FullTextView = lazy(() => import('./FullTextView').then(m => ({ default: m.FullTextView })));
 
-// Field definitions by type
+// Field definitions by type. The union of all sections for each type MUST
+// match the DB schema (src/db/seed.js ITEM_TYPES[].fields) so that every
+// field the AI calibration can touch is editable here. Fields that don't fit
+// a semantic section go into "other".
 const FIELDS_BY_TYPE = {
   journalArticle: {
     basic: ['title', 'date', 'shortTitle'],
-    publication: ['publicationTitle', 'volume', 'issue', 'pages'],
-    identifiers: ['DOI', 'ISSN', 'url'],
+    publication: ['publicationTitle', 'publicationTitleAbbrev', 'volume', 'issue', 'pages'],
+    identifiers: ['DOI', 'ISSN', 'url', 'accessDate'],
     abstract: ['abstractNote'],
-    extra: ['language', 'extra'],
+    other: ['language', 'rights', 'libraryCatalog', 'archive', 'archiveLocation', 'extra'],
   },
   preprint: {
     basic: ['title', 'date'],
     publication: ['repository'],
-    identifiers: ['DOI', 'url'],
+    identifiers: ['DOI', 'arXivID', 'url', 'accessDate'],
     abstract: ['abstractNote'],
-    extra: ['extra'],
+    other: ['language', 'rights', 'extra'],
   },
   book: {
-    basic: ['title', 'date', 'edition'],
-    publication: ['publisher', 'place', 'series', 'volume', 'numPages'],
-    identifiers: ['ISBN', 'url'],
+    basic: ['title', 'date', 'edition', 'shortTitle'],
+    publication: ['publisher', 'place', 'series', 'seriesNumber', 'volume', 'numPages'],
+    identifiers: ['ISBN', 'url', 'accessDate'],
     abstract: ['abstractNote'],
-    extra: ['language', 'extra'],
+    other: ['language', 'rights', 'callNumber', 'libraryCatalog', 'extra'],
   },
   bookSection: {
-    basic: ['title', 'date', 'bookTitle'],
-    publication: ['publisher', 'place', 'series', 'volume', 'pages', 'edition'],
-    identifiers: ['ISBN', 'url'],
+    basic: ['title', 'date', 'bookTitle', 'edition', 'shortTitle'],
+    publication: ['publisher', 'place', 'series', 'seriesNumber', 'volume', 'pages'],
+    identifiers: ['ISBN', 'url', 'accessDate'],
     abstract: ['abstractNote'],
-    extra: ['extra'],
+    other: ['language', 'rights', 'extra'],
   },
   conferencePaper: {
-    basic: ['title', 'date', 'conferenceName'],
+    basic: ['title', 'date', 'conferenceName', 'shortTitle'],
     publication: ['proceedingsTitle', 'place', 'publisher', 'pages'],
-    identifiers: ['DOI', 'ISBN', 'url'],
+    identifiers: ['DOI', 'ISBN', 'url', 'accessDate'],
     abstract: ['abstractNote'],
-    extra: ['extra'],
+    other: ['language', 'rights', 'extra'],
   },
   thesis: {
-    basic: ['title', 'date', 'thesisType'],
+    basic: ['title', 'date', 'thesisType', 'shortTitle'],
     publication: ['university', 'place', 'numPages'],
-    identifiers: ['url'],
+    identifiers: ['url', 'accessDate'],
     abstract: ['abstractNote'],
-    extra: ['language', 'extra'],
+    other: ['language', 'rights', 'extra'],
   },
   report: {
-    basic: ['title', 'date', 'reportType', 'reportNumber'],
+    basic: ['title', 'date', 'reportType', 'reportNumber', 'shortTitle'],
     publication: ['publisher', 'place', 'series', 'pages'],
-    identifiers: ['url'],
+    identifiers: ['url', 'accessDate'],
     abstract: ['abstractNote'],
-    extra: ['extra'],
+    other: ['language', 'rights', 'extra'],
   },
   document: {
     basic: ['title', 'date'],
     publication: ['publisher', 'numPages', 'pages'],
-    identifiers: ['DOI', 'ISBN', 'url'],
+    identifiers: ['DOI', 'ISBN', 'url', 'accessDate'],
     abstract: ['abstractNote'],
-    extra: ['language', 'extra'],
+    other: ['language', 'rights', 'extra'],
   },
 };
 
 const FIELD_LABELS = {
   title: '标题', abstractNote: '摘要', publicationTitle: '期刊',
-  volume: '卷', issue: '期', pages: '页码', date: '日期',
-  DOI: 'DOI', ISBN: 'ISBN', ISSN: 'ISSN', url: 'URL',
-  language: '语言', shortTitle: '短标题', extra: '附加信息',
+  publicationTitleAbbrev: '期刊缩写', volume: '卷', issue: '期', pages: '页码',
+  date: '日期', DOI: 'DOI', ISBN: 'ISBN', ISSN: 'ISSN', url: 'URL',
+  accessDate: '引用日期', language: '语言', shortTitle: '短标题', extra: '附加信息',
   bookTitle: '书名', conferenceName: '会议名称', proceedingsTitle: '会议录',
   place: '地点', publisher: '出版社', numPages: '页数',
-  series: '系列', edition: '版次', thesisType: '学位类型',
+  series: '系列', seriesNumber: '系列编号', edition: '版次', thesisType: '学位类型',
   university: '大学', reportType: '报告类型', reportNumber: '报告编号',
-  repository: '仓库',
+  repository: '仓库', arXivID: 'arXiv ID', rights: '权限',
+  libraryCatalog: '目录', archive: '存档', archiveLocation: '存档位置',
+  callNumber: '索书号',
 };
 
 const CREATOR_TYPES = ['author', 'editor', 'translator', 'contributor'];
@@ -206,6 +212,10 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   const [exportContent, setExportContent] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [parseBusy, setParseBusy] = useState(false);
+  const [calibrateOpen, setCalibrateOpen] = useState(false);
+  const [calibrateLoading, setCalibrateLoading] = useState(false);
+  const [calibrateResult, setCalibrateResult] = useState(null);
+  const [calibrateError, setCalibrateError] = useState(null);
 
   useEffect(() => {
     if (!item) return;
@@ -230,6 +240,20 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [dirty]);
+
+  // AIS Basket rule: a journalArticle without a DOI can only be filed under
+  // "未归档". When DOI is missing, force publicationTitle to NOT_ARCHIVED so
+  // the constrained selector cannot assign it to a real basket journal.
+  // Mark dirty so the corrected value is persisted on save.
+  useEffect(() => {
+    if (!draft) return;
+    if (draft.itemType !== 'journalArticle') return;
+    const doiMissing = !draft.fields?.DOI;
+    if (doiMissing && draft.fields?.publicationTitle !== NOT_ARCHIVED) {
+      setDraft(d => ({ ...d, fields: { ...d.fields, publicationTitle: NOT_ARCHIVED } }));
+      setDirty(true);
+    }
+  }, [draft?.itemType, draft?.fields?.DOI, draft?.fields?.publicationTitle]);
 
   const pdfAttachments = (attachments || []).filter(a => (a.contentType || '').includes('pdf'));
   const previewUrl = activePdfKey ? `/api/attachments/${activePdfKey}/file` : null;
@@ -306,6 +330,8 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   };
 
   const fields = FIELDS_BY_TYPE[draft.itemType] || FIELDS_BY_TYPE.document;
+  // journalArticle without a DOI is locked to "未归档" (see the effect above).
+  const doiMissing = draft.itemType === 'journalArticle' && !draft.fields?.DOI;
 
   const openExport = async (format) => {
     if (!item) return;
@@ -343,6 +369,55 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     }
   };
 
+  const triggerCalibrate = async () => {
+    if (calibrateLoading) return;
+    if (fulltextState !== 'done') {
+      toast.warning('请先解析全文后再校准');
+      setTab('fulltext');
+      return;
+    }
+    setCalibrateOpen(true);
+    setCalibrateLoading(true);
+    setCalibrateError(null);
+    setCalibrateResult(null);
+    try {
+      const res = await api.calibrateItem(itemKey);
+      setCalibrateResult(res);
+    } catch (err) {
+      setCalibrateError(err.message);
+    } finally {
+      setCalibrateLoading(false);
+    }
+  };
+
+  const applyCalibration = ({ fields, creators }) => {
+    if (!draft) return;
+    const newFields = { ...draft.fields };
+    let fieldCount = 0;
+    for (const [k, v] of Object.entries(fields)) {
+      newFields[k] = v === '' ? null : v;
+      fieldCount++;
+    }
+    setDraft({ ...draft, fields: newFields });
+    // Merge accepted creators into the existing creatorsDraft by orderIndex.
+    if (creators && creators.length > 0) {
+      const merged = [...creatorsDraft];
+      for (const c of creators) {
+        const idx = typeof c.orderIndex === 'number' ? c.orderIndex : -1;
+        if (idx >= 0 && idx < merged.length) {
+          merged[idx] = { ...merged[idx], ...c };
+        } else {
+          merged.push(c);
+        }
+      }
+      setCreatorsDraft(merged);
+    }
+    setDirty(true);
+    setCalibrateOpen(false);
+    setTab('detail');
+    toast.success(`已应用到草稿（${fieldCount} 字段${creators?.length ? `，${creators.length} 作者` : ''}），请核对后保存`);
+  };
+
   return (
     <div className="flex h-full flex-col">
       {/* Dirty indicator bar */}
@@ -375,6 +450,18 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               <span className="hidden sm:inline">
                 {fulltextActive ? '解析中' : fulltextState === 'done' ? '重新解析' : fulltextState === 'failed' ? '重试' : '解析全文'}
               </span>
+            </Button>
+          )}
+          {pdfAttachments.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={triggerCalibrate}
+              disabled={calibrateLoading || fulltextState !== 'done'}
+              title={fulltextState !== 'done' ? '需先解析全文后才能校准' : '用 AI 对比全文校准元数据'}
+            >
+              {calibrateLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
+              <span className="hidden sm:inline">AI 校准</span>
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => openExport('bibtex')} title="导出 BibTeX">
@@ -440,12 +527,37 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                 <Section title="发表信息">
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                     {fields.publication.map(name => (
-                      <Field
-                        key={name}
-                        name={name}
-                        value={draft.fields[name]}
-                        onChange={v => setField(name, v)}
-                      />
+                      name === 'publicationTitle' ? (
+                        <div key={name} className="col-span-2">
+                          <Label className="text-xs text-muted-foreground">期刊</Label>
+                          <Select
+                            value={draft.fields.publicationTitle || ''}
+                            onValueChange={v => setField('publicationTitle', v)}
+                            disabled={doiMissing}
+                          >
+                            <SelectTrigger className="mt-1 h-8 text-sm">
+                              <SelectValue placeholder={doiMissing ? NOT_ARCHIVED : '选择期刊'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ALLOWED_PUBLICATION_TITLES.map(j => (
+                                <SelectItem key={j} value={j}>{j}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {doiMissing && (
+                            <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+                              DOI 缺失，仅可归入「未归档」
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <Field
+                          key={name}
+                          name={name}
+                          value={draft.fields[name]}
+                          onChange={v => setField(name, v)}
+                        />
+                      )
                     ))}
                   </div>
                 </Section>
@@ -555,10 +667,10 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                 </div>
               </Section>
 
-              {fields.extra && fields.extra.length > 0 && (
+              {fields.other && fields.other.length > 0 && (
                 <Section title="其他">
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2">
-                    {fields.extra.map(name => (
+                    {fields.other.map(name => (
                       <Field
                         key={name}
                         name={name}
@@ -675,6 +787,15 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CalibratePanel
+        open={calibrateOpen}
+        onOpenChange={setCalibrateOpen}
+        result={calibrateResult}
+        loading={calibrateLoading}
+        error={calibrateError}
+        onApply={applyCalibration}
+      />
     </div>
   );
 });

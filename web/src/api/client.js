@@ -89,5 +89,14 @@ export const api = {
   parseFulltextBatch(keys) {
     return req('/api/fulltext/parse-batch', { method: 'POST', body: JSON.stringify({ keys }) });
   },
-  listFulltextPending() { return req('/api/fulltext/pending').then(r => r.items); },
+  retryFailedFulltext() {
+    return req('/api/fulltext/retry-failed', { method: 'POST' });
+  },
+  listFulltextPending({ filter = 'all', page = 1, pageSize = 50 } = {}) {
+    const qs = new URLSearchParams({ filter, page: String(page), pageSize: String(pageSize) });
+    return req(`/api/fulltext/pending?${qs.toString()}`);
+  },
+  calibrateItem(key) {
+    return req(`/api/items/${key}/calibrate`, { method: 'POST' });
+  },
 };

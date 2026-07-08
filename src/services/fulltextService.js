@@ -6,7 +6,7 @@ import { Attachment } from '../models/Attachment.js';
 import { resolveStoredPath } from './storageService.js';
 import {
   getFullTextRowByKey, getFullTextRow, upsertFullText,
-  listPendingFullText, listSubmittingFullText, listAllFullText, deleteFullTextRow,
+  listPendingFullText, listSubmittingFullText, listFailedFullText, listAllFullText, deleteFullTextRow,
 } from '../repositories/fulltextRepo.js';
 import {
   submitLocalPdf, getBatchResult, downloadAndExtract, rewriteAssetPaths,
@@ -56,7 +56,9 @@ export async function parseItem(key, { force = false } = {}) {
   const pdfPath = findPdfPath(item);
   if (!pdfPath) throw new Error('no PDF attachment available to parse');
 
-  const fileName = path.basename(pdfPath) || `${key}.pdf`;
+  // Use <key>.pdf as the MinerU file_name so polling can match results back
+  // to items by file_name regardless of submission path (single or batch).
+  const fileName = `${key}.pdf`;
   const { batchId } = await submitLocalPdf({
     filePath: pdfPath,
     fileName,
@@ -83,18 +85,35 @@ export async function parseItem(key, { force = false } = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Async submission queue
+// Async submission queue (one-by-one)
 //
 // The batch endpoint enqueues hundreds of items here instead of submitting
-// them synchronously (which would take minutes and time out the HTTP
-// request). Each enqueued item gets a DB row in state='submitting' right
-// away so it shows up in the task log immediately. A bounded-concurrency
-// drain loop calls MinerU's upload+submit for each, then flips the row to
-// 'pending' (success) or 'failed' (error) for the polling worker to pick up.
+// them synchronously. Each enqueued item gets a DB row in state='submitting'
+// right away so it shows up in the task log immediately. A bounded-concurrency
+// drain loop submits ONE file at a time to MinerU via submitLocalPdf, then
+// flips the row to 'pending' (success) or 'failed' (error) for the polling
+// worker to pick up. One-by-one submission avoids the 429 / -60019 quota
+// storms that the 200-file chunked approach triggered.
 // ---------------------------------------------------------------------------
 const submitQueue = [];
 let submitQueueRunning = false;
-const SUBMIT_CONCURRENCY = 2;
+const SUBMIT_CONCURRENCY = Math.max(1, Math.min(4, Number(config.mineru.submitConcurrency ?? 2)));
+const SUBMIT_INTERVAL_MS = Math.max(0, Number(config.mineru.submitIntervalMs ?? 800));
+const SUBMIT_MAX_RETRIES = Math.max(0, Number(config.mineru.submitMaxRetries ?? 5));
+
+function sleep(ms) {
+  return new Promise(r => setTimeout(r, ms));
+}
+
+/**
+ * Exponential backoff with full jitter for 429 retries.
+ */
+function backoffDelay(attempt) {
+  const base = Math.max(100, Number(config.mineru.submitRetryBaseMs ?? 2000));
+  const cap = Math.max(base, Number(config.mineru.submitRetryMaxMs ?? 60000));
+  const exp = Math.min(cap, base * 2 ** attempt);
+  return Math.floor(Math.random() * exp);
+}
 
 /**
  * Enqueue a batch of items for background submission to MinerU.
@@ -150,41 +169,69 @@ export function enqueueBatchParse(keys) {
   return { queued, skippedDone, skippedRunning, noPdf, notFound, total: keys.length };
 }
 
+/**
+ * Drain the submit queue one item at a time with bounded concurrency.
+ * Each item is submitted via submitLocalPdf (single-file MinerU batch).
+ */
 async function drainSubmitQueue() {
   if (submitQueueRunning) return;
   submitQueueRunning = true;
   try {
-    while (submitQueue.length > 0) {
-      // Take up to SUBMIT_CONCURRENCY items and submit in parallel.
-      const batch = submitQueue.splice(0, SUBMIT_CONCURRENCY);
-      await Promise.all(batch.map(({ itemId, key, pdfPath }) => submitOne(itemId, key, pdfPath)));
-    }
+    const workers = Array.from({ length: SUBMIT_CONCURRENCY }, () => runSubmitWorker());
+    await Promise.all(workers);
   } finally {
     submitQueueRunning = false;
   }
 }
 
-async function submitOne(itemId, key, pdfPath) {
-  try {
-    const fileName = path.basename(pdfPath) || `${key}.pdf`;
-    const { batchId } = await submitLocalPdf({
-      filePath: pdfPath,
-      fileName,
-      modelVersion: config.mineru.modelVersion,
-    });
-    upsertFullText(itemId, {
-      state: 'pending',
-      mineruBatchId: batchId,
-      errMsg: null,
-      errCode: null,
-    });
-  } catch (err) {
-    upsertFullText(itemId, {
-      state: 'failed',
-      errMsg: err.message,
-      errCode: null,
-    });
-    console.error(`[fulltext] submit failed for ${key}: ${err.message}`);
+async function runSubmitWorker() {
+  while (submitQueue.length > 0) {
+    const job = submitQueue.shift();
+    if (!job) break;
+    await submitOne(job);
+    // Brief gap between submissions to be gentle on MinerU rate limits.
+    if (submitQueue.length > 0 && SUBMIT_INTERVAL_MS > 0) await sleep(SUBMIT_INTERVAL_MS);
+  }
+}
+
+/**
+ * Submit a single item to MinerU with 429 backoff retry.
+ */
+async function submitOne({ itemId, key, pdfPath }) {
+  let attempt = 0;
+  while (true) {
+    try {
+      const { batchId } = await submitLocalPdf({
+        filePath: pdfPath,
+        fileName: `${key}.pdf`,
+        modelVersion: config.mineru.modelVersion,
+      });
+      upsertFullText(itemId, {
+        state: 'pending',
+        mineruBatchId: batchId,
+        errMsg: null,
+        errCode: null,
+      });
+      return;
+    } catch (err) {
+      const status = err.status ?? null;
+      const isTransient = status === 429 || status === 503 || status === 502;
+      if (isTransient && attempt < SUBMIT_MAX_RETRIES) {
+        const delay = backoffDelay(attempt);
+        attempt++;
+        console.warn(`[fulltext] submit ${key} throttled (HTTP ${status}); retry ${attempt}/${SUBMIT_MAX_RETRIES} after ${delay}ms`);
+        upsertFullText(itemId, { state: 'submitting', errMsg: `rate-limited, retry ${attempt}/${SUBMIT_MAX_RETRIES}` });
+        await sleep(delay);
+        continue;
+      }
+      upsertFullText(itemId, {
+        state: 'failed',
+        errMsg: err.message,
+        errCode: status != null ? String(status) : String(err.mineruCode ?? ''),
+      });
+      console.error(`[fulltext] submit failed for ${key}: ${err.message}`);
+      return;
+    }
   }
 }
 
@@ -211,59 +258,96 @@ export function recoverSubmittingOnStartup() {
 }
 
 /**
- * One polling tick: walk all pending rows, query MinerU, update state, and
- * finalize (download + extract + rewrite) any that are done. Concurrency is
- * capped at config.mineru.maxConcurrent to respect rate limits.
+ * Re-enqueue every row currently in 'failed' state.
+ */
+export function retryFailed() {
+  const failed = listFailedFullText();
+  const keys = failed.map(r => r.itemKey).filter(Boolean);
+  if (keys.length === 0) return { queued: 0, skippedDone: 0, skippedRunning: 0, noPdf: 0, notFound: 0, total: 0 };
+  return enqueueBatchParse(keys);
+}
+
+/**
+ * One polling tick: query MinerU for each distinct batchId among pending
+ * rows, then match results back to items by file_name (<key>.pdf). Multiple
+ * items sharing a batchId (from a 200-file chunk) are resolved with a single
+ * query, so request count scales with batch count, not item count.
+ * Concurrency is capped at config.mineru.maxConcurrent.
  */
 export async function pollOnce() {
   const pending = listPendingFullText();
   if (pending.length === 0) return { checked: 0, finalized: 0, failed: 0 };
+
+  // Group rows by batchId so each batch is queried only once.
+  const byBatch = new Map();
+  for (const row of pending) {
+    if (!row.mineruBatchId) continue;
+    if (!byBatch.has(row.mineruBatchId)) byBatch.set(row.mineruBatchId, []);
+    byBatch.get(row.mineruBatchId).push(row);
+  }
+  if (byBatch.size === 0) return { checked: 0, finalized: 0, failed: 0 };
 
   const limit = Math.max(1, config.mineru.maxConcurrent);
   let finalized = 0;
   let failed = 0;
   let checked = 0;
 
-  // Simple concurrency limiter.
-  const queue = pending.slice();
+  const queue = [...byBatch.entries()]; // [[batchId, rows[]], ...]
   async function worker() {
     while (queue.length) {
-      const row = queue.shift();
+      const [batchId, rows] = queue.shift();
       checked++;
       try {
-        const data = await getBatchResult(row.mineruBatchId);
+        const data = await getBatchResult(batchId);
         const results = data.extract_result || [];
-        const first = results[0];
-        if (!first) {
-          upsertFullText(row.itemID, { state: 'failed', errMsg: 'no result returned' });
-          failed++;
-          continue;
-        }
-        if (first.state === 'done' && first.full_zip_url) {
-          await finalizeDone(row, first.full_zip_url);
-          finalized++;
-        } else if (first.state === 'failed') {
-          upsertFullText(row.itemID, {
-            state: 'failed',
-            errMsg: first.err_msg || 'parse failed',
-          });
-          failed++;
-        } else {
-          // pending / running / converting / waiting-file
-          const prog = first.extract_progress || {};
-          upsertFullText(row.itemID, {
-            state: mapState(first.state),
-            extractedPages: prog.extracted_pages ?? null,
-            totalPages: prog.total_pages ?? null,
-          });
+        // Index results by file_name for O(1) lookup.
+        const byName = new Map(results.map(r => [r.file_name, r]));
+        for (const row of rows) {
+          const expectedName = `${row.itemKey}.pdf`;
+          const r = byName.get(expectedName);
+          if (!r) continue; // not in results yet; leave state as-is
+          if (r.state === 'done' && r.full_zip_url) {
+            await finalizeDone(row, r.full_zip_url);
+            finalized++;
+          } else if (r.state === 'failed') {
+            upsertFullText(row.itemID, {
+              state: 'failed',
+              errMsg: r.err_msg || 'parse failed',
+            });
+            failed++;
+          } else {
+            const prog = r.extract_progress || {};
+            upsertFullText(row.itemID, {
+              state: mapState(r.state),
+              extractedPages: prog.extracted_pages ?? null,
+              totalPages: prog.total_pages ?? null,
+            });
+          }
         }
       } catch (err) {
-        // Don't mark failed on transient network errors; leave state as-is.
-        console.error(`[fulltext] poll error for ${row.itemKey}:`, err.message);
+        const mineruCode = err.mineruCode ?? null;
+        // -60012: task not found or expired (e.g. batch was submitted under
+        //   a different token, or the result TTL elapsed). These won't ever
+        //   resolve — mark failed so the user can retry with the current token.
+        // A0202/A0211: invalid/expired token — same treatment.
+        if (mineruCode === -60012 || mineruCode === 'A0202' || mineruCode === 'A0211') {
+          for (const row of rows) {
+            upsertFullText(row.itemID, {
+              state: 'failed',
+              errMsg: err.message,
+              errCode: String(mineruCode),
+            });
+            failed++;
+          }
+          console.warn(`[fulltext] batch ${batchId} unreachable (code ${mineruCode}); marked ${rows.length} item(s) as failed`);
+        } else {
+          // Transient network errors: leave state as-is for next tick.
+          console.error(`[fulltext] poll error for batch ${batchId} (${rows.length} items):`, err.message);
+        }
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(limit, pending.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(limit, byBatch.size) }, worker));
   return { checked, finalized, failed };
 }
 

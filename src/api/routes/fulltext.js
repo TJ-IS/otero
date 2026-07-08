@@ -1,14 +1,30 @@
 import { Router } from 'express';
 import { Item } from '../../models/Item.js';
 import {
-  parseItem, getFullText, deleteFullText, listAll, enqueueBatchParse,
+  parseItem, getFullText, deleteFullText, enqueueBatchParse, retryFailed,
 } from '../../services/fulltextService.js';
+import { listFullTextPaged, getFullTextCounts } from '../../repositories/fulltextRepo.js';
 
 export const fulltextRouter = Router();
 
-// GET /api/fulltext/pending  — admin queue view (all rows)
-fulltextRouter.get('/fulltext/pending', (_req, res) => {
-  res.json({ items: listAll() });
+const ALLOWED_FILTERS = new Set(['all', 'active', 'done', 'failed']);
+
+// GET /api/fulltext/pending?filter=&page=&pageSize=
+// Paged task-log view. Returns current page plus per-state counts so the
+// UI can render summary + pagination without a second round-trip.
+fulltextRouter.get('/fulltext/pending', (req, res) => {
+  const filter = ALLOWED_FILTERS.has(req.query.filter) ? req.query.filter : 'all';
+  const page = Math.max(1, Number(req.query.page) || 1);
+  const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
+  const { items, total } = listFullTextPaged({ filter, page, pageSize });
+  res.json({
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    counts: getFullTextCounts(),
+  });
 });
 
 // POST /api/fulltext/parse-batch  { keys: [key, ...] }
@@ -21,6 +37,14 @@ fulltextRouter.post('/fulltext/parse-batch', (req, res) => {
   if (keys.length === 0) return res.status(400).json({ error: 'keys required' });
   const summary = enqueueBatchParse(keys);
   res.json({ results: [], summary });
+});
+
+// POST /api/fulltext/retry-failed
+// Re-enqueues every row currently in 'failed' state. Useful after a burst
+// of HTTP 429 rate-limit failures.
+fulltextRouter.post('/fulltext/retry-failed', (_req, res) => {
+  const summary = retryFailed();
+  res.json({ summary });
 });
 
 // POST /api/items/:key/fulltext/parse  ?force=true

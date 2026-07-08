@@ -52,6 +52,21 @@ export const config = {
     enableFormula: process.env.OTERO_MINERU_FORMULA !== 'false',
     enableTable: process.env.OTERO_MINERU_TABLE !== 'false',
     language: process.env.OTERO_MINERU_LANGUAGE || 'ch',
+    // Submit queue throttling & 429 backoff.
+    submitConcurrency: Number(process.env.OTERO_MINERU_SUBMIT_CONCURRENCY ?? 2),
+    submitIntervalMs: Number(process.env.OTERO_MINERU_SUBMIT_INTERVAL_MS ?? 800),
+    submitMaxRetries: Number(process.env.OTERO_MINERU_SUBMIT_MAX_RETRIES ?? 5),
+    submitRetryBaseMs: Number(process.env.OTERO_MINERU_SUBMIT_RETRY_BASE_MS ?? 2000),
+    submitRetryMaxMs: Number(process.env.OTERO_MINERU_SUBMIT_RETRY_MAX_MS ?? 60000),
+    // How many files to pack into one /file-urls/batch request (max 200).
+    batchSize: Number(process.env.OTERO_MINERU_BATCH_SIZE ?? 200),
+  },
+  llm: {
+    apiKey: process.env.OPENAI_API_KEY || '',
+    baseURL: process.env.OPENAI_BASE_URL || 'https://api.deepseek.com/v1',
+    model: process.env.OPENAI_MODEL || 'deepseek-v4-flash',
+    timeoutMs: Number(process.env.OTERO_LLM_TIMEOUT_MS ?? 90000),
+    maxMarkdownChars: Number(process.env.OTERO_LLM_MAX_CHARS ?? 16000),
   },
 };
 

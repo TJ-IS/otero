@@ -65,6 +65,15 @@ export function listSubmittingFullText() {
   `).all();
 }
 
+export function listFailedFullText() {
+  return getDb().prepare(`
+    SELECT f.*, i.key AS itemKey FROM itemFullText f
+    JOIN items i ON i.itemID = f.itemID
+    WHERE f.state = 'failed'
+    ORDER BY f.dateModified ASC
+  `).all();
+}
+
 export function listAllFullText() {
   return getDb().prepare(`
     SELECT f.*, i.key AS itemKey,
@@ -77,6 +86,56 @@ export function listAllFullText() {
     JOIN items i ON i.itemID = f.itemID
     ORDER BY f.dateModified DESC
   `).all();
+}
+
+// State groups for the filter tabs in the task log UI.
+const STATE_GROUPS = {
+  all:      null,
+  active:   ['submitting', 'pending', 'running', 'converting'],
+  done:     ['done'],
+  failed:   ['failed'],
+};
+
+/**
+ * Paged query for the task log. `filter` is one of STATE_GROUPS keys.
+ * Returns { items, total } where total is the count for that filter
+ * (used to render pagination controls).
+ */
+export function listFullTextPaged({ filter = 'all', page = 1, pageSize = 50 } = {}) {
+  const db = getDb();
+  const states = STATE_GROUPS[filter] ?? null;
+  const where = states && states.length
+    ? `WHERE f.state IN (${states.map(() => '?').join(',')})`
+    : '';
+  const total = db.prepare(`SELECT COUNT(*) AS n FROM itemFullText f ${where}`).get(...(states || [])).n;
+  const offset = Math.max(0, (page - 1) * pageSize);
+  const items = db.prepare(`
+    SELECT f.*, i.key AS itemKey,
+      (SELECT v.value FROM itemData d
+        JOIN itemDataValues v ON v.valueID = d.valueID
+        WHERE d.itemID = i.itemID
+          AND d.fieldID = (SELECT fieldID FROM fields WHERE fieldName = 'title')
+      ) AS title
+    FROM itemFullText f
+    JOIN items i ON i.itemID = f.itemID
+    ${where}
+    ORDER BY f.dateModified DESC
+    LIMIT ? OFFSET ?
+  `).all(...(states || []), pageSize, offset);
+  return { items, total };
+}
+
+/**
+ * Per-state counts for the task log summary line. Returns an object keyed
+ * by state name; missing states default to 0 on the caller side.
+ */
+export function getFullTextCounts() {
+  const rows = getDb().prepare(`
+    SELECT state, COUNT(*) AS n FROM itemFullText GROUP BY state
+  `).all();
+  const out = {};
+  for (const r of rows) out[r.state] = r.n;
+  return out;
 }
 
 export function deleteFullTextRow(itemId) {
