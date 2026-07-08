@@ -29,11 +29,11 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { Save, Trash2, FileText, Plus, X, ExternalLink, Download, Copy, Check, ChevronUp, ChevronDown, BookOpen, Sparkles, Loader2, Wand2 } from 'lucide-react';
+import { Save, Trash2, FileText, Plus, X, ExternalLink, Copy, Check, ChevronUp, ChevronDown, BookOpen, Sparkles, Loader2, Wand2, Braces } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
-import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle, ALLOWED_PUBLICATION_TITLES, NOT_ARCHIVED } from '@/lib/items';
+import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle, ALLOWED_PUBLICATION_TITLES, UNFILED } from '@/lib/items';
 import { CalibratePanel } from './CalibratePanel';
 
 // Lazy-load the full-text viewer: it pulls in react-markdown + remark-gfm +
@@ -242,15 +242,15 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   }, [dirty]);
 
   // AIS Basket rule: a journalArticle without a DOI can only be filed under
-  // "未归档". When DOI is missing, force publicationTitle to NOT_ARCHIVED so
-  // the constrained selector cannot assign it to a real basket journal.
+  // UNFILED ("待归档"). When DOI is missing, force publicationTitle to UNFILED
+  // so the constrained selector cannot assign it to a real basket journal.
   // Mark dirty so the corrected value is persisted on save.
   useEffect(() => {
     if (!draft) return;
     if (draft.itemType !== 'journalArticle') return;
     const doiMissing = !draft.fields?.DOI;
-    if (doiMissing && draft.fields?.publicationTitle !== NOT_ARCHIVED) {
-      setDraft(d => ({ ...d, fields: { ...d.fields, publicationTitle: NOT_ARCHIVED } }));
+    if (doiMissing && draft.fields?.publicationTitle !== UNFILED) {
+      setDraft(d => ({ ...d, fields: { ...d.fields, publicationTitle: UNFILED } }));
       setDirty(true);
     }
   }, [draft?.itemType, draft?.fields?.DOI, draft?.fields?.publicationTitle]);
@@ -330,7 +330,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   };
 
   const fields = FIELDS_BY_TYPE[draft.itemType] || FIELDS_BY_TYPE.document;
-  // journalArticle without a DOI is locked to "未归档" (see the effect above).
+  // journalArticle without a DOI is locked to UNFILED ("待归档") (see the effect above).
   const doiMissing = draft.itemType === 'journalArticle' && !draft.fields?.DOI;
 
   const openExport = async (format) => {
@@ -447,9 +447,6 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               {fulltextActive || parseBusy
                 ? <Loader2 className="size-3.5 animate-spin" />
                 : <Sparkles className="size-3.5" />}
-              <span className="hidden sm:inline">
-                {fulltextActive ? '解析中' : fulltextState === 'done' ? '重新解析' : fulltextState === 'failed' ? '重试' : '解析全文'}
-              </span>
             </Button>
           )}
           {pdfAttachments.length > 0 && (
@@ -461,14 +458,13 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               title={fulltextState !== 'done' ? '需先解析全文后才能校准' : '用 AI 对比全文校准元数据'}
             >
               {calibrateLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
-              <span className="hidden sm:inline">AI 校准</span>
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => openExport('bibtex')} title="导出 BibTeX">
-            <Download className="size-3.5" />
+            <Braces className="size-3.5" />
           </Button>
           <Button size="sm" variant="outline" onClick={() => openExport('ris')} title="导出 RIS">
-            <Download className="size-3.5" />
+            <FileText className="size-3.5" />
           </Button>
           <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)} title="删除">
             <Trash2 className="size-3.5" />
@@ -536,7 +532,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                             disabled={doiMissing}
                           >
                             <SelectTrigger className="mt-1 h-8 text-sm">
-                              <SelectValue placeholder={doiMissing ? NOT_ARCHIVED : '选择期刊'} />
+                              <SelectValue placeholder={doiMissing ? UNFILED : '选择期刊'} />
                             </SelectTrigger>
                             <SelectContent>
                               {ALLOWED_PUBLICATION_TITLES.map(j => (
@@ -546,7 +542,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           </Select>
                           {doiMissing && (
                             <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
-                              DOI 缺失，仅可归入「未归档」
+                              DOI 缺失，仅可归入「待归档」
                             </p>
                           )}
                         </div>

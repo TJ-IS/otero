@@ -1,6 +1,7 @@
--- Otero SQLite schema v1
+-- Otero SQLite schema
 -- Modeled on deps/zotero/resource/schema/userdata.sql but simplified.
 -- Uses EAV pattern for item fields so different item types can have different field sets.
+-- Schema version is tracked in the schemaVersion table; see src/db/migrate.js.
 
 PRAGMA foreign_keys = ON;
 
@@ -177,7 +178,7 @@ CREATE TABLE IF NOT EXISTS settings (
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS itemFullText (
   itemID          INTEGER PRIMARY KEY REFERENCES items(itemID) ON DELETE CASCADE,
-  state           TEXT NOT NULL DEFAULT 'idle',   -- idle|pending|running|converting|done|failed
+  state           TEXT NOT NULL DEFAULT 'idle',   -- idle|submitting|pending|running|converting|done|failed
   mineruBatchId   TEXT,                            -- MinerU batch_id (single-file batch upload)
   modelVersion    TEXT,                            -- vlm / pipeline
   extractedPages  INTEGER,

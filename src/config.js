@@ -31,7 +31,7 @@ export const config = {
   dataDir: path.join(projectRoot, 'data'),
   dbPath: path.join(projectRoot, 'data', 'otero.db'),
   storageDir: path.join(projectRoot, 'data', 'storage'),
-  schemaVersion: 2,
+  schemaVersion: 4,
   api: {
     port: Number(process.env.OTERO_PORT ?? 3000),
     host: process.env.OTERO_HOST ?? '127.0.0.1',

@@ -9,6 +9,18 @@
  *   - fallback:    fallback.fromPdfExtraction output
  */
 
+// CrossRef HTML-escapes ampersands (and a few other chars) inside JSON string
+// values, e.g. container-title comes back as "Information &amp; Management".
+// Decode the common entities so we store the canonical text. arXiv/OpenLibrary
+// return clean text, but decoding is idempotent so applying it everywhere is
+// safe.
+const ENTITY_MAP = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", '#39': "'" };
+const ENTITY_RE = /&(#39|amp|lt|gt|quot|apos);/g;
+function decodeEntities(s) {
+  if (!s) return s;
+  return String(s).replace(ENTITY_RE, (_, e) => ENTITY_MAP[e] ?? _);
+}
+
 function splitNames(nameStr) {
   const tokens = String(nameStr || '').trim().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return null;
@@ -34,9 +46,9 @@ function crossrefAuthors(message) {
 
 function mapCrossref(message) {
   const fields = {};
-  if (message.title?.[0]) fields.title = message.title[0];
-  if (message['container-title']?.[0]) fields.publicationTitle = message['container-title'][0];
-  if (message['short-container-title']?.[0]) fields.publicationTitleAbbrev = message['short-container-title'][0];
+  if (message.title?.[0]) fields.title = decodeEntities(message.title[0]);
+  if (message['container-title']?.[0]) fields.publicationTitle = decodeEntities(message['container-title'][0]);
+  if (message['short-container-title']?.[0]) fields.publicationTitleAbbrev = decodeEntities(message['short-container-title'][0]);
   if (message.volume) fields.volume = message.volume;
   if (message.issue) fields.issue = message.issue;
   if (message.page) fields.pages = message.page;
@@ -49,8 +61,8 @@ function mapCrossref(message) {
   if (message.ISSN?.[0]) fields.ISSN = message.ISSN[0];
   if (message.URL) fields.url = message.URL;
   if (message.language) fields.language = message.language;
-  if (message.publisher) fields.publisher = message.publisher;
-  if (message.abstract) fields.abstractNote = message.abstract;
+  if (message.publisher) fields.publisher = decodeEntities(message.publisher);
+  if (message.abstract) fields.abstractNote = decodeEntities(message.abstract);
 
   // Type inference: anything with container-title + volume/issue/page is journalArticle;
   // otherwise default to journalArticle too (CrossRef is mostly journals).
@@ -65,8 +77,8 @@ function mapCrossref(message) {
 
 function mapArxiv(entry) {
   const fields = {};
-  if (entry.title) fields.title = entry.title;
-  if (entry.summary) fields.abstractNote = entry.summary;
+  if (entry.title) fields.title = decodeEntities(entry.title);
+  if (entry.summary) fields.abstractNote = decodeEntities(entry.summary);
   const year = pickYear(entry.published);
   if (year) fields.date = year;
   if (entry.doi) fields.DOI = entry.doi;
@@ -84,8 +96,8 @@ function mapArxiv(entry) {
 
 function mapOpenlibrary(entry) {
   const fields = {};
-  if (entry.title) fields.title = entry.title;
-  if (entry.subtitle) fields.title = `${entry.title}: ${entry.subtitle}`;
+  if (entry.title) fields.title = decodeEntities(entry.title);
+  if (entry.subtitle) fields.title = `${decodeEntities(entry.title)}: ${decodeEntities(entry.subtitle)}`;
   const publishers = entry.publishers?.[0]?.name;
   if (publishers) fields.publisher = publishers;
   const place = entry.publishers?.[0]?.location;

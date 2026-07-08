@@ -18,7 +18,7 @@
 | 8 | Decision Support Systems |
 | 9 | Journal of Information Technology |
 | 10 | The Journal of Strategic Information Systems |
-| 11 | Information &amp; Management |
+| 11 | Information & Management |
 
 ## 功能特性
 

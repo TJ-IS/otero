@@ -2,27 +2,16 @@ import { Item } from '../models/Item.js';
 import { getDb } from '../db/connection.js';
 import { getFullText } from './fulltextService.js';
 import { config } from '../config.js';
+import { JOURNAL_WHITELIST, UNFILED } from './journalWhitelist.js';
 
 /**
  * AIS Senior Scholars' Basket of Journals — the 11 journals this system
- * curates. publicationTitle suggestions are constrained to this list plus
- * "未归档" when the source cannot be matched to any basket journal.
+ * curates (single backend source of truth: src/services/journalWhitelist.js).
+ * publicationTitle suggestions are constrained to this list plus UNFILED
+ * ("待归档") when the source cannot be matched to any basket journal.
  */
-const AIS_BASKET_JOURNALS = [
-  'MIS Quarterly',
-  'Information Systems Research',
-  'Journal of Management Information Systems',
-  'Journal of the Association for Information Systems',
-  'European Journal of Information Systems',
-  'Information Systems Journal',
-  'Journal of Information Technology',
-  'Journal of Strategic Information Systems',
-  'Information & Management',
-  'Decision Support Systems',
-  'Communications of the ACM',
-];
-const NOT_ARCHIVED = '未归档';
-const ALLOWED_PUBLICATION_TITLES = [...AIS_BASKET_JOURNALS, NOT_ARCHIVED];
+const AIS_BASKET_JOURNALS = JOURNAL_WHITELIST;
+const ALLOWED_PUBLICATION_TITLES = [...AIS_BASKET_JOURNALS, UNFILED];
 
 /**
  * List the field names allowed for a given itemType name.
@@ -103,10 +92,10 @@ ${markdown}
 - status 含义：correct=当前值正确；incorrect=当前值有误应改为 suggested；missing=当前为空应补 suggested；extra=当前值多余建议清空（suggested 留空）。
 - 只对允许字段列表里的字段输出；不要编造字段名。
 - 期刊字段名是 publicationTitle（不是 journal/publicationName）。日期字段是 date（通常只存年份）。DOI 字段名是 DOI（大写）。
-- publicationTitle 的 suggested 必须是下列 AIS Senior Scholars' Basket 期刊之一，或字符串"${NOT_ARCHIVED}"（当全文无法确认属于其中任何一本时使用"${NOT_ARCHIVED}"）。允许值列表：
+- publicationTitle 的 suggested 必须是下列 AIS Senior Scholars' Basket 期刊之一，或字符串"${UNFILED}"（当全文无法确认属于其中任何一本时使用"${UNFILED}"）。允许值列表：
 ${AIS_BASKET_JOURNALS.map(j => `  - ${j}`).join('\n')}
-  - ${NOT_ARCHIVED}
-- 若当前 DOI 字段为空（缺失），publicationTitle 的 suggested 必须为"${NOT_ARCHIVED}"，不得建议任何 basket 期刊。
+  - ${UNFILED}
+- 若当前 DOI 字段为空（缺失），publicationTitle 的 suggested 必须为"${UNFILED}"，不得建议任何 basket 期刊。
 - 作者：若全文未提及或无法判断，status=correct 且 suggested 与 current 相同。
 - 若全文内容不足以判断某字段，confidence 设低（<0.5）并在 reason 注明"全文未明确"。
 - suggested 必须是可直接写入数据库的最终值，不要含解释性文字。
@@ -195,36 +184,8 @@ export async function calibrateItem(key) {
 
   // Normalize: ensure fields/creators arrays exist, filter to allowed fields.
   const allowedSet = new Set(allowedFields);
-  const allowedTitles = new Set(ALLOWED_PUBLICATION_TITLES);
   const doiMissing = !fields.DOI;
-  const fieldsOut = Array.isArray(parsed.fields)
-    ? parsed.fields
-        .filter(f => allowedSet.has(f.field))
-        .map(f => {
-          // Enforce the AIS Basket constraint on publicationTitle: if the LLM
-          // proposes a value outside the allowed list, discard the suggestion
-          // and flag it so the user sees why it was rejected.
-          if (f.field === 'publicationTitle' && f.suggested && !allowedTitles.has(f.suggested)) {
-            return {
-              ...f,
-              suggested: f.current || '',
-              status: f.current ? 'correct' : 'missing',
-              reason: `建议值「${f.suggested}」不在 AIS Basket 允许列表内，已忽略。${f.reason || ''}`.trim(),
-            };
-          }
-          // Enforce the DOI rule: a journalArticle without a DOI may only be
-          // filed under "未归档", regardless of what the LLM suggested.
-          if (f.field === 'publicationTitle' && doiMissing && f.suggested !== NOT_ARCHIVED) {
-            return {
-              ...f,
-              suggested: NOT_ARCHIVED,
-              status: f.suggested === f.current ? 'correct' : 'incorrect',
-              reason: `DOI 缺失，仅可归入「${NOT_ARCHIVED}」。${f.reason || ''}`.trim(),
-            };
-          }
-          return f;
-        })
-    : [];
+  const fieldsOut = normalizeCalibrationFields(parsed, { allowedSet, doiMissing });
   const creatorsOut = Array.isArray(parsed.creators) ? parsed.creators : [];
 
   return {
@@ -241,4 +202,40 @@ export async function calibrateItem(key) {
       markdownChars: markdown.length,
     },
   };
+}
+
+/**
+ * Pure normalization of the LLM's per-field suggestions. Exported for testing.
+ *
+ * - Drops any field not in `allowedSet` (the itemType's allowed field names).
+ * - Enforces the AIS Basket constraint on `publicationTitle`: a suggestion
+ *   outside ALLOWED_PUBLICATION_TITLES is discarded (reverted to current).
+ * - Enforces the DOI rule: when `doiMissing` is true, `publicationTitle` may
+ *   only be UNFILED ("待归档"); anything else is rewritten to UNFILED.
+ */
+export function normalizeCalibrationFields(parsed, { allowedSet, doiMissing }) {
+  const allowedTitles = new Set(ALLOWED_PUBLICATION_TITLES);
+  return Array.isArray(parsed?.fields)
+    ? parsed.fields
+        .filter(f => allowedSet.has(f.field))
+        .map(f => {
+          if (f.field === 'publicationTitle' && f.suggested && !allowedTitles.has(f.suggested)) {
+            return {
+              ...f,
+              suggested: f.current || '',
+              status: f.current ? 'correct' : 'missing',
+              reason: `建议值「${f.suggested}」不在 AIS Basket 允许列表内，已忽略。${f.reason || ''}`.trim(),
+            };
+          }
+          if (f.field === 'publicationTitle' && doiMissing && f.suggested !== UNFILED) {
+            return {
+              ...f,
+              suggested: UNFILED,
+              status: f.suggested === f.current ? 'correct' : 'incorrect',
+              reason: `DOI 缺失，仅可归入「${UNFILED}」。${f.reason || ''}`.trim(),
+            };
+          }
+          return f;
+        })
+    : [];
 }

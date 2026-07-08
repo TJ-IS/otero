@@ -24,9 +24,14 @@ export const ITEM_TYPE_LABELS = {
 
 /**
  * AIS Senior Scholars' Basket of Journals — the 11 journals this system
- * curates, plus "未归档" for items that cannot be matched to a basket journal.
- * MUST stay in sync with the backend list in src/services/calibrateService.js.
- * The publicationTitle field is constrained to these values in the UI.
+ * curates, plus UNFILED ("待归档") for items that cannot be matched to a
+ * basket journal. The publicationTitle field is constrained to these values
+ * in the UI.
+ *
+ * This is the FRONTEND copy. The backend source of truth lives in
+ * `src/services/journalWhitelist.js` and is imported by calibrateService.
+ * The two lists MUST stay identical — a test (test/journalWhitelist.test.js)
+ * asserts that they match.
  */
 export const AIS_BASKET_JOURNALS = [
   'MIS Quarterly',
@@ -35,16 +40,16 @@ export const AIS_BASKET_JOURNALS = [
   'Journal of the Association for Information Systems',
   'European Journal of Information Systems',
   'Information Systems Journal',
-  'Journal of Information Technology',
-  'Journal of Strategic Information Systems',
-  'Information & Management',
+  'Information and Organization',
   'Decision Support Systems',
-  'Communications of the ACM',
+  'Journal of Information Technology',
+  'The Journal of Strategic Information Systems',
+  'Information & Management',
 ];
 
-export const NOT_ARCHIVED = '未归档';
+export const UNFILED = '待归档';
 
-export const ALLOWED_PUBLICATION_TITLES = [...AIS_BASKET_JOURNALS, NOT_ARCHIVED];
+export const ALLOWED_PUBLICATION_TITLES = [...AIS_BASKET_JOURNALS, UNFILED];
 
 export function creatorDisplay(c) {
   if (c.fieldMode === 1 || !c.firstName) return c.lastName || c.name || '';
