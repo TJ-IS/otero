@@ -111,6 +111,7 @@ export const api = {
     return req(`/api/items/${key}/fulltext/parse${qs}`, { method: 'POST' });
   },
   getFulltext(key) { return req(`/api/items/${key}/fulltext`); },
+  getFulltextStructure(key) { return req(`/api/items/${key}/fulltext/structure`); },
   deleteFulltext(key) { return req(`/api/items/${key}/fulltext`, { method: 'DELETE' }); },
   parseFulltextBatch(keys) {
     return req('/api/fulltext/parse-batch', { method: 'POST', body: JSON.stringify({ keys }) });

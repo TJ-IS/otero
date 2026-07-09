@@ -392,6 +392,145 @@ export function getFullText(key) {
   return result;
 }
 
+const DOI_RE = /https?:\/\/(?:dx\.)?doi\.org\/(10\.\d{4,9}\/[^\s)"']+)|\b(10\.\d{4,9}\/[^\s)"']+)/i;
+
+function findContentList(dir) {
+  try {
+    for (const f of fs.readdirSync(dir)) {
+      if (f === 'content_list.json' || (f.endsWith('_content_list.json') && !f.endsWith('_v2.json'))) {
+        return path.join(dir, f);
+      }
+    }
+  } catch { /* dir missing */ }
+  return null;
+}
+
+function* walk(dir) {
+  let ents;
+  try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  for (const e of ents) {
+    const p = path.join(dir, e.name);
+    yield p;
+    if (e.isDirectory()) yield* walk(p);
+  }
+}
+
+function findContentListRecursive(dir) {
+  const direct = findContentList(dir);
+  if (direct) return direct;
+  for (const p of walk(dir)) {
+    if (fs.statSync(p).isDirectory()) {
+      const found = findContentList(p);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Public read API: structured MinerU output derived from content_list.json.
+ * Returns outline, figures, tables, equations, charts, references, footnotes,
+ * and publisher stamp (header/footer) regardless of whether a markdown file
+ * exists, so the article page can render rich assets even when full.md is absent.
+ */
+export function getFullTextStructure(key) {
+  const row = getFullTextRowByKey(key);
+  const base = {
+    state: row?.state || 'idle',
+    itemKey: key,
+    pageCount: 0,
+    outline: [],
+    publisherStamp: { lines: [], doi: '' },
+    figures: [],
+    tables: [],
+    equations: [],
+    charts: [],
+    references: [],
+    footnotes: [],
+  };
+  if (!row || row.state !== 'done' || !row.assetDir) return base;
+
+  const dir = fulltextDirFor(key);
+  const contentListPath = findContentListRecursive(dir);
+  if (!contentListPath) return base;
+
+  let blocks;
+  try { blocks = JSON.parse(fs.readFileSync(contentListPath, 'utf8')); }
+  catch { return base; }
+  if (!Array.isArray(blocks)) return base;
+
+  const maxPage = blocks
+    .map(b => b.page_idx)
+    .filter(n => typeof n === 'number' && n >= 0)
+    .reduce((a, b) => Math.max(a, b), -1);
+  base.pageCount = maxPage + 1;
+
+  const listDir = path.dirname(contentListPath);
+  const imgUrl = (imgPath) => {
+    if (!imgPath) return null;
+    const abs = path.resolve(listDir, imgPath);
+    const rel = path.relative(dir, abs).replace(/\\/g, '/');
+    return `/api/attachments/${key}/fulltext/${rel}`;
+  };
+
+  const seenStamp = new Set();
+  let id = 0;
+  for (const b of blocks) {
+    const type = b.type;
+    const pageIdx = typeof b.page_idx === 'number' ? b.page_idx : 0;
+
+    if (type === 'text' && b.text_level != null && b.text) {
+      base.outline.push({ id: `o${id++}`, level: Number(b.text_level) || 1, text: String(b.text).trim(), pageIdx });
+    } else if (['header', 'footer', 'page_header', 'page_footer'].includes(type)) {
+      const text = (b.text || '').trim();
+      if (!text || pageIdx > 1) continue;
+      if (seenStamp.has(text)) continue;
+      seenStamp.add(text);
+      base.publisherStamp.lines.push(text);
+      if (!base.publisherStamp.doi) {
+        const m = text.match(DOI_RE);
+        if (m) base.publisherStamp.doi = (m[1] || m[2] || '').replace(/[.,;]+$/, '').trim();
+      }
+    } else if (type === 'image' && b.img_path) {
+      base.figures.push({
+        id: `f${id++}`,
+        pageIdx,
+        imgUrl: imgUrl(b.img_path),
+        caption: (b.image_caption || []).join('\n'),
+        footnote: (b.image_footnote || []).join('\n'),
+      });
+    } else if (type === 'table') {
+      base.tables.push({
+        id: `t${id++}`,
+        pageIdx,
+        imgUrl: b.img_path ? imgUrl(b.img_path) : null,
+        caption: (b.table_caption || []).join('\n'),
+        html: b.table_body || null,
+      });
+    } else if (type === 'equation') {
+      base.equations.push({
+        id: `e${id++}`,
+        pageIdx,
+        text: b.text || '',
+        imgUrl: b.img_path ? imgUrl(b.img_path) : null,
+      });
+    } else if (type === 'chart' && b.img_path) {
+      base.charts.push({
+        id: `c${id++}`,
+        pageIdx,
+        imgUrl: imgUrl(b.img_path),
+        caption: b.text || (b.image_caption || []).join('\n'),
+      });
+    } else if (type === 'ref_text') {
+      base.references.push({ id: `r${id++}`, pageIdx, text: b.text || '' });
+    } else if (type === 'page_footnote' || type === 'aside_text') {
+      base.footnotes.push({ id: `n${id++}`, pageIdx, text: b.text || '' });
+    }
+  }
+
+  return base;
+}
+
 /** Remove extracted assets + DB row so a fresh parse can be triggered. */
 export function deleteFullText(key) {
   const row = getFullTextRowByKey(key);

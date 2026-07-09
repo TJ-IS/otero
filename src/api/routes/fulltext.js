@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Item } from '../../models/Item.js';
 import {
-  parseItem, getFullText, deleteFullText, enqueueBatchParse, retryFailed,
+  parseItem, getFullText, getFullTextStructure, deleteFullText, enqueueBatchParse, retryFailed,
 } from '../../services/fulltextService.js';
 import { listFullTextPaged, getFullTextCounts } from '../../repositories/fulltextRepo.js';
 
@@ -65,6 +65,15 @@ fulltextRouter.get('/items/:key/fulltext', (req, res) => {
   const it = Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   res.json(getFullText(req.params.key));
+});
+
+// GET /api/items/:key/fulltext/structure
+// Structured MinerU output (outline, figures, tables, equations, charts,
+// references, footnotes, publisher stamp) derived from content_list.json.
+fulltextRouter.get('/items/:key/fulltext/structure', (req, res) => {
+  const it = Item.loadByKey(req.params.key);
+  if (!it) return res.status(404).json({ error: 'not found' });
+  res.json(getFullTextStructure(req.params.key));
 });
 
 // DELETE /api/items/:key/fulltext

@@ -1,4 +1,5 @@
 import { memo, Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -473,6 +474,11 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          <Button size="sm" variant="outline" asChild title="在新标签打开专门页">
+            <Link to={`/items/${itemKey}`} target="_blank" rel="noreferrer">
+              <ExternalLink className="size-3.5" /> 专门页
+            </Link>
+          </Button>
           {canEdit && pdfAttachments.length > 0 && (
             <Button
               size="sm"
