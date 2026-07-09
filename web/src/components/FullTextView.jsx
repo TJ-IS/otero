@@ -13,6 +13,7 @@ import { FileText, RefreshCw, Trash2, Loader2, AlertCircle, CheckCircle2 } from 
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
+import { useAuth } from '@/contexts/AuthContext';
 
 // KaTeX CSS — imported once for this view. Vite bundles it.
 import 'katex/dist/katex.min.css';
@@ -68,6 +69,7 @@ function ImageLightbox({ src, alt, open, onOpenChange }) {
 }
 
 export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
+  const { canEdit } = useAuth();
   const { data: row, error, loading, refresh } = useAsync(() => api.getFulltext(itemKey), [itemKey]);
   const [busy, setBusy] = useState(false);
   const [lightbox, setLightbox] = useState({ open: false, src: '', alt: '' });
@@ -84,6 +86,10 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
   }, [isActive, refresh]);
 
   const triggerParse = useCallback(async ({ force = false } = {}) => {
+    if (!canEdit) {
+      toast.error('请先连接白名单钱包');
+      return;
+    }
     setBusy(true);
     try {
       await api.parseFulltext(itemKey, { force });
@@ -94,9 +100,13 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
     } finally {
       setBusy(false);
     }
-  }, [itemKey, refresh]);
+  }, [itemKey, refresh, canEdit]);
 
   const removeFulltext = useCallback(async () => {
+    if (!canEdit) {
+      toast.error('请先连接白名单钱包');
+      return;
+    }
     setBusy(true);
     try {
       await api.deleteFulltext(itemKey);
@@ -107,7 +117,7 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
     } finally {
       setBusy(false);
     }
-  }, [itemKey, refresh]);
+  }, [itemKey, refresh, canEdit]);
 
   // Markdown components: rewrite relative image srcs to absolute asset URLs,
   // open images in a lightbox on click, lazy-load, open external links safely.
@@ -164,7 +174,7 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
         <StateBadge state={state} />
         <ProgressInfo row={row} />
         <div className="ml-auto flex items-center gap-1.5">
-          {state === 'done' && (
+          {canEdit && state === 'done' && (
             <>
               <Button
                 size="sm"
@@ -186,12 +196,12 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
               </Button>
             </>
           )}
-          {state === 'idle' && (
+          {canEdit && state === 'idle' && (
             <Button size="sm" onClick={() => triggerParse()} disabled={busy}>
               <FileText className="size-3.5" /> 解析全文
             </Button>
           )}
-          {state === 'failed' && (
+          {canEdit && state === 'failed' && (
             <Button size="sm" onClick={() => triggerParse({ force: true })} disabled={busy}>
               <RefreshCw className="size-3.5" /> 重试
             </Button>

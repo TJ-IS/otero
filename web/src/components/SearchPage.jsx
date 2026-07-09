@@ -16,6 +16,7 @@ import { highlight, snippetAround } from '@/lib/highlight';
 import { cn } from '@/lib/utils';
 import { ItemDetail } from '@/components/ItemDetail';
 import { toast } from 'sonner';
+import { WalletButton } from '@/components/WalletButton';
 
 const MIN_DETAIL = 360;
 const MAX_DETAIL = 720;
@@ -231,6 +232,7 @@ export const SearchPage = memo(function SearchPage() {
           )}
         </form>
         <div className="ml-auto flex items-center gap-1.5">
+          <WalletButton />
           <Button
             variant="ghost"
             size="sm"

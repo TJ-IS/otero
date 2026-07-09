@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const POLL_MS = 3000;
 const PAGE_SIZE = 50;
@@ -50,6 +51,7 @@ function fmtTime(s) {
 }
 
 export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, onSelectItem }) {
+  const { canEdit } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [busyKey, setBusyKey] = useState(null);
@@ -100,6 +102,10 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
   }, [open, activeCount, refresh]);
 
   const retry = useCallback(async (key) => {
+    if (!canEdit) {
+      toast.error('请先连接白名单钱包');
+      return;
+    }
     setBusyKey(key);
     try {
       await api.parseFulltext(key, { force: true });
@@ -110,9 +116,13 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
     } finally {
       setBusyKey(null);
     }
-  }, [refresh]);
+  }, [refresh, canEdit]);
 
   const retryAllFailed = useCallback(async () => {
+    if (!canEdit) {
+      toast.error('请先连接白名单钱包');
+      return;
+    }
     setBulkRetrying(true);
     try {
       const r = await api.retryFailedFulltext();
@@ -187,7 +197,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
             {loading ? '加载中…' : `最近更新于 ${new Date().toLocaleTimeString()}`}
           </span>
           <div className="flex items-center gap-2">
-            {counts.failed > 0 && (
+            {canEdit && counts.failed > 0 && (
               <Button
                 size="sm"
                 variant="outline"
@@ -258,7 +268,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                           >
                             <ExternalLink className="size-3" />
                           </Button>
-                          {r.state === 'failed' && (
+                          {canEdit && r.state === 'failed' && (
                             <Button
                               size="sm"
                               variant="ghost"

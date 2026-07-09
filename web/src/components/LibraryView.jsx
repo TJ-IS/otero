@@ -16,12 +16,14 @@ import { ItemDetail } from '@/components/ItemDetail';
 import { TopBar } from '@/components/TopBar';
 import { cn } from '@/lib/utils';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SIDEBAR_WIDTH = 260;
 const MIN_DETAIL = 300;
 const MAX_DETAIL = 640;
 
 export function LibraryView() {
+  const { canEdit } = useAuth();
   const [filter, setFilter] = useState({ type: null, journal: '待归档', collection: null, search: null });
   const [selectedKey, setSelectedKey] = useState(null);
   const [itemsVersion, setItemsVersion] = useState(0);
@@ -102,9 +104,13 @@ export function LibraryView() {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl/Cmd + I: Import PDF
+      // Ctrl/Cmd + I: Import PDF (editors only)
       if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
         e.preventDefault();
+        if (!canEdit) {
+          toast.error('请先连接白名单钱包');
+          return;
+        }
         fileInputRef.current?.click();
       }
       // Escape: Close detail panel

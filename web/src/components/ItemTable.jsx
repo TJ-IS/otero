@@ -12,6 +12,7 @@ import {
   File, ChevronUp, ChevronDown, Sparkles, Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 const TYPE_ICONS = {
   journalArticle: <FileText className="size-3.5 shrink-0" />,
@@ -34,6 +35,7 @@ function SortIcon({ field, sortField, sortDir }) {
 }
 
 export const ItemTable = memo(function ItemTable({ filter, version, selectedKey, onSelect }) {
+  const { canEdit } = useAuth();
   const { data: items, error, loading } = useAsync(
     () => api.listItems({ type: filter?.type, journal: filter?.journal, collection: filter?.collection, search: filter?.search }),
     [filter?.type, filter?.journal, filter?.collection, filter?.search, version],
@@ -92,6 +94,10 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
   }, []);
 
   const batchParseAll = useCallback(async () => {
+    if (!canEdit) {
+      toast.error('请先连接白名单钱包');
+      return;
+    }
     if (!sortedItems.length || batchParsing) return;
     const keys = sortedItems.map(it => it.key);
     setBatchParsing(true);
@@ -162,7 +168,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
       <div className="flex items-baseline justify-between gap-3 border-b px-4 py-2">
         <span className="truncate text-sm font-medium" title={title}>{title}</span>
         <div className="flex items-center gap-3">
-          {sortedItems.length > 0 && (
+          {canEdit && sortedItems.length > 0 && (
             <button
               onClick={batchParseAll}
               disabled={batchParsing}

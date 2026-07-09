@@ -68,6 +68,15 @@ export const config = {
     timeoutMs: Number(process.env.OTERO_LLM_TIMEOUT_MS ?? 90000),
     maxMarkdownChars: Number(process.env.OTERO_LLM_MAX_CHARS ?? 16000),
   },
+  auth: {
+    secret: process.env.OTERO_AUTH_SECRET || 'dev-insecure-secret',
+    editorWhitelist: (process.env.OTERO_EDITOR_WHITELIST || '')
+      .split(',')
+      .map(a => a.trim().toLowerCase())
+      .filter(Boolean),
+    jwtTtlSec: Number(process.env.OTERO_AUTH_JWT_TTL_SEC ?? 60 * 60 * 24 * 7),
+    nonceTtlSec: Number(process.env.OTERO_AUTH_NONCE_TTL_SEC ?? 300),
+  },
 };
 
 export function ensureDataDirs() {

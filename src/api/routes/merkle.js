@@ -53,7 +53,10 @@ merkleRouter.post('/merkle/verify', (req, res) => {
  * Rebuild the in-memory tree from the current database state.
  * Useful after bulk imports or metadata changes.
  */
-merkleRouter.post('/merkle/rebuild', (_req, res) => {
+merkleRouter.post('/merkle/rebuild', (req, res) => {
+  if (!req.auth?.canEdit) {
+    return res.status(req.auth ? 403 : 401).json({ error: req.auth ? 'not an editor' : 'unauthorized' });
+  }
   merkleTree.rebuild();
   res.json({ root: merkleTree.getRoot() });
 });

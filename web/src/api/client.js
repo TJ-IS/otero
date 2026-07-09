@@ -3,9 +3,23 @@
 
 const BASE = '';
 
+let authToken = null;
+
+export function setAuthToken(token) {
+  authToken = token;
+}
+
+export function getAuthToken() {
+  return authToken;
+}
+
 async function req(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (authToken) {
+    headers.Authorization = `Bearer ${authToken}`;
+  }
   const res = await fetch(BASE + path, {
-    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    headers,
     ...opts,
   });
   if (!res.ok) {
@@ -20,6 +34,15 @@ async function req(path, opts = {}) {
 }
 
 export const api = {
+  // Auth
+  async getMe() { return req('/api/auth/me'); },
+  async getNonce(address) {
+    return req(`/api/auth/nonce?address=${encodeURIComponent(address)}`).then(r => r.message);
+  },
+  async verifyWallet(address, nonce, signature) {
+    return req('/api/auth/verify', { method: 'POST', body: JSON.stringify({ address, nonce, signature }) });
+  },
+
   // Items
   listItems({ type, journal, collection, search, topLevel = true, includeDeleted = false } = {}) {
     const qs = new URLSearchParams();
@@ -32,7 +55,8 @@ export const api = {
     return req(`/api/items?${qs.toString()}`).then(r => r.items);
   },
   async fetchItemExport(key, format = 'bibtex') {
-    const res = await fetch(`/api/items/${key}/export?format=${format}`);
+    const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
+    const res = await fetch(`/api/items/${key}/export?format=${format}`, { headers });
     if (!res.ok) {
       let detail;
       try { detail = (await res.json()).error; } catch { detail = res.statusText; }
@@ -72,7 +96,9 @@ export const api = {
   uploadPdf(file) {
     const fd = new FormData();
     fd.append('pdf', file);
-    return fetch('/api/import/pdf', { method: 'POST', body: fd }).then(async (res) => {
+    const headers = {};
+    if (authToken) headers.Authorization = `Bearer ${authToken}`;
+    return fetch('/api/import/pdf', { method: 'POST', headers, body: fd }).then(async (res) => {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'upload failed');
       return json;

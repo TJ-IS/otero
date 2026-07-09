@@ -12,6 +12,8 @@ import { fulltextRouter } from './routes/fulltext.js';
 import { calibrateRouter } from './routes/calibrate.js';
 import { extractRouter } from './routes/extract.js';
 import { merkleRouter } from './routes/merkle.js';
+import { authRouter } from './routes/auth.js';
+import { optionalAuth, editorWriteGate } from './middleware/auth.js';
 import { startFullTextWorker } from '../services/fulltextWorker.js';
 import { recoverSubmittingOnStartup } from '../services/fulltextService.js';
 import { config } from '../config.js';
@@ -27,6 +29,9 @@ export function buildApp() {
   app.use(json({ limit: '5mb' }));
 
   app.get('/health', (_req, res) => res.json({ ok: true, version: '0.1.0' }));
+
+  app.use('/api/auth', authRouter);
+  app.use('/api', optionalAuth(), editorWriteGate);
 
   app.use('/api/items', itemsRouter);
   app.use('/api/collections', collectionsRouter);

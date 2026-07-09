@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
 import { useAsync } from '@/hooks/useAsync';
 import { MineruTaskLog } from './MineruTaskLog';
+import { WalletButton } from './WalletButton';
+import { useAuth } from '../contexts/AuthContext';
 
 export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, onSearch, sidebarOpen = false, onToggleSidebar, fileInputRef: externalRef, onSelectItem }) {
   const internalRef = useRef(null);
@@ -18,6 +20,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
   const [logOpen, setLogOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
+  const { canEdit } = useAuth();
 
   // Debounced search
   useEffect(() => {
@@ -164,7 +167,8 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
         <Button variant="outline" size="sm" onClick={refreshItems} title="刷新列表">
           <RefreshCw className="size-4" />
         </Button>
-        <Button size="sm" onClick={() => fileInput.current?.click()}>
+        <WalletButton />
+        <Button size="sm" onClick={() => canEdit ? fileInput.current?.click() : toast.error('请先连接白名单钱包')} disabled={!canEdit}>
           <Upload className="size-4" />
           <span className="hidden sm:inline">导入 PDF</span>
         </Button>
@@ -175,6 +179,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
           multiple
           className="hidden"
           onChange={onFileInputChange}
+          disabled={!canEdit}
         />
       </div>
 

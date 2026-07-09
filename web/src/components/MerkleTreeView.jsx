@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { ArrowLeft, Search, GitBranch, RefreshCw, ShieldCheck, ShieldX, Hash, ArrowRight } from 'lucide-react';
+import { WalletButton } from './WalletButton';
+import { useAuth } from '@/contexts/AuthContext';
 
 function shortHash(hash) {
   if (!hash) return '—';
@@ -15,6 +17,7 @@ function shortHash(hash) {
 }
 
 export function MerkleTreeView() {
+  const { canEdit } = useAuth();
   const { data: rootInfo, refresh: refreshRoot } = useAsync(() => api.getMerkleRoot(), []);
   const [doiInput, setDoiInput] = useState('');
   const [result, setResult] = useState(null);
@@ -47,6 +50,10 @@ export function MerkleTreeView() {
   };
 
   const handleRebuild = async () => {
+    if (!canEdit) {
+      toast.error('请先连接白名单钱包');
+      return;
+    }
     try {
       await api.rebuildMerkleTree();
       refreshRoot();
@@ -76,7 +83,8 @@ export function MerkleTreeView() {
               <span className="ml-2">({rootInfo.leafCount} DOIs)</span>
             </span>
           )}
-          <Button size="sm" variant="outline" onClick={handleRebuild} title="重建 Merkle Tree">
+          <WalletButton />
+          <Button size="sm" variant="outline" onClick={handleRebuild} disabled={!canEdit} title={canEdit ? '重建 Merkle Tree' : '请先连接白名单钱包'}>
             <RefreshCw className="size-4" />
           </Button>
         </div>

@@ -35,6 +35,7 @@ import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
 import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle, ALLOWED_PUBLICATION_TITLES, UNFILED } from '@/lib/items';
 import { CalibratePanel } from './CalibratePanel';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Lazy-load the full-text viewer: it pulls in react-markdown + remark-gfm +
 // remark-math + rehype-katex + katex CSS (~heavy). Only needed when the user
@@ -137,7 +138,7 @@ function fieldHref(name, value) {
   return null;
 }
 
-const Field = memo(function Field({ name, value, onChange, multiline }) {
+const Field = memo(function Field({ name, value, onChange, multiline, readOnly }) {
   const href = useMemo(() => fieldHref(name, value), [name, value]);
   return (
     <div className={FULL_WIDTH_FIELDS.has(name) ? 'col-span-2' : ''}>
@@ -147,13 +148,15 @@ const Field = memo(function Field({ name, value, onChange, multiline }) {
           <Textarea
             value={value || ''}
             onChange={e => onChange(e.target.value)}
-            className={`min-h-[100px] text-sm ${href ? 'pr-8' : ''}`}
+            readOnly={readOnly}
+            className={`min-h-[100px] text-sm ${href ? 'pr-8' : ''} ${readOnly ? 'bg-muted/50 cursor-not-allowed' : ''}`}
           />
         ) : (
           <Input
             value={value || ''}
             onChange={e => onChange(e.target.value)}
-            className={`h-8 text-sm ${href ? 'pr-8' : ''}`}
+            readOnly={readOnly}
+            className={`h-8 text-sm ${href ? 'pr-8' : ''} ${readOnly ? 'bg-muted/50 cursor-not-allowed' : ''}`}
           />
         )}
         {href && (
@@ -223,6 +226,7 @@ function ExportModal({ open, onOpenChange, format, content }) {
 }
 
 export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChanged, onDirtyChange }) {
+  const { canEdit } = useAuth();
   const { data: item, error, loading, refresh } = useAsync(() => api.getItem(itemKey), [itemKey]);
   const { data: attachments } = useAsync(() => api.getItemAttachments(itemKey), [itemKey]);
   const { data: fulltext, refresh: refreshFulltext } = useAsync(() => api.getFulltext(itemKey), [itemKey]);
@@ -288,26 +292,32 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   if (!item || !draft) return null;
 
   const setField = (name, value) => {
+    if (!canEdit) return;
     setDraft(d => ({ ...d, fields: { ...d.fields, [name]: value } }));
     setDirty(true);
   };
   const setItemType = (value) => {
+    if (!canEdit) return;
     setDraft(d => ({ ...d, itemType: value }));
     setDirty(true);
   };
   const setCreator = (idx, patch) => {
+    if (!canEdit) return;
     setCreatorsDraft(list => list.map((c, i) => i === idx ? { ...c, ...patch } : c));
     setDirty(true);
   };
   const addCreator = () => {
+    if (!canEdit) return;
     setCreatorsDraft(list => [...list, { firstName: '', lastName: '', creatorType: 'author', fieldMode: 0 }]);
     setDirty(true);
   };
   const removeCreator = (idx) => {
+    if (!canEdit) return;
     setCreatorsDraft(list => list.filter((_, i) => i !== idx));
     setDirty(true);
   };
   const moveCreator = (idx, dir) => {
+    if (!canEdit) return;
     const newIdx = idx + dir;
     if (newIdx < 0 || newIdx >= creatorsDraft.length) return;
     const arr = [...creatorsDraft];
@@ -317,6 +327,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   };
 
   const save = async () => {
+    if (!canEdit) return;
     try {
       const fieldsPayload = {};
       for (const [k, v] of Object.entries(draft.fields)) {
@@ -338,7 +349,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   };
 
   const revert = () => {
-    if (!item) return;
+    if (!item || !canEdit) return;
     setDraft({ fields: { ...item.fields }, itemType: item.itemType });
     setCreatorsDraft(item.creators || []);
     setDirty(false);
@@ -346,6 +357,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   };
 
   const del = async () => {
+    if (!canEdit) return;
     try {
       await api.deleteItem(item.key);
       onDeleted();
@@ -379,7 +391,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   const fulltextState = fulltext?.state || 'idle';
   const fulltextActive = ['submitting', 'pending', 'running', 'converting'].includes(fulltextState);
   const triggerParse = async () => {
-    if (parseBusy || fulltextActive) return;
+    if (!canEdit || parseBusy || fulltextActive) return;
     setParseBusy(true);
     const force = fulltextState === 'done' || fulltextState === 'failed';
     try {
@@ -395,7 +407,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   };
 
   const triggerCalibrate = async () => {
-    if (calibrateLoading) return;
+    if (!canEdit || calibrateLoading) return;
     if (fulltextState !== 'done') {
       toast.warning('请先解析全文后再校准');
       setTab('fulltext');
@@ -416,7 +428,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   };
 
   const applyCalibration = ({ fields, creators }) => {
-    if (!draft) return;
+    if (!draft || !canEdit) return;
     const newFields = { ...draft.fields };
     let fieldCount = 0;
     for (const [k, v] of Object.entries(fields)) {
@@ -461,7 +473,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          {pdfAttachments.length > 0 && (
+          {canEdit && pdfAttachments.length > 0 && (
             <Button
               size="sm"
               variant="outline"
@@ -474,7 +486,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                 : <Sparkles className="size-3.5" />}
             </Button>
           )}
-          {pdfAttachments.length > 0 && (
+          {canEdit && pdfAttachments.length > 0 && (
             <Button
               size="sm"
               variant="outline"
@@ -491,17 +503,21 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
           <Button size="sm" variant="outline" onClick={() => openExport('ris')} title="导出 RIS">
             <FileText className="size-3.5" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)} title="删除">
-            <Trash2 className="size-3.5" />
-          </Button>
-          {dirty && (
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)} title="删除">
+              <Trash2 className="size-3.5" />
+            </Button>
+          )}
+          {canEdit && dirty && (
             <Button size="sm" variant="outline" onClick={revert} title="取消">
               <X className="size-3.5" />
             </Button>
           )}
-          <Button size="sm" onClick={save} disabled={!dirty} title="保存">
-            <Save className="size-3.5" />
-          </Button>
+          {canEdit && (
+            <Button size="sm" onClick={save} disabled={!dirty} title="保存">
+              <Save className="size-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -524,7 +540,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                 <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                   <div className="col-span-2">
                     <Label className="text-xs text-muted-foreground">类型</Label>
-                    <Select value={draft.itemType} onValueChange={setItemType}>
+                    <Select value={draft.itemType} onValueChange={setItemType} disabled={!canEdit}>
                       <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {ITEM_TYPES.map(t => (
@@ -539,6 +555,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                       name={name}
                       value={draft.fields[name]}
                       onChange={v => setField(name, v)}
+                      readOnly={!canEdit}
                     />
                   ))}
                 </div>
@@ -554,7 +571,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           <Select
                             value={draft.fields.publicationTitle || ''}
                             onValueChange={v => setField('publicationTitle', v)}
-                            disabled={doiMissing}
+                            disabled={doiMissing || !canEdit}
                           >
                             <SelectTrigger className="mt-1 h-8 text-sm">
                               <SelectValue placeholder={doiMissing ? UNFILED : '选择期刊'} />
@@ -577,6 +594,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           name={name}
                           value={draft.fields[name]}
                           onChange={v => setField(name, v)}
+                          readOnly={!canEdit}
                         />
                       )
                     ))}
@@ -593,6 +611,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                         name={name}
                         value={draft.fields[name]}
                         onChange={v => setField(name, v)}
+                        readOnly={!canEdit}
                       />
                     ))}
                   </div>
@@ -606,6 +625,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                     value={draft.fields.abstractNote}
                     onChange={v => setField('abstractNote', v)}
                     multiline
+                    readOnly={!canEdit}
                   />
                 </Section>
               )}
@@ -614,9 +634,11 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               <Section
                 title="作者"
                 action={
-                  <Button size="sm" variant="ghost" onClick={addCreator} className="h-7 text-xs">
-                    <Plus className="size-3.5" /> 添加
-                  </Button>
+                  canEdit ? (
+                    <Button size="sm" variant="ghost" onClick={addCreator} className="h-7 text-xs">
+                      <Plus className="size-3.5" /> 添加
+                    </Button>
+                  ) : null
                 }
               >
                 <div className="space-y-2">
@@ -627,18 +649,21 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           placeholder="姓"
                           value={c.lastName || ''}
                           onChange={e => setCreator(idx, { lastName: e.target.value, fieldMode: 0 })}
-                          className="h-8 text-sm"
+                          readOnly={!canEdit}
+                          className={`h-8 text-sm ${!canEdit ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                         />
                         <Input
                           placeholder="名"
                           value={c.firstName || ''}
                           onChange={e => setCreator(idx, { firstName: e.target.value, fieldMode: 0 })}
-                          className="h-8 text-sm"
+                          readOnly={!canEdit}
+                          className={`h-8 text-sm ${!canEdit ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                         />
                         <div className="col-span-2">
                           <Select
                             value={c.creatorType || 'author'}
                             onValueChange={v => setCreator(idx, { creatorType: v })}
+                            disabled={!canEdit}
                           >
                             <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                             <SelectContent>
@@ -654,7 +679,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           size="icon"
                           variant="ghost"
                           onClick={() => moveCreator(idx, -1)}
-                          disabled={idx === 0}
+                          disabled={idx === 0 || !canEdit}
                           className="h-6 w-6"
                           title="上移"
                         >
@@ -664,7 +689,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           size="icon"
                           variant="ghost"
                           onClick={() => moveCreator(idx, 1)}
-                          disabled={idx === creatorsDraft.length - 1}
+                          disabled={idx === creatorsDraft.length - 1 || !canEdit}
                           className="h-6 w-6"
                           title="下移"
                         >
@@ -674,6 +699,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           size="icon"
                           variant="ghost"
                           onClick={() => removeCreator(idx)}
+                          disabled={!canEdit}
                           className="h-6 w-6"
                           title="删除"
                         >
@@ -698,6 +724,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                         value={draft.fields[name]}
                         onChange={v => setField(name, v)}
                         multiline={name === 'extra'}
+                        readOnly={!canEdit}
                       />
                     ))}
                   </div>
@@ -794,7 +821,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
         content={exportContent}
       />
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <AlertDialog open={canEdit && deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>删除该条目？</AlertDialogTitle>
@@ -810,7 +837,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
       </AlertDialog>
 
       <CalibratePanel
-        open={calibrateOpen}
+        open={canEdit && calibrateOpen}
         onOpenChange={setCalibrateOpen}
         result={calibrateResult}
         loading={calibrateLoading}
