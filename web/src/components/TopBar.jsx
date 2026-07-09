@@ -22,6 +22,10 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
   const navigate = useNavigate();
   const { canEdit } = useAuth();
 
+  useEffect(() => {
+    if (!canEdit) setLogOpen(false);
+  }, [canEdit]);
+
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -147,15 +151,17 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
             <span className="hidden sm:inline">Merkle</span>
           </Link>
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setLogOpen(true)}
-          title="MinerU 解析任务日志"
-          className="shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          <ListChecks className="size-4" />
-        </Button>
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLogOpen(true)}
+            title="MinerU 解析任务日志"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <ListChecks className="size-4" />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"
@@ -183,7 +189,9 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
         />
       </div>
 
-      <MineruTaskLog open={logOpen} onOpenChange={setLogOpen} onSelectItem={onSelectItem} />
+      {canEdit && (
+        <MineruTaskLog open={logOpen} onOpenChange={setLogOpen} onSelectItem={onSelectItem} />
+      )}
     </header>
   );
 });

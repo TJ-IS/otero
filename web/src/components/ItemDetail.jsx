@@ -249,7 +249,15 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
   useEffect(() => {
     if (!item) return;
-    setDraft({ fields: { ...item.fields }, itemType: item.itemType });
+    // AIS Basket: journalArticle without DOI can only sit under UNFILED.
+    // Normalize in the draft on load so the UI is correct, but do NOT mark
+    // dirty — otherwise opening many unfiled items traps the panel behind
+    // "未保存的修改" and blocks switching/closing.
+    const fields = { ...item.fields };
+    if (item.itemType === 'journalArticle' && !fields.DOI && fields.publicationTitle !== UNFILED) {
+      fields.publicationTitle = UNFILED;
+    }
+    setDraft({ fields, itemType: item.itemType });
     setCreatorsDraft(item.creators || []);
     setDirty(false);
     setTab('detail');
@@ -271,20 +279,6 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     return () => window.removeEventListener('beforeunload', handler);
   }, [dirty]);
 
-  // AIS Basket rule: a journalArticle without a DOI can only be filed under
-  // UNFILED ("待归档"). When DOI is missing, force publicationTitle to UNFILED
-  // so the constrained selector cannot assign it to a real basket journal.
-  // Mark dirty so the corrected value is persisted on save.
-  useEffect(() => {
-    if (!draft) return;
-    if (draft.itemType !== 'journalArticle') return;
-    const doiMissing = !draft.fields?.DOI;
-    if (doiMissing && draft.fields?.publicationTitle !== UNFILED) {
-      setDraft(d => ({ ...d, fields: { ...d.fields, publicationTitle: UNFILED } }));
-      setDirty(true);
-    }
-  }, [draft?.itemType, draft?.fields?.DOI, draft?.fields?.publicationTitle]);
-
   const pdfAttachments = (attachments || []).filter(a => (a.contentType || '').includes('pdf'));
   const previewUrl = activePdfKey ? `/api/attachments/${activePdfKey}/file` : null;
 
@@ -294,12 +288,30 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
   const setField = (name, value) => {
     if (!canEdit) return;
-    setDraft(d => ({ ...d, fields: { ...d.fields, [name]: value } }));
+    setDraft(d => {
+      const fields = { ...d.fields, [name]: value };
+      // Clearing DOI on a journalArticle must drop it back to UNFILED.
+      if (
+        d.itemType === 'journalArticle'
+        && name === 'DOI'
+        && !value
+        && fields.publicationTitle !== UNFILED
+      ) {
+        fields.publicationTitle = UNFILED;
+      }
+      return { ...d, fields };
+    });
     setDirty(true);
   };
   const setItemType = (value) => {
     if (!canEdit) return;
-    setDraft(d => ({ ...d, itemType: value }));
+    setDraft(d => {
+      const fields = { ...d.fields };
+      if (value === 'journalArticle' && !fields.DOI && fields.publicationTitle !== UNFILED) {
+        fields.publicationTitle = UNFILED;
+      }
+      return { ...d, itemType: value, fields };
+    });
     setDirty(true);
   };
   const setCreator = (idx, patch) => {
@@ -476,7 +488,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
         <div className="flex flex-wrap items-center gap-1.5">
           <Button size="sm" variant="outline" asChild title="在新标签打开专门页">
             <Link to={`/items/${itemKey}`} target="_blank" rel="noreferrer">
-              <ExternalLink className="size-3.5" /> 专门页
+              <ExternalLink className="size-3.5" />
             </Link>
           </Button>
           {canEdit && pdfAttachments.length > 0 && (
