@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
-import { ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle, filterTitle } from '@/lib/items';
+import { ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle, filterTitle, volumeIssuePages } from '@/lib/items';
 import { highlight } from '@/lib/highlight';
 import {
   FileText, BookOpen, GraduationCap, BookMarked, Presentation,
@@ -26,6 +26,19 @@ const TYPE_ICONS = {
 };
 
 const ROW_HEIGHT = 37;
+
+// Numeric-first comparison for the 卷/期/页码 column. Compares volume, then
+// issue, then page start (leading number of `pages`). Missing values sort
+// last so populated rows surface first regardless of direction intent.
+function numOrInf(v) {
+  const n = parseInt(String(v ?? '').trim(), 10);
+  return Number.isNaN(n) ? Infinity : n;
+}
+function cmpVip(a, b) {
+  return (numOrInf(a?.volume) - numOrInf(b?.volume))
+    || (numOrInf(a?.issue) - numOrInf(b?.issue))
+    || (numOrInf(a?.pages) - numOrInf(b?.pages));
+}
 
 function SortIcon({ field, sortField, sortDir }) {
   if (sortField !== field) return <ChevronDown className="size-3 opacity-25 ml-0.5" />;
@@ -59,6 +72,11 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
       } else if (sortField === 'itemType') {
         av = ITEM_TYPE_LABELS[a.itemType] || a.itemType;
         bv = ITEM_TYPE_LABELS[b.itemType] || b.itemType;
+      } else if (sortField === 'vip') {
+        // Volume/issue/pages sort numerically (volume → issue → page start),
+        // so "10" sorts after "2". Missing parts sort last within their level.
+        const cmp = cmpVip(a.fields, b.fields);
+        return sortDir === 'asc' ? cmp : -cmp;
       } else {
         av = a.dateModified || '';
         bv = b.dateModified || '';
@@ -204,6 +222,11 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                   年份 <SortIcon field="date" sortField={sortField} sortDir={sortDir} />
                 </span>
               </th>
+              <th className={cn(thClass, 'w-28')} onClick={() => toggleSort('vip')}>
+                <span className="inline-flex items-center">
+                  卷期页 <SortIcon field="vip" sortField={sortField} sortDir={sortDir} />
+                </span>
+              </th>
               <th className={cn(thClass, 'w-32')} onClick={() => toggleSort('itemType')}>
                 <span className="inline-flex items-center">
                   类型 <SortIcon field="itemType" sortField={sortField} sortDir={sortDir} />
@@ -215,7 +238,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
             {loading && (items || []).length === 0 && <TableSkeleton />}
             {!loading && sortedItems.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-3 py-16 text-center text-muted-foreground">
+                <td colSpan={5} className="px-3 py-16 text-center text-muted-foreground">
                   {hasActiveFilter
                     ? '没有匹配的条目，请尝试调整筛选条件'
                     : '暂无条目，点击右上角"导入 PDF"开始'}
@@ -224,7 +247,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
             )}
             {paddingTop > 0 && (
               <tr key="__pad-top" aria-hidden="true" style={{ height: paddingTop }}>
-                <td colSpan={4} style={{ padding: 0, border: 'none' }} />
+                <td colSpan={5} style={{ padding: 0, border: 'none' }} />
               </tr>
             )}
             {virtualItems.map(virtualRow => {
@@ -252,6 +275,9 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                   <td className="w-16 px-3 py-2 text-muted-foreground tabular-nums">
                     {yearOf(it.fields?.date) || '—'}
                   </td>
+                  <td className="w-28 truncate px-3 py-2 text-muted-foreground tabular-nums" title={volumeIssuePages(it.fields)}>
+                    {volumeIssuePages(it.fields) || '—'}
+                  </td>
                   <td className="w-32 px-3 py-2">
                     <Badge variant="secondary" className="inline-flex items-center gap-1 font-normal">
                       {TYPE_ICONS[it.itemType]}
@@ -263,7 +289,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
             })}
             {paddingBottom > 0 && (
               <tr key="__pad-bottom" aria-hidden="true" style={{ height: paddingBottom }}>
-                <td colSpan={4} style={{ padding: 0, border: 'none' }} />
+                <td colSpan={5} style={{ padding: 0, border: 'none' }} />
               </tr>
             )}
           </tbody>
@@ -281,6 +307,7 @@ function TableSkeleton() {
           <td className="max-w-[420px] px-3 py-2"><Skeleton className="h-4 w-[280px]" /></td>
           <td className="max-w-[200px] px-3 py-2"><Skeleton className="h-4 w-[140px]" /></td>
           <td className="w-20 px-3 py-2"><Skeleton className="h-4 w-10" /></td>
+          <td className="w-28 px-3 py-2"><Skeleton className="h-4 w-16" /></td>
           <td className="w-36 px-3 py-2"><Skeleton className="h-4 w-20" /></td>
         </tr>
       ))}

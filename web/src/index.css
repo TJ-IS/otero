@@ -157,4 +157,27 @@
   .fulltext-prose .katex {
     max-width: 100%;
   }
+  /* In-text author-year citations resolved to the reference list. Distinct
+     from plain external links: subtle tinted chip, no underline until hover.
+     Scoped under .fulltext-prose so it outranks the generic `a` link style. */
+  .fulltext-prose a.cite-ref {
+    @apply text-primary rounded-sm px-0.5 cursor-pointer;
+    background-color: hsl(var(--primary) / 0.08);
+    text-decoration: none;
+    transition: background-color 0.12s ease;
+  }
+  .fulltext-prose a.cite-ref:hover,
+  .fulltext-prose a.cite-ref:focus-visible {
+    background-color: hsl(var(--primary) / 0.16);
+    text-decoration: none;
+    outline: none;
+  }
+  /* Flash the reference list row after a citation click jumps to it. */
+  .ref-flash {
+    animation: ref-flash 1.6s ease-out;
+  }
+  @keyframes ref-flash {
+    0%, 25% { background-color: hsl(var(--primary) / 0.18); }
+    100% { background-color: transparent; }
+  }
 }

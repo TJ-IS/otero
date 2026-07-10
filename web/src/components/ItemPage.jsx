@@ -480,7 +480,7 @@ export const ItemPage = memo(function ItemPage() {
                   <TabsContent value="references" className="mt-3">
                     <ol className="text-sm space-y-2 list-decimal pl-5 marker:text-muted-foreground">
                       {references.map(r => (
-                        <li key={r.id} className="leading-relaxed pl-1">
+                        <li key={r.id} id={`ref-${r.id}`} className="leading-relaxed pl-1 scroll-mt-16 rounded-sm transition-colors">
                           <span className="text-foreground/90">{r.text}</span>
                           <span className="ml-1.5 text-xs text-muted-foreground">p.{r.pageIdx + 1}</span>
                         </li>
@@ -553,6 +553,7 @@ export const ItemPage = memo(function ItemPage() {
                   <FulltextMarkdown
                     markdown={fulltext.markdown}
                     imagesBaseUrl={fulltext.imagesBaseUrl}
+                    references={references}
                   />
                 </Suspense>
               )}

@@ -72,6 +72,19 @@ export function itemTitle(item) {
   return item?.fields?.title || '(无标题)';
 }
 
+// Compact citation-style locator: "卷(期): 页码", e.g. "12(3): 45-67".
+// Each part is optional — omit gracefully when a field is absent.
+export function volumeIssuePages(fields) {
+  const volume = fields?.volume?.trim();
+  const issue = fields?.issue?.trim();
+  const pages = fields?.pages?.trim();
+  let vi = '';
+  if (volume) vi = volume;
+  if (issue) vi = vi ? `${vi}(${issue})` : `(${issue})`;
+  if (vi && pages) return `${vi}: ${pages}`;
+  return vi || pages || '';
+}
+
 // Human-readable label for the active list filter.
 export function filterTitle(filter, collections) {
   if (!filter) return '全部条目';

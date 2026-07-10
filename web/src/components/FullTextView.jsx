@@ -47,6 +47,7 @@ function StateBadge({ state }) {
 export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
   const { canEdit } = useAuth();
   const { data: row, error, loading, refresh } = useAsync(() => api.getFulltext(itemKey), [itemKey]);
+  const { data: structure } = useAsync(() => api.getFulltextStructure(itemKey), [itemKey]);
   const [busy, setBusy] = useState(false);
   const refreshTimer = useRef(null);
 
@@ -193,6 +194,7 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
             <FulltextMarkdown
               markdown={row.markdown}
               imagesBaseUrl={row.imagesBaseUrl}
+              references={structure?.references || []}
               className="px-6 py-4 max-w-none"
             />
           </div>
