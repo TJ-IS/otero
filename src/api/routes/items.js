@@ -2,12 +2,18 @@ import { Router } from 'express';
 import { Items, Item } from '../../models/Item.js';
 import { getDb } from '../../db/connection.js';
 import { toBibtex, toRis, toBibtexBatch, toRisBatch } from '../../services/exportService.js';
+import { UNFILED } from '../../services/journalWhitelist.js';
 
 export const itemsRouter = Router();
 
 // GET /api/items
 itemsRouter.get('/', (req, res) => {
   const { type, journal, collection, search, includeDeleted } = req.query;
+  // The "待归档" bucket (unfiled literature) is editor-only. Non-editors get
+  // an empty result rather than the unfiled items.
+  if (journal === UNFILED && !req.auth?.canEdit) {
+    return res.json({ items: [] });
+  }
   const topLevel = req.query.topLevel !== 'false' && req.query.topLevel !== '0';
   const items = Items.list({
     type,

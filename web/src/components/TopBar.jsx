@@ -174,19 +174,22 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
           <RefreshCw className="size-4" />
         </Button>
         <WalletButton />
-        <Button size="sm" onClick={() => canEdit ? fileInput.current?.click() : toast.error('请先连接白名单钱包')} disabled={!canEdit}>
-          <Upload className="size-4" />
-          <span className="hidden sm:inline">导入 PDF</span>
-        </Button>
-        <input
-          ref={fileInput}
-          type="file"
-          accept="application/pdf"
-          multiple
-          className="hidden"
-          onChange={onFileInputChange}
-          disabled={!canEdit}
-        />
+        {canEdit && (
+          <>
+            <Button size="sm" onClick={() => fileInput.current?.click()}>
+              <Upload className="size-4" />
+              <span className="hidden sm:inline">导入 PDF</span>
+            </Button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept="application/pdf"
+              multiple
+              className="hidden"
+              onChange={onFileInputChange}
+            />
+          </>
+        )}
       </div>
 
       {canEdit && (

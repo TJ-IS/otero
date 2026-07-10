@@ -4,9 +4,13 @@ import { memo } from 'react';
 import { cn } from '@/lib/utils';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const Sidebar = memo(function Sidebar({ filter, onFilterChange, version, onCollapse }) {
-  const { data: journals } = useAsync(() => api.listJournals(), [version]);
+  // Re-fetch when auth changes: the "待归档" bucket is only returned by the
+  // API for whitelisted editors, so login/logout must refresh the list.
+  const { canEdit } = useAuth();
+  const { data: journals } = useAsync(() => api.listJournals(), [version, canEdit]);
 
   const isActive = (value) => filter?.journal === value;
 

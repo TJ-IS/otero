@@ -15,15 +15,16 @@ import { ItemTable } from '@/components/ItemTable';
 import { ItemDetail } from '@/components/ItemDetail';
 import { TopBar } from '@/components/TopBar';
 import { cn } from '@/lib/utils';
-import { ITEM_TYPE_LABELS } from '@/lib/items';
+import { ITEM_TYPE_LABELS, UNFILED } from '@/lib/items';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/api/client';
 
 const SIDEBAR_WIDTH = 260;
 const MIN_DETAIL = 300;
 const MAX_DETAIL = 640;
 
 export function LibraryView() {
-  const { canEdit } = useAuth();
+  const { canEdit, ready } = useAuth();
   const [filter, setFilter] = useState({ type: null, journal: '待归档', collection: null, search: null });
   const [selectedKey, setSelectedKey] = useState(null);
   const [itemsVersion, setItemsVersion] = useState(0);
@@ -46,6 +47,25 @@ export function LibraryView() {
 
   const refreshItems = useCallback(() => setItemsVersion(v => v + 1), []);
   const refreshSidebar = useCallback(() => setSidebarVersion(v => v + 1), []);
+
+  // The "待归档" bucket is editor-only. Once auth resolves, redirect a
+  // non-editor viewing it to their first available journal so they don't
+  // land on an empty, invisible filter.
+  useEffect(() => {
+    if (!ready || canEdit) return;
+    if (filter.journal !== UNFILED || filter.collection || filter.search) return;
+    let cancelled = false;
+    api.listJournals().then((journals) => {
+      if (cancelled) return;
+      const first = (journals || []).find(j => j.name !== UNFILED);
+      if (first) {
+        setFilter(prev => ({ ...prev, type: null, journal: first.name, collection: null, search: null }));
+        setSelectedKey(null);
+        setDetailOpen(false);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [ready, canEdit, filter.journal, filter.collection, filter.search]);
 
   const onFilterChange = useCallback((next) => {
     setFilter(prev => ({ ...prev, ...next }));
