@@ -181,3 +181,69 @@
     100% { background-color: transparent; }
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Chat panel markdown (assistant messages in ChatPanel)
+ * Compact variant of .fulltext-prose sized for chat bubbles.
+ * ------------------------------------------------------------------------ */
+@layer components {
+  .chat-prose {
+    @apply text-sm leading-relaxed;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .chat-prose > *:first-child { margin-top: 0; }
+  .chat-prose > *:last-child { margin-bottom: 0; }
+  .chat-prose p {
+    @apply my-2;
+  }
+  .chat-prose ul {
+    @apply list-disc pl-5 my-2 space-y-0.5;
+  }
+  .chat-prose ol {
+    @apply list-decimal pl-5 my-2 space-y-0.5;
+  }
+  .chat-prose h1,
+  .chat-prose h2,
+  .chat-prose h3 {
+    @apply font-semibold mt-3 mb-1.5;
+  }
+  .chat-prose h1 {
+    @apply text-base;
+  }
+  .chat-prose h2 {
+    @apply text-[0.95rem];
+  }
+  .chat-prose h3 {
+    @apply text-sm;
+  }
+  .chat-prose strong {
+    @apply font-semibold;
+  }
+  .chat-prose code {
+    @apply bg-black/[0.06] px-1 py-0.5 rounded text-[0.85em] font-mono;
+    overflow-wrap: anywhere;
+  }
+  .chat-prose pre {
+    @apply bg-black/[0.06] p-2.5 rounded-md overflow-x-auto my-2 text-xs;
+  }
+  .chat-prose pre code {
+    @apply bg-transparent p-0;
+  }
+  .chat-prose blockquote {
+    @apply border-l-2 border-border pl-3 italic opacity-90 my-2;
+  }
+  .chat-prose a {
+    @apply underline underline-offset-2;
+  }
+  .chat-prose table {
+    @apply text-xs border-collapse my-2 block overflow-x-auto;
+  }
+  .chat-prose th,
+  .chat-prose td {
+    @apply border border-border px-1.5 py-1 text-left;
+  }
+  .chat-prose hr {
+    @apply my-3 border-border;
+  }
+}

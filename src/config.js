@@ -80,6 +80,16 @@ export const config = {
     timeoutMs: Number(process.env.OTERO_LLM_TIMEOUT_MS ?? 90000),
     maxMarkdownChars: Number(process.env.OTERO_LLM_MAX_CHARS ?? 16000),
   },
+  chat: {
+    // Full-text markdown is truncated to this many chars before being folded
+    // into the chat system prompt (kept separate from maxMarkdownChars since
+    // chat needs room for conversation turns on top of the context).
+    maxMarkdownChars: Number(process.env.OTERO_CHAT_MAX_CHARS ?? 12000),
+    timeoutMs: Number(process.env.OTERO_CHAT_TIMEOUT_MS ?? 120000),
+    // Caps how many prior turns (user+assistant messages) the client may
+    // replay back to the server per request, to bound token usage.
+    maxHistoryMessages: Number(process.env.OTERO_CHAT_MAX_HISTORY ?? 20),
+  },
   auth: {
     secret: process.env.OTERO_AUTH_SECRET || 'dev-insecure-secret',
     editorWhitelist: (process.env.OTERO_EDITOR_WHITELIST || '')

@@ -20,6 +20,7 @@ import { useAsync } from '@/hooks/useAsync';
 import { ITEM_TYPE_LABELS, itemTitle, creatorsList } from '@/lib/items';
 import { headingId } from '@/lib/fulltext';
 import { cn } from '@/lib/utils';
+import { ChatPanel } from './ChatPanel';
 
 const FulltextMarkdown = lazy(() => import('./FulltextMarkdown').then(m => ({ default: m.FulltextMarkdown })));
 
@@ -574,6 +575,8 @@ export const ItemPage = memo(function ItemPage() {
         open={lightbox.open}
         onOpenChange={(open) => setLightbox(s => ({ ...s, open }))}
       />
+
+      <ChatPanel itemKey={key} />
     </div>
   );
 });

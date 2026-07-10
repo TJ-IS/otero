@@ -117,7 +117,10 @@ export function editorWriteGate(req, res, next) {
   }
   const url = req.originalUrl || req.url || '';
   const publicWrites = ['/api/auth', '/api/merkle/verify'];
-  if (publicWrites.some(prefix => url.startsWith(prefix))) {
+  // Chat is a POST endpoint but must stay open to all visitors (no editor
+  // gate), matching /api/items/:key/chat.
+  const publicWritePatterns = [/^\/api\/items\/[^/]+\/chat(\?.*)?$/];
+  if (publicWrites.some(prefix => url.startsWith(prefix)) || publicWritePatterns.some(re => re.test(url))) {
     return next();
   }
   return requireEditor(req, res, next);
