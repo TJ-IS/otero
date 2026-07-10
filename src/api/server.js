@@ -10,6 +10,7 @@ import { importRouter } from './routes/import.js';
 import { attachmentsRouter } from './routes/attachments.js';
 import { fulltextRouter } from './routes/fulltext.js';
 import { calibrateRouter } from './routes/calibrate.js';
+import { crossrefRouter } from './routes/crossref.js';
 import { extractRouter } from './routes/extract.js';
 import { merkleRouter } from './routes/merkle.js';
 import { authRouter } from './routes/auth.js';
@@ -40,6 +41,7 @@ export function buildApp() {
   app.use('/api/attachments', attachmentsRouter);
   app.use('/api', fulltextRouter);
   app.use('/api', calibrateRouter);
+  app.use('/api', crossrefRouter);
   app.use('/api', extractRouter);
   app.use('/api', merkleRouter);
 

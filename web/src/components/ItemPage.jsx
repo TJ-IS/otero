@@ -230,7 +230,7 @@ export const ItemPage = memo(function ItemPage() {
   const f = item.fields || {};
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background">
+    <div className="min-h-[100dvh] flex flex-col bg-background overflow-x-hidden">
       {/* Compact toolbar — no truncated title */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center gap-2 px-3 sm:px-4 h-12">
@@ -312,8 +312,8 @@ export const ItemPage = memo(function ItemPage() {
         </aside>
 
         {/* Reading column */}
-        <main className="flex-1 min-w-0 overflow-y-auto">
-          <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-6 sm:py-8 space-y-8">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+          <div className="mx-auto w-full max-w-3xl min-w-0 px-4 sm:px-6 py-6 sm:py-8 space-y-8">
             {/* Title block — full, no truncation */}
             <header className="space-y-3">
               <h1 className="text-xl sm:text-2xl font-semibold tracking-tight leading-snug text-balance">

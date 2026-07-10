@@ -69,7 +69,7 @@ export const FulltextMarkdown = memo(function FulltextMarkdown({ markdown, image
 
   return (
     <>
-      <article className={`fulltext-prose ${className}`.trim()}>
+      <article className={`fulltext-prose min-w-0 max-w-full overflow-x-hidden ${className}`.trim()}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
           rehypePlugins={[rehypeRaw, rehypeKatex]}

@@ -36,12 +36,20 @@ function pickYear(dateStr) {
 
 function crossrefAuthors(message) {
   const list = message?.author || [];
-  return list.map(a => {
-    if (a.family && a.given) return { firstName: a.given, lastName: a.family, creatorType: 'author' };
-    if (a.name) return { name: a.name, creatorType: 'author' };
-    if (a.family) return { lastName: a.family, creatorType: 'author' };
-    return null;
-  }).filter(Boolean);
+  const people = [];
+  for (const a of list) {
+    // Real people in CrossRef almost always have structured given/family.
+    // Bare `name`-only entries are affiliations dumped into the author list
+    // (e.g. "DBS Bank, Singapore", "University of …") — skip them entirely.
+    if (a.family && a.given) {
+      people.push({ firstName: a.given, lastName: a.family, creatorType: 'author' });
+      continue;
+    }
+    if (a.family) {
+      people.push({ lastName: a.family, creatorType: 'author' });
+    }
+  }
+  return people;
 }
 
 function mapCrossref(message) {

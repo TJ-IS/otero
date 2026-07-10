@@ -126,6 +126,12 @@ export const api = {
   calibrateItem(key) {
     return req(`/api/items/${key}/calibrate`, { method: 'POST' });
   },
+  enrichFromCrossref(key, { doi, fields, creators, itemType } = {}) {
+    return req(`/api/items/${key}/crossref`, {
+      method: 'POST',
+      body: JSON.stringify({ doi, fields, creators, itemType }),
+    });
+  },
 
   // Merkle DOI proofs
   getMerkleRoot() { return req('/api/merkle/root'); },

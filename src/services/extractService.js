@@ -121,68 +121,65 @@ export function readHeaderFooterMetadata(key) {
 }
 
 /**
- * Build the extraction prompt. Framed as "extract from full text" (not
- * "verify existing metadata"), since most unfiled items are sparse. The
- * publisher stamp (DOI, journal, volume/issue/pages, year) often lives in
- * header/footer blocks that MinerU excludes from full.md, so we inject them
- * explicitly as supplementary metadata.
+ * Build a COMPACT extraction prompt. The original prompt asked the LLM to
+ * return an array of {field,value,confidence,reason} objects — the per-field
+ * Chinese "reason" sentence roughly doubled output tokens. This version
+ * requests a flat fields map plus an `uncertain` list, which is ~60% smaller
+ * in output while preserving the same information (field→value, and which
+ * fields are low-confidence).
+ *
+ * Framed as "extract from full text" (not "verify existing metadata"), since
+ * most unfiled items are sparse. The publisher stamp (DOI, journal,
+ * volume/issue/pages, year) often lives in header/footer blocks that MinerU
+ * excludes from full.md, so we inject them explicitly as supplementary
+ * metadata.
  */
 function buildPrompt({ markdown, currentItemType, headerFooterText }) {
   const hfSection = headerFooterText
-    ? `\n## 页眉/页脚文本（出版商印记，含 DOI/期刊名/卷期等，优先采用）\n<header_footer>\n${headerFooterText}\n</header_footer>\n`
+    ? `\n## 页眉/页脚（出版商印记，含 DOI/期刊名/卷期页/年份/ISSN，优先采用）\n${headerFooterText}\n`
     : '';
 
-  return `你是一名文献元数据抽取专家。下面给出从一篇 PDF 全文中解析出的 Markdown 内容（通常包含标题、作者、摘要、正文与参考文献），以及 MinerU 单独提取的页眉/页脚文本（出版商印记区域，通常含 DOI、期刊名、卷期页、年份、ISSN 等）。请从中抽取书目元数据。
+  return `你是文献元数据抽取专家。从下面全文 Markdown 与页眉/页脚中提取书目元数据，只输出 JSON，不要任何额外文字。
 
 ## 当前条目类型（仅供参考，可建议更合适的类型）
 ${currentItemType}
 ${hfSection}
-## 全文 Markdown（截取前部，元数据通常在首页）
-<fulltext>
+## 全文 Markdown（前部，元数据通常在首页）
 ${markdown}
-</fulltext>
 
-## 任务
-请从全文与页眉页脚中提取以下书目信息，并对每个字段给出置信度（0.0-1.0）。若全文中未出现某信息，对应字段 value 留空、confidence 设为 0。
-
-## 输出 JSON schema（只返回 JSON，不要任何额外文字）
+## 输出格式（只返回 JSON）
 {
-  "suggestedItemType": "建议的条目类型",
-  "itemTypeConfidence": 0.0到1.0,
-  "fields": [
-    {
-      "field": "字段名",
-      "value": "提取到的值或空字符串",
-      "confidence": 0.0到1.0,
-      "reason": "一句话依据（中文）"
-    }
-  ],
+  "itemType": "journalArticle",
+  "itemTypeConfidence": 0.9,
+  "fields": {
+    "title": "", "abstractNote": "", "publicationTitle": "",
+    "volume": "", "issue": "", "pages": "", "date": "",
+    "DOI": "", "ISSN": "", "url": "", "language": ""
+  },
   "creators": [
-    {
-      "firstName": "",
-      "lastName": "",
-      "creatorType": "author",
-      "confidence": 0.0到1.0
-    }
-  ]
+    {"lastName": "Smith", "firstName": "John"},
+    {"lastName": "Zhang", "firstName": ""},
+    {"lastName": "李四", "firstName": ""}
+  ],
+  "uncertain": ["pages", "ISSN"]
 }
 
-## 可建议的 itemType（只能从中选择）
-${ITEM_TYPES.map(t => `  - ${t}`).join('\n')}
+## 可选 itemType（只能从中选）
+${ITEM_TYPES.join(', ')}
 
-## 需要提取的字段名（只输出这些字段，不要编造字段名）
-${TARGET_FIELDS.map(f => `  - ${f}`).join('\n')}
+## 需提取字段（只输出这些字段名，不要编造）
+${TARGET_FIELDS.join(', ')}
 
 ## 规则
-- suggestedItemType：根据全文判断最合适的类型。学术论文→journalArticle；预印本（arXiv 等）→preprint；书籍→book；书章→bookSection；会议论文→conferencePaper；学位论文→thesis；报告→report；无法判断→document。
-- publicationTitle：提取**真实的期刊/出版物全名**。页眉中通常有期刊全名（如 "Journal of Strategic Information Systems"），优先采用。不要写"待归档"。若全文未出现期刊名则留空。
-- date：通常只存年份（如 "2023"）。页眉/页脚中的年份优先。若有完整日期可保留。
-- DOI：格式如 "10.1234/xxx"，不要带 URL 前缀。页脚中的 "https://doi.org/..." 是论文自身 DOI，应提取。
-- volume/issue/pages：页眉中的期刊行常含卷期页（如 "Information and Organization 29 (2019) 100250" 中 29 是卷、100250 是文章号）。
-- pages：格式如 "1-25" 或 "12-34, 56-78"。
-- 作者：按全文出现的顺序提取全部作者。西方人名 firstName 为名、lastName 为姓；中文姓名 lastName 为整名、firstName 留空、creatorType 用 "author"。若无作者则输出空数组。
-- confidence：1.0=全文明确出现且无歧义；0.5-0.9=有依据但存在推断；<0.5=不确定或全文未明确。
-- value 必须是可直接写入数据库的最终值，不要含解释性文字或 Markdown 标记。`;
+- itemType：学术论文→journalArticle；预印本（arXiv 等）→preprint；书籍→book；书章→bookSection；会议论文→conferencePaper；学位论文→thesis；报告→report；无法判断→document。itemTypeConfidence 为 0.0-1.0。
+- fields：只填能从全文/页眉页脚确认的字段，未出现的留空字符串。
+  - publicationTitle：真实期刊/出版物全名（页眉中常有，优先采用），不要写"待归档"。
+  - date：通常只存年份（如 "2023"），页眉/页脚中的年份优先。
+  - DOI：格式 "10.1234/xxx"，不带 URL 前缀；页脚 "https://doi.org/..." 是论文自身 DOI。
+  - volume/issue/pages：页眉期刊行常含卷期页（如 "Information and Organization 29 (2019) 100250" → volume=29, pages=100250）。pages 格式如 "1-25"。
+- creators：按全文出现顺序列出**全部作者，不要省略，至少前 10 位**。西方人名 lastName=姓、firstName=名（如 John Smith → firstName=John, lastName=Smith）；中文/单字段姓名 lastName=全名、firstName 留空。无作者输出空数组。
+- uncertain：你没把握的字段名数组（对应 confidence 低于 0.8）；有把握的不要列入。
+- 所有值必须是纯文本，不要含 XML/HTML 标签、Markdown 标记（# ** _ 等）、引号或解释性文字。`;
 }
 
 function extractJson(text) {
@@ -194,6 +191,107 @@ function extractJson(text) {
     return JSON.parse(text.slice(start, end + 1));
   }
   throw new Error('无法从 LLM 响应中解析 JSON');
+}
+
+/**
+ * Strip the markup leakage the LLM sometimes leaves in field values: XML/HTML
+ * tags (e.g. <fulltext>, <header_footer> from the prompt), Markdown header
+ * markers (#), bold/italic markers (** __), and surrounding quotes. Without
+ * this, extracted titles/abstracts can contain raw tags that pollute the DB.
+ */
+function cleanFieldValue(value) {
+  if (!value) return '';
+  let v = String(value).trim();
+  // XML/HTML tags: <fulltext>, <header_footer>, <abstract>, etc.
+  v = v.replace(/<\/?[a-zA-Z][^>]*>/g, '');
+  // Leading Markdown header markers.
+  v = v.replace(/^#{1,6}\s+/, '');
+  // Bold/italic markers.
+  v = v.replace(/\*\*/g, '').replace(/__/g, '');
+  // Surrounding quotes (straight + curly + CJK).
+  v = v.replace(/^["'“”‘’「『]+|["'“”‘’」』]+$/g, '');
+  // Collapse internal whitespace.
+  v = v.replace(/\s+/g, ' ').trim();
+  return v;
+}
+
+/**
+ * Clean a creator name and strip trailing affiliation superscripts/commas
+ * (e.g. "Smith, John1,2" → "Smith, John" handled by caller splitting; here
+ * we strip trailing digits/punctuation on a single name component).
+ */
+function cleanCreatorName(name) {
+  if (!name) return '';
+  let v = String(name).trim();
+  v = v.replace(/<\/?[a-zA-Z][^>]*>/g, '');
+  v = v.replace(/^#{1,6}\s+/, '');
+  v = v.replace(/\*\*/g, '').replace(/__/g, '');
+  v = v.replace(/^["'“”‘’「『]+|["'“”‘’」』]+$/g, '');
+  // Trailing affiliation markers: digits, commas, semicolons.
+  v = v.replace(/[\d,;：:·\s]+$/, '');
+  v = v.replace(/\s+/g, ' ').trim();
+  return v;
+}
+
+/**
+ * Trim the MinerU markdown to the front-matter region that actually carries
+ * bibliographic metadata. The references section ("References" / "参考文献" /
+ * "Bibliography" / "Works Cited") bloats input tokens massively but is useless
+ * for title/author/DOI/journal extraction. Cut at the first references
+ * heading when it appears after at least 800 chars of body; otherwise fall
+ * back to the maxChars slice.
+ */
+function trimMarkdownForMetadata(md, maxChars) {
+  const RE = /^#{1,6}\s*(references|参考文献|bibliography|works\s+cited|引用文献|refs?)\s*$/im;
+  if (md.length <= maxChars) {
+    const m = md.match(RE);
+    if (m && m.index != null && m.index > 800) return md.slice(0, m.index).trimEnd();
+    return md;
+  }
+  const head = md.slice(0, maxChars);
+  const m = head.match(RE);
+  if (m && m.index != null && m.index > 800) return md.slice(0, m.index).trimEnd();
+  return head;
+}
+
+/**
+ * Conservative regex fallback for authors when the LLM returns none. Scans the
+ * first ~4000 chars after the title heading for capitalized "First Last" name
+ * sequences. Confidence is set low (0.5) so this never auto-applies past the
+ * 0.8 threshold — it's a review-only suggestion. Returns [] when the byline
+ * is ambiguous.
+ */
+function fallbackAuthors(markdown) {
+  const head = markdown.slice(0, 4000);
+  const lines = head.split('\n').map(l => l.trim()).filter(Boolean);
+  let startIdx = 0;
+  for (let i = 0; i < Math.min(lines.length, 25); i++) {
+    if (/^#{1,3}\s+/.test(lines[i])) { startIdx = i + 1; break; }
+  }
+  const cand = lines.slice(startIdx, startIdx + 6).join(' ');
+  if (!cand) return [];
+  const stop = new Set([
+    'Abstract', 'Introduction', 'Keywords', 'Summary', 'Contents',
+    '摘要', '关键词', '引言', '目录', '作者', '通讯',
+  ]);
+  const matches = cand.match(/\b[A-Z][a-z]+(?:[- ][A-Z][a-z]+)+\b/g) || [];
+  const out = [];
+  for (const full of matches) {
+    const firstWord = full.split(' ')[0];
+    if (stop.has(full) || stop.has(firstWord)) continue;
+    out.push(full);
+    if (out.length >= 10) break;
+  }
+  return out.map(full => {
+    const parts = full.split(' ');
+    return {
+      firstName: parts.slice(0, -1).join(' '),
+      lastName: parts[parts.length - 1],
+      creatorType: 'author',
+      fieldMode: 0,
+      confidence: 0.5,
+    };
+  });
 }
 
 /**
@@ -214,9 +312,7 @@ export async function extractItem(key) {
   }
 
   const currentItemType = item.itemType || 'document';
-  const markdown = ft.markdown.length > config.llm.maxMarkdownChars
-    ? ft.markdown.slice(0, config.llm.maxMarkdownChars)
-    : ft.markdown;
+  const markdown = trimMarkdownForMetadata(ft.markdown, config.llm.maxMarkdownChars);
 
   // MinerU puts the publisher stamp (DOI, journal, volume/issue/pages, year)
   // into header/footer blocks that are excluded from full.md. Read them from
@@ -264,23 +360,32 @@ export async function extractItem(key) {
   const content = data?.choices?.[0]?.message?.content || '';
   const parsed = extractJson(content);
 
-  // Normalize the LLM output.
-  const suggestedItemType = ITEM_TYPES.includes(parsed.suggestedItemType)
-    ? parsed.suggestedItemType
+  // Normalize the LLM output. The compact schema returns a flat fields map
+  // (field→value) plus an `uncertain` list, instead of an array of verbose
+  // {field,value,confidence,reason} objects. We rebuild the legacy array
+  // shape so consumers (applyExtraction, extract_all.mjs) keep working.
+  const suggestedItemType = ITEM_TYPES.includes(parsed.itemType || parsed.suggestedItemType)
+    ? (parsed.itemType || parsed.suggestedItemType)
     : 'document';
-  const itemTypeConfidence = clamp01(Number(parsed.itemTypeConfidence) || 0);
+  const hasTitleOrDoi = !!(parsed.fields?.title || parsed.fields?.DOI);
+  const itemTypeConfidence = clamp01(
+    Number(parsed.itemTypeConfidence) || (hasTitleOrDoi ? 0.9 : 0.5)
+  );
 
-  const allowedTarget = new Set(TARGET_FIELDS);
-  const fields = Array.isArray(parsed.fields)
+  const fieldsObj = parsed.fields && typeof parsed.fields === 'object' && !Array.isArray(parsed.fields)
     ? parsed.fields
-        .filter(f => allowedTarget.has(f.field))
-        .map(f => ({
-          field: f.field,
-          value: typeof f.value === 'string' ? f.value.trim() : String(f.value ?? '').trim(),
-          confidence: clamp01(Number(f.confidence) || 0),
-          reason: f.reason || '',
-        }))
-    : [];
+    : {};
+  const uncertainSet = new Set(Array.isArray(parsed.uncertain) ? parsed.uncertain : []);
+
+  const fields = [];
+  for (const field of TARGET_FIELDS) {
+    const raw = fieldsObj[field];
+    if (raw == null || raw === '') continue;
+    const value = cleanFieldValue(String(raw));
+    if (!value) continue;
+    const confidence = uncertainSet.has(field) ? 0.5 : 0.9;
+    fields.push({ field, value, confidence, reason: '' });
+  }
 
   // The regex-extracted DOI from header/footer blocks is deterministic and
   // reliable; LLMs sometimes truncate or hallucinate DOIs (e.g. one run gave
@@ -316,16 +421,23 @@ export async function extractItem(key) {
     }
   }
 
-  const creators = Array.isArray(parsed.creators)
+  let creators = Array.isArray(parsed.creators)
     ? parsed.creators.map((c, i) => ({
-        firstName: (c.firstName || '').trim(),
-        lastName: (c.lastName || '').trim(),
+        firstName: cleanCreatorName(c.firstName || c.f || ''),
+        lastName: cleanCreatorName(c.lastName || c.l || ''),
         creatorType: c.creatorType || 'author',
-        fieldMode: c.fieldMode ?? (c.firstName ? 0 : 1),
+        fieldMode: c.fieldMode ?? (c.firstName || c.f ? 0 : 1),
         orderIndex: i,
-        confidence: clamp01(Number(c.confidence) || 0),
+        confidence: 0.9,
       })).filter(c => c.firstName || c.lastName)
     : [];
+
+  // When the LLM fails to return any authors, fall back to a conservative
+  // regex byline scan. Confidence is 0.5 so it never auto-applies past the
+  // 0.8 threshold — review-only.
+  if (creators.length === 0) {
+    creators = fallbackAuthors(markdown).map((c, i) => ({ ...c, orderIndex: i }));
+  }
 
   const overallConfidence = computeOverall(fields, creators, itemTypeConfidence);
 

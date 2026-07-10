@@ -30,12 +30,13 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { Save, Trash2, FileText, Plus, X, ExternalLink, Copy, Check, ChevronUp, ChevronDown, BookOpen, Sparkles, Loader2, Wand2, Braces } from 'lucide-react';
+import { Save, Trash2, FileText, Plus, X, ExternalLink, Copy, Check, ChevronUp, ChevronDown, BookOpen, Sparkles, Loader2, Wand2, Braces, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
 import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle, ALLOWED_PUBLICATION_TITLES, UNFILED } from '@/lib/items';
 import { CalibratePanel } from './CalibratePanel';
+import { CrossrefPanel } from './CrossrefPanel';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Lazy-load the full-text viewer: it pulls in react-markdown + remark-gfm +
@@ -246,6 +247,10 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   const [calibrateLoading, setCalibrateLoading] = useState(false);
   const [calibrateResult, setCalibrateResult] = useState(null);
   const [calibrateError, setCalibrateError] = useState(null);
+  const [crossrefOpen, setCrossrefOpen] = useState(false);
+  const [crossrefLoading, setCrossrefLoading] = useState(false);
+  const [crossrefResult, setCrossrefResult] = useState(null);
+  const [crossrefError, setCrossrefError] = useState(null);
 
   useEffect(() => {
     if (!item) return;
@@ -468,6 +473,61 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     toast.success(`已应用到草稿（${fieldCount} 字段${creators?.length ? `，${creators.length} 作者` : ''}），请核对后保存`);
   };
 
+  const triggerCrossref = async () => {
+    if (!canEdit || crossrefLoading) return;
+    const doi = (draft?.fields?.DOI || '').trim();
+    if (!doi) {
+      toast.warning('请先填写 DOI');
+      return;
+    }
+    setCrossrefOpen(true);
+    setCrossrefLoading(true);
+    setCrossrefError(null);
+    setCrossrefResult(null);
+    try {
+      // Compare against the current draft (may include unsaved DOI/fields).
+      const res = await api.enrichFromCrossref(itemKey, {
+        doi,
+        fields: draft.fields,
+        creators: creatorsDraft,
+        itemType: draft.itemType,
+      });
+      setCrossrefResult(res);
+    } catch (err) {
+      setCrossrefError(err.message);
+    } finally {
+      setCrossrefLoading(false);
+    }
+  };
+
+  const applyCrossref = ({ fields, creators, itemType }) => {
+    if (!draft || !canEdit) return;
+    const newFields = { ...draft.fields };
+    let fieldCount = 0;
+    for (const [k, v] of Object.entries(fields || {})) {
+      newFields[k] = v === '' ? null : v;
+      fieldCount++;
+    }
+    // AIS Basket: if CrossRef filled a real journal but DOI is present, keep it.
+    // If somehow DOI missing after apply, force UNFILED.
+    if ((!newFields.DOI) && draft.itemType === 'journalArticle') {
+      newFields.publicationTitle = UNFILED;
+    }
+    const nextType = itemType || draft.itemType;
+    setDraft({ fields: newFields, itemType: nextType });
+    if (creators) {
+      setCreatorsDraft(creators);
+    }
+    setDirty(true);
+    setCrossrefOpen(false);
+    setTab('detail');
+    const parts = [];
+    if (fieldCount) parts.push(`${fieldCount} 字段`);
+    if (creators) parts.push(`${creators.length} 作者`);
+    if (itemType) parts.push('类型');
+    toast.success(`已应用到草稿（${parts.join('，') || '无变更'}），请核对后保存`);
+  };
+
   return (
     <div className="flex h-full flex-col">
       {/* Dirty indicator bar */}
@@ -624,13 +684,56 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                 <Section title="标识符">
                   <div className="grid grid-cols-2 gap-x-3 gap-y-2">
                     {fields.identifiers.map(name => (
-                      <Field
-                        key={name}
-                        name={name}
-                        value={draft.fields[name]}
-                        onChange={v => setField(name, v)}
-                        readOnly={!canEdit}
-                      />
+                      name === 'DOI' ? (
+                        <div key={name} className="col-span-2">
+                          <Label className="text-xs text-muted-foreground">{FIELD_LABELS[name] || name}</Label>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <div className="relative flex-1 min-w-0">
+                              <Input
+                                value={draft.fields.DOI || ''}
+                                onChange={e => setField('DOI', e.target.value)}
+                                readOnly={!canEdit}
+                                className={`h-8 text-sm pr-8 ${!canEdit ? 'bg-muted/50 cursor-not-allowed' : ''}`}
+                              />
+                              {fieldHref('DOI', draft.fields.DOI) && (
+                                <a
+                                  href={fieldHref('DOI', draft.fields.DOI)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
+                                  title="跳转 DOI"
+                                  onClick={e => e.stopPropagation()}
+                                >
+                                  <ExternalLink className="size-3.5" />
+                                </a>
+                              )}
+                            </div>
+                            {canEdit && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 shrink-0 px-2"
+                                onClick={triggerCrossref}
+                                disabled={crossrefLoading || !(draft.fields.DOI || '').trim()}
+                                title="用 CrossRef 解析 DOI 并填充元数据"
+                              >
+                                {crossrefLoading
+                                  ? <Loader2 className="size-3.5 animate-spin" />
+                                  : <Globe className="size-3.5" />}
+                                <span className="ml-1 text-xs">CrossRef</span>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <Field
+                          key={name}
+                          name={name}
+                          value={draft.fields[name]}
+                          onChange={v => setField(name, v)}
+                          readOnly={!canEdit}
+                        />
+                      )
                     ))}
                   </div>
                 </Section>
@@ -861,6 +964,15 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
         loading={calibrateLoading}
         error={calibrateError}
         onApply={applyCalibration}
+      />
+
+      <CrossrefPanel
+        open={canEdit && crossrefOpen}
+        onOpenChange={setCrossrefOpen}
+        result={crossrefResult}
+        loading={crossrefLoading}
+        error={crossrefError}
+        onApply={applyCrossref}
       />
     </div>
   );

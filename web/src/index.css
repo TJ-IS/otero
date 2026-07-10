@@ -67,6 +67,24 @@
   .fulltext-prose {
     @apply text-sm leading-relaxed text-foreground;
     font-family: ui-sans-serif, system-ui, sans-serif;
+    /* MinerU OCR often glues words with no spaces; force wrap so the page
+       never grows a horizontal scrollbar. */
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .fulltext-prose h1,
+  .fulltext-prose h2,
+  .fulltext-prose h3,
+  .fulltext-prose h4,
+  .fulltext-prose p,
+  .fulltext-prose li,
+  .fulltext-prose blockquote,
+  .fulltext-prose td,
+  .fulltext-prose th {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .fulltext-prose h1 {
     @apply text-xl font-bold mt-6 mb-3;
@@ -85,6 +103,7 @@
   }
   .fulltext-prose a {
     @apply text-blue-600 hover:underline;
+    overflow-wrap: anywhere;
   }
   .fulltext-prose ul {
     @apply list-disc pl-6 my-3;
@@ -97,18 +116,25 @@
   }
   .fulltext-prose blockquote {
     @apply border-l-4 border-muted pl-4 italic text-muted-foreground my-3;
+    max-width: 100%;
   }
   .fulltext-prose code {
     @apply bg-muted px-1.5 py-0.5 rounded text-[0.85em] font-mono;
+    overflow-wrap: anywhere;
+    word-break: break-all;
   }
   .fulltext-prose pre {
     @apply bg-muted p-3 rounded-md overflow-x-auto my-3 text-xs;
+    max-width: 100%;
   }
   .fulltext-prose pre code {
     @apply bg-transparent p-0;
+    word-break: normal;
+    overflow-wrap: normal;
   }
   .fulltext-prose table {
     @apply border-collapse text-xs;
+    max-width: 100%;
   }
   .fulltext-prose th,
   .fulltext-prose td {
@@ -121,10 +147,14 @@
     @apply my-6 border-border;
   }
   .fulltext-prose img {
-    @apply max-w-full;
+    @apply max-w-full h-auto;
   }
-  /* KaTeX block equations: center and add breathing room. */
+  /* KaTeX block equations: scroll inside the block, never widen the page. */
   .fulltext-prose .katex-display {
     @apply my-4 overflow-x-auto overflow-y-hidden;
+    max-width: 100%;
+  }
+  .fulltext-prose .katex {
+    max-width: 100%;
   }
 }
