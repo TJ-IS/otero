@@ -54,3 +54,31 @@ export async function deleteObject(objectName) {
     await client.removeObject(config.storage.minio.bucket, objectName);
   } catch { /* ignore */ }
 }
+
+/**
+ * List all object names under a prefix (non-recursive prefix scan).
+ * Returns an array of object name strings.
+ */
+export async function listObjectNames(prefix) {
+  const client = getMinioClient();
+  const bucket = config.storage.minio.bucket;
+  return new Promise((resolve, reject) => {
+    const names = [];
+    const stream = client.listObjectsV2(bucket, prefix, true);
+    stream.on('data', obj => names.push(obj.name));
+    stream.on('end', () => resolve(names));
+    stream.on('error', reject);
+  });
+}
+
+/**
+ * Delete all objects whose name starts with prefix.
+ */
+export async function deleteObjectsWithPrefix(prefix) {
+  const client = getMinioClient();
+  const bucket = config.storage.minio.bucket;
+  const names = await listObjectNames(prefix);
+  if (names.length === 0) return;
+  const objectsList = names.map(name => ({ name }));
+  await client.removeObjects(bucket, objectsList);
+}

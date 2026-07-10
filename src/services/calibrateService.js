@@ -126,7 +126,7 @@ export async function calibrateItem(key) {
   const item = Item.loadByKey(key);
   if (!item) throw new Error('条目未找到');
 
-  const ft = getFullText(key);
+  const ft = await getFullText(key);
   if (ft.state !== 'done' || !ft.markdown) {
     throw new Error('请先解析全文后再校准（当前全文状态：' + (ft.state || 'idle') + '）');
   }

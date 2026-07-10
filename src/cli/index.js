@@ -123,7 +123,7 @@ program
         while (true) {
           await new Promise(r => setTimeout(r, 3000));
           await pollOnce();
-          const cur = getFullText(key);
+          const cur = await getFullText(key);
           process.stdout.write(`\rstate=${cur.state}` +
             (cur.totalPages ? ` ${cur.extractedPages ?? 0}/${cur.totalPages}` : '') +
             '    ');

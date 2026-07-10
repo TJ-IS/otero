@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { config } from '../config.js';
 import { Item } from '../models/Item.js';
 import { Attachment } from '../models/Attachment.js';
-import { resolveStoredPath, storedFileExists, downloadToTemp } from './storageService.js';
+import {
+  resolveStoredPath, storedFileExists, downloadToTemp, useMinio,
+  uploadDir, deleteStoredPrefix, listStoredPrefix, readStoredFile, getStoredFileStream,
+} from './storageService.js';
 import {
   getFullTextRowByKey, getFullTextRow, upsertFullText,
   listPendingFullText, listSubmittingFullText, listFailedFullText, listAllFullText, deleteFullTextRow,
@@ -23,6 +27,40 @@ function fulltextDirFor(key) {
 
 function relToStorage(absPath) {
   return path.relative(config.storageDir, absPath);
+}
+
+/** MinIO object-key prefix for an item's extracted full-text assets.
+ * Uses the same two-letter shard as PDF storage: <key[0:2]>/<key>/fulltext */
+function fulltextPrefixFor(key) {
+  return `${key.slice(0, 2)}/${key}/fulltext`;
+}
+
+/** Remove MinerU's bundled copy of the source PDF (duplicates the PDF we
+ * already store separately as the item's attachment). */
+function removeOriginPdfs(dir) {
+  for (const p of walk(dir)) {
+    if (p.endsWith('_origin.pdf')) {
+      try { fs.unlinkSync(p); } catch { /* ignore */ }
+    }
+  }
+}
+
+/**
+ * Given a flat list of object names (or file basenames), pick the best
+ * content_list.json candidate: prefer an exact "content_list.json" match,
+ * shallowest first; fall back to a "*_content_list.json" (non-_v2) match.
+ */
+export function pickContentListObjectName(names) {
+  const depth = n => n.split('/').length;
+  const isPrimary = n => n.split('/').pop() === 'content_list.json';
+  const isSecondary = n => {
+    const b = n.split('/').pop();
+    return b.endsWith('_content_list.json') && !b.endsWith('_v2.json');
+  };
+  const primary = names.filter(isPrimary).sort((a, b) => depth(a) - depth(b));
+  if (primary.length) return primary[0];
+  const secondary = names.filter(isSecondary).sort((a, b) => depth(a) - depth(b));
+  return secondary[0] || null;
 }
 
 /**
@@ -75,7 +113,7 @@ export async function parseItem(key, { force = false } = {}) {
   }
 
   // Clean any prior extracted assets so a re-parse starts fresh.
-  cleanupAssets(key);
+  await cleanupAssets(key);
 
   const row = upsertFullText(item.id, {
     state: 'pending',
@@ -152,7 +190,7 @@ export async function enqueueBatchParse(keys) {
     if (!pdfRelPath) { noPdf++; continue; }
 
     // Record immediately so the item is visible in the task log.
-    cleanupAssets(key);
+    await cleanupAssets(key);
     upsertFullText(item.id, {
       state: 'submitting',
       mineruBatchId: null,
@@ -375,13 +413,35 @@ function mapState(s) {
 }
 
 async function finalizeDone(row, zipUrl) {
-  const destDir = fulltextDirFor(row.itemKey);
-  const { fullMdPath } = await downloadAndExtract(zipUrl, destDir);
+  // MinerU's zip extraction (AdmZip) needs a real directory, so we always
+  // extract locally first. In MinIO mode, the local dir is a throwaway temp
+  // dir: after extraction we upload every file to MinIO and delete it.
+  const localDir = useMinio()
+    ? path.join(os.tmpdir(), `otero-fulltext-${row.itemKey}-${Date.now()}`)
+    : fulltextDirFor(row.itemKey);
+
+  const { fullMdPath } = await downloadAndExtract(zipUrl, localDir);
   rewriteAssetPaths(fullMdPath, row.itemKey);
+  removeOriginPdfs(localDir); // duplicate of the already-stored source PDF
+
+  let markdownPath, assetDir;
+  if (useMinio()) {
+    const prefix = fulltextPrefixFor(row.itemKey);
+    await deleteStoredPrefix(prefix); // clear any partial prior upload
+    await uploadDir(localDir, prefix);
+    const relMd = path.relative(localDir, fullMdPath).replace(/\\/g, '/');
+    markdownPath = `${prefix}/${relMd}`;
+    assetDir = prefix;
+    try { fs.rmSync(localDir, { recursive: true, force: true }); } catch { /* ignore */ }
+  } else {
+    markdownPath = relToStorage(fullMdPath);
+    assetDir = relToStorage(localDir);
+  }
+
   upsertFullText(row.itemID, {
     state: 'done',
-    markdownPath: relToStorage(fullMdPath),
-    assetDir: relToStorage(destDir),
+    markdownPath,
+    assetDir,
     extractedPages: null,
     totalPages: null,
     errCode: null,
@@ -391,14 +451,14 @@ async function finalizeDone(row, zipUrl) {
 }
 
 /** Public read API: status + inline markdown content (when done). */
-export function getFullText(key) {
+export async function getFullText(key) {
   const row = getFullTextRowByKey(key);
   if (!row) return { state: 'idle', itemKey: key };
   const result = { ...row, itemKey: key };
   if (row.state === 'done' && row.markdownPath) {
-    const abs = resolveStoredPath(row.markdownPath);
     try {
-      result.markdown = fs.readFileSync(abs, 'utf8');
+      const buf = await readStoredFile(row.markdownPath);
+      result.markdown = buf.toString('utf8');
     } catch (err) {
       result.markdown = null;
       result.errMsg = `markdown file missing: ${err.message}`;
@@ -444,12 +504,47 @@ function findContentListRecursive(dir) {
 }
 
 /**
+ * Read and parse the content_list.json for a key, in either storage mode.
+ * Returns { blocks, listDirRel } where listDirRel is the directory containing
+ * content_list.json, expressed relative to the item's fulltext root (posix
+ * separators) — used to resolve image paths referenced within the JSON.
+ * Returns null if no content_list.json can be found or parsed.
+ */
+export async function getContentListBlocks(key) {
+  if (useMinio()) {
+    const prefix = fulltextPrefixFor(key);
+    const names = await listStoredPrefix(prefix);
+    const relNames = names
+      .filter(n => n.startsWith(`${prefix}/`))
+      .map(n => n.slice(prefix.length + 1));
+    const picked = pickContentListObjectName(relNames);
+    if (!picked) return null;
+    try {
+      const buf = await readStoredFile(`${prefix}/${picked}`);
+      const blocks = JSON.parse(buf.toString('utf8'));
+      if (!Array.isArray(blocks)) return null;
+      return { blocks, listDirRel: path.posix.dirname(picked) };
+    } catch { return null; }
+  }
+
+  const dir = fulltextDirFor(key);
+  const contentListPath = findContentListRecursive(dir);
+  if (!contentListPath) return null;
+  try {
+    const blocks = JSON.parse(fs.readFileSync(contentListPath, 'utf8'));
+    if (!Array.isArray(blocks)) return null;
+    const listDirRel = path.relative(dir, path.dirname(contentListPath)).replace(/\\/g, '/');
+    return { blocks, listDirRel };
+  } catch { return null; }
+}
+
+/**
  * Public read API: structured MinerU output derived from content_list.json.
  * Returns outline, figures, tables, equations, charts, references, footnotes,
  * and publisher stamp (header/footer) regardless of whether a markdown file
  * exists, so the article page can render rich assets even when full.md is absent.
  */
-export function getFullTextStructure(key) {
+export async function getFullTextStructure(key) {
   const row = getFullTextRowByKey(key);
   const base = {
     state: row?.state || 'idle',
@@ -466,14 +561,9 @@ export function getFullTextStructure(key) {
   };
   if (!row || row.state !== 'done' || !row.assetDir) return base;
 
-  const dir = fulltextDirFor(key);
-  const contentListPath = findContentListRecursive(dir);
-  if (!contentListPath) return base;
-
-  let blocks;
-  try { blocks = JSON.parse(fs.readFileSync(contentListPath, 'utf8')); }
-  catch { return base; }
-  if (!Array.isArray(blocks)) return base;
+  const found = await getContentListBlocks(key);
+  if (!found) return base;
+  const { blocks, listDirRel } = found;
 
   const maxPage = blocks
     .map(b => b.page_idx)
@@ -481,11 +571,10 @@ export function getFullTextStructure(key) {
     .reduce((a, b) => Math.max(a, b), -1);
   base.pageCount = maxPage + 1;
 
-  const listDir = path.dirname(contentListPath);
   const imgUrl = (imgPath) => {
     if (!imgPath) return null;
-    const abs = path.resolve(listDir, imgPath);
-    const rel = path.relative(dir, abs).replace(/\\/g, '/');
+    const joined = path.posix.join(listDirRel, imgPath.replace(/\\/g, '/'));
+    const rel = path.posix.normalize(joined).replace(/^(\.\.\/)+/, '');
     return `/api/attachments/${key}/fulltext/${rel}`;
   };
 
@@ -548,15 +637,19 @@ export function getFullTextStructure(key) {
 }
 
 /** Remove extracted assets + DB row so a fresh parse can be triggered. */
-export function deleteFullText(key) {
+export async function deleteFullText(key) {
   const row = getFullTextRowByKey(key);
   if (!row) return { deleted: false };
-  cleanupAssets(key);
+  await cleanupAssets(key);
   deleteFullTextRow(row.itemID);
   return { deleted: true };
 }
 
-function cleanupAssets(key) {
+async function cleanupAssets(key) {
+  if (useMinio()) {
+    await deleteStoredPrefix(fulltextPrefixFor(key));
+    return;
+  }
   const dir = fulltextDirFor(key);
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
 }
@@ -571,10 +664,20 @@ export function listAll() {
 }
 
 /**
- * Resolve a sub-path under an item's fulltext dir, with traversal guard.
- * Returns the absolute path or null if it escapes the root.
+ * Resolve a sub-path under an item's fulltext assets, with traversal guard.
+ * Returns a value suitable for storageService's getStoredFileStream()/
+ * storedFileExists() — an absolute filesystem path in filesystem mode, or a
+ * MinIO object name in MinIO mode. Returns null if the path escapes the
+ * root or the asset doesn't exist.
  */
-export function resolveFullTextAsset(key, subPath) {
+export async function resolveFullTextAsset(key, subPath) {
+  if (useMinio()) {
+    const clean = path.posix.normalize(String(subPath || '').replace(/\\/g, '/')).replace(/^\/+/, '');
+    if (!clean || clean === '.' || clean.startsWith('..') || clean.includes('/../')) return null;
+    const objectName = `${fulltextPrefixFor(key)}/${clean}`;
+    const exists = await storedFileExists(objectName);
+    return exists ? objectName : null;
+  }
   const root = fulltextDirFor(key);
   const abs = path.resolve(root, subPath || '');
   const rootResolved = path.resolve(root);

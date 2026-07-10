@@ -3,9 +3,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import { config, ensureDataDirs } from '../config.js';
-import { uploadFile, getObjectStream, deleteObject, objectExists } from './minioClient.js';
+import { uploadFile, getObjectStream, deleteObject, objectExists, listObjectNames, deleteObjectsWithPrefix } from './minioClient.js';
 
-const useMinio = () => config.storage.type === 'minio';
+export const useMinio = () => config.storage.type === 'minio';
 
 /**
  * Storage layout (filesystem):  data/storage/<key[0:2]>/<key>.<ext>
@@ -129,4 +129,45 @@ export async function downloadToTemp(relPath) {
     stream.on('error', reject);
   });
   return tmp;
+}
+
+/**
+ * Recursively upload every file under localDir to MinIO.
+ * Each file is stored as <objectPrefix>/<relative-path-from-localDir>.
+ * Returns the list of object names written.
+ */
+export async function uploadDir(localDir, objectPrefix) {
+  const names = [];
+  function* walkSync(dir) {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) yield* walkSync(full);
+      else yield full;
+    }
+  }
+  for (const absFile of walkSync(localDir)) {
+    const rel = path.relative(localDir, absFile).replace(/\\/g, '/');
+    const objectName = `${objectPrefix}/${rel}`;
+    await uploadFile(absFile, objectName);
+    names.push(objectName);
+  }
+  return names;
+}
+
+/**
+ * Delete all MinIO objects under a stored prefix (e.g. "<key>/fulltext").
+ * No-op in filesystem mode.
+ */
+export async function deleteStoredPrefix(prefix) {
+  if (!useMinio()) return;
+  await deleteObjectsWithPrefix(prefix);
+}
+
+/**
+ * List all object names under a stored prefix.
+ * Returns [] in filesystem mode.
+ */
+export async function listStoredPrefix(prefix) {
+  if (!useMinio()) return [];
+  return listObjectNames(prefix);
 }

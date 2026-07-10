@@ -128,7 +128,7 @@ let doiFixed = 0, doiFilled = 0, archived = 0, noFooterDoi = 0, noJournal = 0;
 const start = Date.now();
 
 for (const t of targets) {
-  const { headerFooterText, doi: regexDoi } = readHeaderFooterMetadata(t.key);
+  const { headerFooterText, doi: regexDoi } = await readHeaderFooterMetadata(t.key);
   const oldDoi = (t.doi || '').trim();
   const oldPub = (t.pubtitle || '').trim();
 

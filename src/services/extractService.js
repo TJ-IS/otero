@@ -1,8 +1,6 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { Item } from '../models/Item.js';
 import { getDb } from '../db/connection.js';
-import { getFullText } from './fulltextService.js';
+import { getFullText, getContentListBlocks } from './fulltextService.js';
 import { config } from '../config.js';
 import { itemTypeIdByName, itemNameById } from '../repositories/itemRepo.js';
 import { JOURNAL_WHITELIST } from './journalWhitelist.js';
@@ -76,23 +74,10 @@ function allowedFieldsForType(itemTypeName) {
  * Returns { headerFooterText, doi } where doi is regex-extracted for reliability
  * (the LLM sometimes mangles DOIs).
  */
-export function readHeaderFooterMetadata(key) {
-  const dir = path.join(config.storageDir, key.slice(0, 2), key, 'fulltext');
-  let contentListPath = null;
-  try {
-    for (const f of fs.readdirSync(dir)) {
-      // Prefer the v1 content_list.json (flat array). Skip the _v2 variant.
-      if (f === 'content_list.json' || (f.endsWith('_content_list.json') && !f.endsWith('_v2.json'))) {
-        contentListPath = path.join(dir, f);
-        break;
-      }
-    }
-  } catch { /* dir missing */ }
-  if (!contentListPath) return { headerFooterText: '', doi: '' };
-
-  let blocks;
-  try { blocks = JSON.parse(fs.readFileSync(contentListPath, 'utf8')); }
-  catch { return { headerFooterText: '', doi: '' }; }
+export async function readHeaderFooterMetadata(key) {
+  const found = await getContentListBlocks(key);
+  if (!found) return { headerFooterText: '', doi: '' };
+  const { blocks } = found;
   if (!Array.isArray(blocks)) return { headerFooterText: '', doi: '' };
 
   // Collect header/footer blocks from the first 2 pages — the publisher stamp
@@ -306,7 +291,7 @@ export async function extractItem(key) {
   const item = Item.loadByKey(key);
   if (!item) throw new Error('条目未找到');
 
-  const ft = getFullText(key);
+  const ft = await getFullText(key);
   if (ft.state !== 'done' || !ft.markdown) {
     throw new Error('请先解析全文后再提取（当前全文状态：' + (ft.state || 'idle') + '）');
   }
@@ -317,7 +302,7 @@ export async function extractItem(key) {
   // MinerU puts the publisher stamp (DOI, journal, volume/issue/pages, year)
   // into header/footer blocks that are excluded from full.md. Read them from
   // content_list.json so the LLM (and a DOI regex) can see them.
-  const { headerFooterText, doi: regexDoi } = readHeaderFooterMetadata(key);
+  const { headerFooterText, doi: regexDoi } = await readHeaderFooterMetadata(key);
 
   const userPrompt = buildPrompt({ markdown, currentItemType, headerFooterText });
 

@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import fs from 'node:fs';
 import path from 'node:path';
 import { getDb } from '../../db/connection.js';
 import { config } from '../../config.js';
@@ -52,20 +51,25 @@ attachmentsRouter.get('/:key/file', async (req, res) => {
 /**
  * Serve a file from an item's extracted full-text directory (MinerU assets).
  * GET /api/attachments/:key/fulltext/*
- * Full-text assets remain on the local filesystem (they are ephemeral results
- * produced by MinerU, not user-uploaded content).
+ * Resolved via resolveFullTextAsset, which is storage-mode-aware (filesystem
+ * or MinIO).
  */
 attachmentsRouter.get('/:key/fulltext/*', async (req, res) => {
   const subPath = req.params[0];
   if (!subPath) return res.status(400).json({ error: 'path required' });
-  const abs = resolveFullTextAsset(req.params.key, subPath);
-  if (!abs) return res.status(404).json({ error: 'not found' });
+  const resolved = await resolveFullTextAsset(req.params.key, subPath);
+  if (!resolved) return res.status(404).json({ error: 'not found' });
 
-  const ext = path.extname(abs).toLowerCase();
+  const ext = path.extname(resolved).toLowerCase();
   const mime = MIME_BY_EXT[ext] || 'application/octet-stream';
   res.setHeader('Content-Type', mime);
   res.setHeader('Cache-Control', 'public, max-age=86400');
-  fs.createReadStream(abs).pipe(res);
+  try {
+    const stream = await getStoredFileStream(resolved);
+    stream.pipe(res);
+  } catch (err) {
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
 });
 
 const MIME_BY_EXT = {
