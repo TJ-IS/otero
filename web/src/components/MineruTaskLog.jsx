@@ -161,7 +161,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[85vh] flex flex-col p-0">
+      <DialogContent className="max-w-5xl w-[calc(100%-2rem)] max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-3 border-b">
           <DialogTitle className="flex items-center gap-2">
             <ListChecks className="size-5" />
@@ -226,6 +226,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                 : '当前筛选下没有任务。'}
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10 bg-background text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
                 <tr>
@@ -289,6 +290,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                 })}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

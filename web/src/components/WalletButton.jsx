@@ -6,6 +6,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu.jsx';
 
@@ -43,9 +45,9 @@ export function WalletButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-1.5">
+        <Button variant="outline" size="sm" className="gap-1.5 px-2 sm:px-3">
           <Wallet className="h-4 w-4" />
-          <span>{shortenAddress(address)}</span>
+          <span className="hidden sm:inline">{shortenAddress(address)}</span>
           {canEdit && (
             <span className="ml-1 hidden rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 sm:inline">
               可编辑
@@ -54,6 +56,10 @@ export function WalletButton() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuLabel className="font-mono text-xs font-normal text-muted-foreground sm:hidden">
+          {shortenAddress(address)}{canEdit ? ' · 可编辑' : ''}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="sm:hidden" />
         <DropdownMenuItem onClick={handleCopy} className="gap-2">
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? '已复制' : '复制地址'}

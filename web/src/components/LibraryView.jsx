@@ -14,17 +14,20 @@ import { Sidebar } from '@/components/Sidebar';
 import { ItemTable } from '@/components/ItemTable';
 import { ItemDetail } from '@/components/ItemDetail';
 import { TopBar } from '@/components/TopBar';
+import { FloatingDetailPanel } from '@/components/FloatingDetailPanel';
 import { cn } from '@/lib/utils';
 import { ITEM_TYPE_LABELS, UNFILED } from '@/lib/items';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import { api } from '@/api/client';
 
 const SIDEBAR_WIDTH = 260;
-const MIN_DETAIL = 300;
+const MIN_DETAIL = 360;
 const MAX_DETAIL = 640;
 
 export function LibraryView() {
   const { canEdit, ready } = useAuth();
+  const isMobile = useIsMobile();
   const [filter, setFilter] = useState({ type: null, journal: '待归档', collection: null, search: null });
   const [selectedKey, setSelectedKey] = useState(null);
   const [itemsVersion, setItemsVersion] = useState(0);
@@ -218,10 +221,18 @@ export function LibraryView() {
             className="absolute inset-0 z-20 cursor-default bg-black/15 animate-in fade-in duration-150"
           />
           <div
-            className="absolute left-3 top-3 bottom-3 z-30 flex"
-            style={{ width: SIDEBAR_WIDTH }}
+            className={cn(
+              'z-30 flex',
+              isMobile ? 'fixed inset-0' : 'absolute left-3 top-3 bottom-3',
+            )}
+            style={isMobile ? undefined : { width: SIDEBAR_WIDTH }}
           >
-            <div className="relative flex h-full flex-1 flex-col border bg-background shadow-2xl overflow-hidden animate-in slide-in-from-left-full duration-200">
+            <div
+              className={cn(
+                'relative flex h-full flex-1 flex-col bg-background overflow-hidden animate-in slide-in-from-left-full duration-200',
+                isMobile ? '' : 'border shadow-2xl',
+              )}
+            >
               <Sidebar
                 filter={filter}
                 onFilterChange={onFilterChange}
@@ -257,54 +268,40 @@ export function LibraryView() {
       </main>
 
       {/* Right detail panel — floats over the main content, does not affect layout */}
-      {detailOpen && (
-        <>
-          {/* Click-outside scrim: clicking anywhere outside the panel closes it */}
-          <button
-            type="button"
-            aria-label="关闭详情"
-            tabIndex={-1}
-            onClick={() => {
-              if (detailDirty) {
-                toast.message('当前条目有未保存的修改', { description: '请先保存或放弃修改后再关闭。' });
-                return;
-              }
-              setDetailOpen(false);
-              setSelectedKey(null);
-            }}
-            className="absolute inset-0 z-20 cursor-default bg-black/15 animate-in fade-in duration-150"
-          />
+      <FloatingDetailPanel
+        open={detailOpen}
+        onClose={() => {
+          if (detailDirty) {
+            toast.message('当前条目有未保存的修改', { description: '请先保存或放弃修改后再关闭。' });
+            return;
+          }
+          setDetailOpen(false);
+          setSelectedKey(null);
+        }}
+        width={Math.max(MIN_DETAIL, detailWidth)}
+        transitioning={isDetailResizing}
+        resizeHandle={
           <div
-            className={cn(
-              'absolute right-3 top-3 bottom-3 z-30 flex',
-              isDetailResizing ? '' : 'transition-[width] duration-200 ease-out',
-            )}
-            style={{ width: Math.max(MIN_DETAIL, detailWidth) }}
-          >
-            {/* Left-edge resize handle */}
-            <div
-              onMouseDown={startDetailResize}
-              className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/40 active:bg-primary/60 transition-colors"
+            onMouseDown={startDetailResize}
+            className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/40 active:bg-primary/60 transition-colors"
+          />
+        }
+      >
+        {selectedKey ? (
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <ItemDetail
+              itemKey={selectedKey}
+              onDeleted={onItemDeleted}
+              onChanged={refreshItems}
+              onDirtyChange={setDetailDirty}
             />
-            <div className="relative flex h-full flex-1 flex-col border bg-background shadow-2xl overflow-hidden animate-in slide-in-from-right-full duration-200">
-              {selectedKey ? (
-                <div className="min-h-0 flex-1 overflow-hidden">
-                  <ItemDetail
-                    itemKey={selectedKey}
-                    onDeleted={onItemDeleted}
-                    onChanged={refreshItems}
-                    onDirtyChange={setDetailDirty}
-                  />
-                </div>
-              ) : (
-                <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground text-sm">
-                  请在左侧选择一个条目
-                </div>
-              )}
-            </div>
           </div>
-        </>
-      )}
+        ) : (
+          <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground text-sm">
+            请在左侧选择一个条目
+          </div>
+        )}
+      </FloatingDetailPanel>
 
       {/* Confirm switch away from dirty item */}
       <AlertDialog open={!!confirmSwitchTarget} onOpenChange={(open) => { if (!open) setConfirmSwitchTarget(null); }}>

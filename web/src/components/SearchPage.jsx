@@ -15,11 +15,9 @@ import {
 import { highlight, snippetAround } from '@/lib/highlight';
 import { cn } from '@/lib/utils';
 import { ItemDetail } from '@/components/ItemDetail';
+import { FloatingDetailPanel } from '@/components/FloatingDetailPanel';
 import { toast } from 'sonner';
 import { WalletButton } from '@/components/WalletButton';
-
-const MIN_DETAIL = 360;
-const MAX_DETAIL = 720;
 
 const BASKET_SET = new Set(AIS_BASKET_JOURNALS);
 
@@ -280,31 +278,20 @@ export const SearchPage = memo(function SearchPage() {
       </div>
 
       {/* Floating detail panel */}
-      {detailOpen && selectedKey && (
-        <>
-          <button
-            type="button"
-            aria-label="关闭详情"
-            tabIndex={-1}
-            onClick={closeDetail}
-            className="absolute inset-0 z-20 cursor-default bg-black/15 animate-in fade-in duration-150"
+      <FloatingDetailPanel
+        open={detailOpen && !!selectedKey}
+        onClose={closeDetail}
+        width={520}
+      >
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <ItemDetail
+            itemKey={selectedKey}
+            onDeleted={onItemDeleted}
+            onChanged={() => {}}
+            onDirtyChange={setDetailDirty}
           />
-          <div
-            className="absolute right-3 top-3 bottom-3 z-30 flex w-[520px] max-w-[80vw]"
-          >
-            <div className="relative flex h-full flex-1 flex-col border bg-background shadow-2xl overflow-hidden animate-in slide-in-from-right-full duration-200">
-              <div className="min-h-0 flex-1 overflow-hidden">
-                <ItemDetail
-                  itemKey={selectedKey}
-                  onDeleted={onItemDeleted}
-                  onChanged={() => {}}
-                  onDirtyChange={setDetailDirty}
-                />
-              </div>
-            </div>
-          </div>
-        </>
-      )}
+        </div>
+      </FloatingDetailPanel>
     </div>
   );
 });

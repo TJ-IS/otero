@@ -615,7 +615,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
             <div className="space-y-4 px-4 pb-6">
               {/* Basic info */}
               <Section title="基本信息">
-                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                   <div className="col-span-2">
                     <Label className="text-xs text-muted-foreground">类型</Label>
                     <Select value={draft.itemType} onValueChange={setItemType} disabled={!canEdit}>
@@ -641,7 +641,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
               {fields.publication && fields.publication.length > 0 && (
                 <Section title="发表信息">
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                     {fields.publication.map(name => (
                       name === 'publicationTitle' ? (
                         <div key={name} className="col-span-2">
@@ -682,7 +682,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
               {fields.identifiers && fields.identifiers.length > 0 && (
                 <Section title="标识符">
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                     {fields.identifiers.map(name => (
                       name === 'DOI' ? (
                         <div key={name} className="col-span-2">
@@ -837,7 +837,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
               {fields.other && fields.other.length > 0 && (
                 <Section title="其他">
-                  <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                     {fields.other.map(name => (
                       <Field
                         key={name}

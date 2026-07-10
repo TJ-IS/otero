@@ -2,14 +2,18 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useAsync } from '@/hooks/useAsync';
+import { useIsMobile } from '@/hooks/useMediaQuery';
 import { api } from '@/api/client';
 import { ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle, filterTitle, volumeIssuePages } from '@/lib/items';
 import { highlight } from '@/lib/highlight';
 import {
   FileText, BookOpen, GraduationCap, BookMarked, Presentation,
-  File, ChevronUp, ChevronDown, Sparkles, Loader2,
+  File, ChevronUp, ChevronDown, Sparkles, Loader2, ArrowUpDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +30,14 @@ const TYPE_ICONS = {
 };
 
 const ROW_HEIGHT = 37;
+const MOBILE_ROW_HEIGHT = 84;
+
+const SORT_OPTIONS = [
+  { value: 'title', label: '标题' },
+  { value: 'date', label: '年份' },
+  { value: 'vip', label: '卷期页' },
+  { value: 'itemType', label: '类型' },
+];
 
 // Numeric-first comparison for the 卷/期/页码 column. Compares volume, then
 // issue, then page start (leading number of `pages`). Missing values sort
@@ -49,6 +61,7 @@ function SortIcon({ field, sortField, sortDir }) {
 
 export const ItemTable = memo(function ItemTable({ filter, version, selectedKey, onSelect }) {
   const { canEdit } = useAuth();
+  const isMobile = useIsMobile();
   const { data: items, error, loading } = useAsync(
     () => api.listItems({ type: filter?.type, journal: filter?.journal, collection: filter?.collection, search: filter?.search }),
     [filter?.type, filter?.journal, filter?.collection, filter?.search, version],
@@ -96,7 +109,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
   const virtualizer = useVirtualizer({
     count: sortedItems.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: () => (isMobile ? MOBILE_ROW_HEIGHT : ROW_HEIGHT),
     overscan: 8,
   });
 
@@ -202,98 +215,170 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
           </span>
         </div>
       </div>
+      {isMobile && (
+        <div className="flex items-center gap-2 border-b px-4 py-2">
+          <Select
+            value={sortField}
+            onValueChange={(v) => { setSortField(v); setSortDir('asc'); }}
+          >
+            <SelectTrigger className="h-8 flex-1 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <button
+            onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:text-foreground transition-colors"
+            title={sortDir === 'asc' ? '升序' : '降序'}
+          >
+            <ArrowUpDown className="size-4" />
+          </button>
+        </div>
+      )}
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-auto outline-none"
         tabIndex={0}
         onKeyDown={onKeyDown}
       >
-        <table className="w-full table-fixed text-sm">
-          <thead className="sticky top-0 z-10 bg-background">
-            <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <th className={cn(thClass, 'w-auto')} onClick={() => toggleSort('title')}>
-                <span className="inline-flex items-center">
-                  标题 <SortIcon field="title" sortField={sortField} sortDir={sortDir} />
-                </span>
-              </th>
-              <th className={cn(thClass, 'w-40')}>作者</th>
-              <th className={cn(thClass, 'w-16')} onClick={() => toggleSort('date')}>
-                <span className="inline-flex items-center">
-                  年份 <SortIcon field="date" sortField={sortField} sortDir={sortDir} />
-                </span>
-              </th>
-              <th className={cn(thClass, 'w-28')} onClick={() => toggleSort('vip')}>
-                <span className="inline-flex items-center">
-                  卷期页 <SortIcon field="vip" sortField={sortField} sortDir={sortDir} />
-                </span>
-              </th>
-              <th className={cn(thClass, 'w-32')} onClick={() => toggleSort('itemType')}>
-                <span className="inline-flex items-center">
-                  类型 <SortIcon field="itemType" sortField={sortField} sortDir={sortDir} />
-                </span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (items || []).length === 0 && <TableSkeleton />}
+        {isMobile ? (
+          <div>
+            {loading && (items || []).length === 0 && <CardSkeleton />}
             {!loading && sortedItems.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-3 py-16 text-center text-muted-foreground">
-                  {hasActiveFilter
-                    ? '没有匹配的条目，请尝试调整筛选条件'
-                    : '暂无条目，点击右上角"导入 PDF"开始'}
-                </td>
-              </tr>
+              <div className="px-3 py-16 text-center text-muted-foreground">
+                {hasActiveFilter
+                  ? '没有匹配的条目，请尝试调整筛选条件'
+                  : '暂无条目，点击右上角"导入 PDF"开始'}
+              </div>
             )}
-            {paddingTop > 0 && (
-              <tr key="__pad-top" aria-hidden="true" style={{ height: paddingTop }}>
-                <td colSpan={5} style={{ padding: 0, border: 'none' }} />
-              </tr>
-            )}
+            {paddingTop > 0 && <div style={{ height: paddingTop }} />}
             {virtualItems.map(virtualRow => {
               const it = sortedItems[virtualRow.index];
               const title = itemTitle(it);
               const authors = creatorsList(it.creators) || '';
               return (
-                <tr
+                <div
                   key={it.key}
                   data-key={it.key}
                   data-index={virtualRow.index}
                   ref={virtualizer.measureElement}
                   onClick={() => onSelect(it.key)}
                   className={cn(
-                    'cursor-pointer border-b transition-colors hover:bg-accent/60',
+                    'cursor-pointer border-b px-4 py-3 transition-colors hover:bg-accent/60',
                     selectedKey === it.key && 'bg-primary/10 text-foreground',
                   )}
                 >
-                  <td className="truncate px-3 py-2" title={title}>
+                  <div className="text-sm font-medium leading-snug">
                     {highlight(title, searchQuery)}
-                  </td>
-                  <td className="w-40 truncate px-3 py-2 text-muted-foreground" title={authors}>
+                  </div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
                     {authors ? highlight(authors, searchQuery) : '—'}
-                  </td>
-                  <td className="w-16 px-3 py-2 text-muted-foreground tabular-nums">
-                    {yearOf(it.fields?.date) || '—'}
-                  </td>
-                  <td className="w-28 truncate px-3 py-2 text-muted-foreground tabular-nums" title={volumeIssuePages(it.fields)}>
-                    {volumeIssuePages(it.fields) || '—'}
-                  </td>
-                  <td className="w-32 px-3 py-2">
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                    <span className="tabular-nums">{yearOf(it.fields?.date) || '—'}</span>
+                    <span className="tabular-nums">{volumeIssuePages(it.fields) || '—'}</span>
                     <Badge variant="secondary" className="inline-flex items-center gap-1 font-normal">
                       {TYPE_ICONS[it.itemType]}
                       {ITEM_TYPE_LABELS[it.itemType] || it.itemType}
                     </Badge>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               );
             })}
-            {paddingBottom > 0 && (
-              <tr key="__pad-bottom" aria-hidden="true" style={{ height: paddingBottom }}>
-                <td colSpan={5} style={{ padding: 0, border: 'none' }} />
+            {paddingBottom > 0 && <div style={{ height: paddingBottom }} />}
+          </div>
+        ) : (
+          <table className="w-full table-fixed text-sm">
+            <thead className="sticky top-0 z-10 bg-background">
+              <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <th className={cn(thClass, 'w-auto')} onClick={() => toggleSort('title')}>
+                  <span className="inline-flex items-center">
+                    标题 <SortIcon field="title" sortField={sortField} sortDir={sortDir} />
+                  </span>
+                </th>
+                <th className={cn(thClass, 'w-40')}>作者</th>
+                <th className={cn(thClass, 'w-16')} onClick={() => toggleSort('date')}>
+                  <span className="inline-flex items-center">
+                    年份 <SortIcon field="date" sortField={sortField} sortDir={sortDir} />
+                  </span>
+                </th>
+                <th className={cn(thClass, 'w-28')} onClick={() => toggleSort('vip')}>
+                  <span className="inline-flex items-center">
+                    卷期页 <SortIcon field="vip" sortField={sortField} sortDir={sortDir} />
+                  </span>
+                </th>
+                <th className={cn(thClass, 'w-32')} onClick={() => toggleSort('itemType')}>
+                  <span className="inline-flex items-center">
+                    类型 <SortIcon field="itemType" sortField={sortField} sortDir={sortDir} />
+                  </span>
+                </th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {loading && (items || []).length === 0 && <TableSkeleton />}
+              {!loading && sortedItems.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-16 text-center text-muted-foreground">
+                    {hasActiveFilter
+                      ? '没有匹配的条目，请尝试调整筛选条件'
+                      : '暂无条目，点击右上角"导入 PDF"开始'}
+                  </td>
+                </tr>
+              )}
+              {paddingTop > 0 && (
+                <tr key="__pad-top" aria-hidden="true" style={{ height: paddingTop }}>
+                  <td colSpan={5} style={{ padding: 0, border: 'none' }} />
+                </tr>
+              )}
+              {virtualItems.map(virtualRow => {
+                const it = sortedItems[virtualRow.index];
+                const title = itemTitle(it);
+                const authors = creatorsList(it.creators) || '';
+                return (
+                  <tr
+                    key={it.key}
+                    data-key={it.key}
+                    data-index={virtualRow.index}
+                    ref={virtualizer.measureElement}
+                    onClick={() => onSelect(it.key)}
+                    className={cn(
+                      'cursor-pointer border-b transition-colors hover:bg-accent/60',
+                      selectedKey === it.key && 'bg-primary/10 text-foreground',
+                    )}
+                  >
+                    <td className="truncate px-3 py-2" title={title}>
+                      {highlight(title, searchQuery)}
+                    </td>
+                    <td className="w-40 truncate px-3 py-2 text-muted-foreground" title={authors}>
+                      {authors ? highlight(authors, searchQuery) : '—'}
+                    </td>
+                    <td className="w-16 px-3 py-2 text-muted-foreground tabular-nums">
+                      {yearOf(it.fields?.date) || '—'}
+                    </td>
+                    <td className="w-28 truncate px-3 py-2 text-muted-foreground tabular-nums" title={volumeIssuePages(it.fields)}>
+                      {volumeIssuePages(it.fields) || '—'}
+                    </td>
+                    <td className="w-32 px-3 py-2">
+                      <Badge variant="secondary" className="inline-flex items-center gap-1 font-normal">
+                        {TYPE_ICONS[it.itemType]}
+                        {ITEM_TYPE_LABELS[it.itemType] || it.itemType}
+                      </Badge>
+                    </td>
+                  </tr>
+                );
+              })}
+              {paddingBottom > 0 && (
+                <tr key="__pad-bottom" aria-hidden="true" style={{ height: paddingBottom }}>
+                  <td colSpan={5} style={{ padding: 0, border: 'none' }} />
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
@@ -310,6 +395,20 @@ function TableSkeleton() {
           <td className="w-28 px-3 py-2"><Skeleton className="h-4 w-16" /></td>
           <td className="w-36 px-3 py-2"><Skeleton className="h-4 w-20" /></td>
         </tr>
+      ))}
+    </>
+  );
+}
+
+function CardSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="border-b px-4 py-3">
+          <Skeleton className="h-4 w-[80%]" />
+          <Skeleton className="mt-1.5 h-3 w-[50%]" />
+          <Skeleton className="mt-2 h-3 w-[40%]" />
+        </div>
       ))}
     </>
   );
