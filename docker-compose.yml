@@ -30,7 +30,7 @@ services:
       minio:
         condition: service_healthy
     ports:
-      - "3001:3000"
+      - "5432:3000"
     volumes:
       - ./data:/app/data
     # Inject all app config (MinIO creds/bucket, MinerU token, OpenAI keys,
