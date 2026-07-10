@@ -32,6 +32,18 @@ export const config = {
   dbPath: path.join(projectRoot, 'data', 'otero.db'),
   storageDir: path.join(projectRoot, 'data', 'storage'),
   schemaVersion: 4,
+  storage: {
+    // 'filesystem' keeps the original behaviour; 'minio' routes all PDF reads/writes through MinIO.
+    type: process.env.STORAGE_TYPE || 'filesystem',
+    minio: {
+      endpoint: process.env.MINIO_ENDPOINT || '127.0.0.1',
+      port: Number(process.env.MINIO_PORT ?? 9000),
+      useSSL: process.env.MINIO_USE_SSL === 'true',
+      accessKey: process.env.MINIO_ACCESS_KEY || 'otero',
+      secretKey: process.env.MINIO_SECRET_KEY || 'otero-secret-change-me',
+      bucket: process.env.MINIO_BUCKET || 'otero-pdfs',
+    },
+  },
   api: {
     port: Number(process.env.OTERO_PORT ?? 3000),
     host: process.env.OTERO_HOST ?? '127.0.0.1',

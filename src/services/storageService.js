@@ -1,49 +1,132 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import { config, ensureDataDirs } from '../config.js';
+import { uploadFile, getObjectStream, deleteObject, objectExists } from './minioClient.js';
+
+const useMinio = () => config.storage.type === 'minio';
 
 /**
- * Storage layout: data/storage/<key[0:2]>/<key>.<ext>
- * Mirrors Zotero's two-level prefix layout to keep dir entries small.
+ * Storage layout (filesystem):  data/storage/<key[0:2]>/<key>.<ext>
+ * Storage layout (MinIO):        <key[0:2]>/<key>.<ext>  (same logical path as object name)
  */
-
 export function storagePathForKey(key, ext = 'pdf') {
-  return path.join(config.storageDir, key.slice(0, 2), `${key}.${ext}`);
+  return path.join(key.slice(0, 2), `${key}.${ext}`);
+}
+
+function absPathForKey(key, ext = 'pdf') {
+  return path.join(config.storageDir, storagePathForKey(key, ext));
+}
+
+function md5ofBuffer(buf) {
+  return crypto.createHash('md5').update(buf).digest('hex');
 }
 
 /**
  * Copy or move a source file into storage under the given key.
  * Returns { path, md5, mtime, size }.
+ *   - On filesystem mode: `path` is storage-relative (e.g. "AB/ABCdef12.pdf")
+ *   - On MinIO mode:      `path` is the MinIO object name (same format)
+ *
+ * Async in both modes so callers can always await it.
  */
-export function storeFile(srcPath, key, { move = false, ext } = {}) {
-  ensureDataDirs();
+export async function storeFile(srcPath, key, { move = false, ext } = {}) {
   const extFromPath = path.extname(srcPath).slice(1);
   const extension = ext ?? (extFromPath || 'bin');
-  const dest = storagePathForKey(key, extension);
+  const relPath = storagePathForKey(key, extension);
+
+  const stat = fs.statSync(srcPath);
+  const buf = fs.readFileSync(srcPath);
+  const md5 = md5ofBuffer(buf);
+  const size = stat.size;
+  const mtime = stat.mtimeMs;
+
+  if (useMinio()) {
+    await uploadFile(srcPath, relPath);
+    if (move) fs.unlinkSync(srcPath);
+    return { path: relPath, md5, mtime, size };
+  }
+
+  ensureDataDirs();
+  const dest = path.join(config.storageDir, relPath);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   if (move) fs.renameSync(srcPath, dest);
   else fs.copyFileSync(srcPath, dest);
-
-  const buf = fs.readFileSync(dest);
-  const md5 = crypto.createHash('md5').update(buf).digest('hex');
-  const stat = fs.statSync(dest);
-  return { path: path.relative(config.storageDir, dest), md5, mtime: stat.mtimeMs, size: stat.size };
+  return { path: relPath, md5, mtime, size };
 }
 
-/** Absolute path on disk for a stored-relative path. */
+/** Absolute path on disk for a stored-relative path (filesystem mode only). */
 export function resolveStoredPath(relPath) {
   if (path.isAbsolute(relPath)) return relPath;
   return path.join(config.storageDir, relPath);
 }
 
-/** Read a stored file as a Buffer. */
-export function readStoredFile(relPath) {
+/**
+ * Read a stored file as a Buffer.
+ * In MinIO mode, downloads into memory (only used for PDF parsing — acceptable
+ * for single files; large-scale bulk reads go through streaming).
+ */
+export async function readStoredFile(relPath) {
+  if (useMinio()) {
+    const stream = await getObjectStream(relPath);
+    return new Promise((resolve, reject) => {
+      const chunks = [];
+      stream.on('data', c => chunks.push(c));
+      stream.on('end', () => resolve(Buffer.concat(chunks)));
+      stream.on('error', reject);
+    });
+  }
   return fs.readFileSync(resolveStoredPath(relPath));
 }
 
-/** Remove a stored file (no-op if missing). */
-export function deleteStoredFile(relPath) {
+/**
+ * Get a readable stream for an object (MinIO) or a fs.ReadStream (filesystem).
+ * Use this in HTTP handlers to avoid buffering large files.
+ */
+export async function getStoredFileStream(relPath) {
+  if (useMinio()) {
+    return getObjectStream(relPath);
+  }
+  return fs.createReadStream(resolveStoredPath(relPath));
+}
+
+/** Remove a stored file. */
+export async function deleteStoredFile(relPath) {
+  if (useMinio()) {
+    await deleteObject(relPath);
+    return;
+  }
   const abs = resolveStoredPath(relPath);
   try { fs.unlinkSync(abs); } catch { /* ignore */ }
+}
+
+/** Check whether a stored file exists. */
+export async function storedFileExists(relPath) {
+  if (useMinio()) {
+    return objectExists(relPath);
+  }
+  return fs.existsSync(resolveStoredPath(relPath));
+}
+
+/**
+ * Download a stored file to a temporary location on disk and return its path.
+ * Useful when downstream code (pdfjs, MinerU upload) needs a real file path.
+ * The caller is responsible for deleting the temp file when done.
+ */
+export async function downloadToTemp(relPath) {
+  if (!useMinio()) {
+    return resolveStoredPath(relPath);
+  }
+  const ext = path.extname(relPath) || '.bin';
+  const tmp = path.join(os.tmpdir(), `otero-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  const stream = await getObjectStream(relPath);
+  await new Promise((resolve, reject) => {
+    const ws = fs.createWriteStream(tmp);
+    stream.pipe(ws);
+    ws.on('finish', resolve);
+    ws.on('error', reject);
+    stream.on('error', reject);
+  });
+  return tmp;
 }

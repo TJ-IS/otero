@@ -32,18 +32,18 @@ fulltextRouter.get('/fulltext/pending', (req, res) => {
 // Each valid item gets a 'submitting' DB row at once so it shows up in the
 // task log; actual MinerU submission is drained by a bounded-concurrency
 // queue in fulltextService.
-fulltextRouter.post('/fulltext/parse-batch', (req, res) => {
+fulltextRouter.post('/fulltext/parse-batch', async (req, res) => {
   const keys = Array.isArray(req.body?.keys) ? req.body.keys : [];
   if (keys.length === 0) return res.status(400).json({ error: 'keys required' });
-  const summary = enqueueBatchParse(keys);
+  const summary = await enqueueBatchParse(keys);
   res.json({ results: [], summary });
 });
 
 // POST /api/fulltext/retry-failed
 // Re-enqueues every row currently in 'failed' state. Useful after a burst
 // of HTTP 429 rate-limit failures.
-fulltextRouter.post('/fulltext/retry-failed', (_req, res) => {
-  const summary = retryFailed();
+fulltextRouter.post('/fulltext/retry-failed', async (_req, res) => {
+  const summary = await retryFailed();
   res.json({ summary });
 });
 

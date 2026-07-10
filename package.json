@@ -21,6 +21,7 @@
     "commander": "^12.1.0",
     "express": "^4.21.0",
     "jose": "^6.2.3",
+    "minio": "^8.0.7",
     "multer": "^1.4.5-lts.1",
     "pdfjs-dist": "^4.7.76",
     "viem": "^2.55.0",

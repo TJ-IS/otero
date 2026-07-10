@@ -76,6 +76,6 @@ export async function startServer({ port, host } = {}) {
     console.log(`Otero API listening on http://${listenHost}:${listenPort}`);
   });
   startFullTextWorker();
-  recoverSubmittingOnStartup();
+  await recoverSubmittingOnStartup();
   return server;
 }

@@ -1,8 +1,9 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import { Item } from '../models/Item.js';
 import { Attachment } from '../models/Attachment.js';
 import { generateKey } from '../utils/key.js';
-import { storeFile, resolveStoredPath } from './storageService.js';
+import { storeFile, downloadToTemp } from './storageService.js';
 import { extractPdf } from './pdfParser.js';
 import { recognize } from './recognizers/index.js';
 import { mapRecognized } from './metadataMapper.js';
@@ -27,7 +28,7 @@ export async function importPdf(pdfPath, opts = {}) {
 
   // 1. Store the file under a freshly generated key.
   const fileKey = generateKey();
-  const stored = storeFile(absSource, fileKey, { ext: 'pdf' });
+  const stored = await storeFile(absSource, fileKey, { ext: 'pdf' });
 
   // 2. Create the attachment Item (no parent yet).
   const attachment = new Attachment({
@@ -43,9 +44,16 @@ export async function importPdf(pdfPath, opts = {}) {
     return { attachment, parent: null, recognized: null, mapped: null };
   }
 
-  // 3. Extract text/metadata from the stored file (so we read exactly what was stored).
-  const storedAbs = resolveStoredPath(stored.path);
-  const extraction = await extractPdf(storedAbs, { maxPages: 3 });
+  // 3. Extract text/metadata. In MinIO mode, the source file may be gone after
+  //    storeFile, so we extract from the original source path instead.
+  const extractPath = fs.existsSync(absSource) ? absSource : await downloadToTemp(stored.path);
+  const needsCleanup = extractPath !== absSource;
+  let extraction;
+  try {
+    extraction = await extractPdf(extractPath, { maxPages: 3 });
+  } finally {
+    if (needsCleanup) try { fs.unlinkSync(extractPath); } catch { /* ignore */ }
+  }
 
   // 4. Recognize.
   const recognized = await recognize(extraction);

@@ -38,7 +38,7 @@ async function importOne(filePath) {
     const mapped = mapRecognized(recognized);
 
     const fileKey = generateKey();
-    const stored = storeFile(filePath, fileKey, { ext: 'pdf' });
+    const stored = await storeFile(filePath, fileKey, { ext: 'pdf' });
 
     const attachment = new Attachment({
       linkMode: 0,

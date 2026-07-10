@@ -3,7 +3,7 @@ import path from 'node:path';
 import { config } from '../config.js';
 import { Item } from '../models/Item.js';
 import { Attachment } from '../models/Attachment.js';
-import { resolveStoredPath } from './storageService.js';
+import { resolveStoredPath, storedFileExists, downloadToTemp } from './storageService.js';
 import {
   getFullTextRowByKey, getFullTextRow, upsertFullText,
   listPendingFullText, listSubmittingFullText, listFailedFullText, listAllFullText, deleteFullTextRow,
@@ -25,13 +25,18 @@ function relToStorage(absPath) {
   return path.relative(config.storageDir, absPath);
 }
 
-/** Find the stored PDF path for an item (its imported-file PDF attachment). */
-function findPdfPath(item) {
+/**
+ * Find the stored PDF relative-path for an item.
+ * In filesystem mode also checks the file actually exists on disk.
+ * In MinIO mode, just returns the stored path string (existence is checked
+ * lazily when we actually need the file).
+ */
+async function findPdfRelPath(item) {
   const atts = Attachment.listByParent(item.id);
   const pdf = atts.find(a => (a.contentType || '').includes('pdf'));
   if (!pdf || !pdf.path) return null;
-  const abs = resolveStoredPath(pdf.path);
-  return fs.existsSync(abs) ? abs : null;
+  const exists = await storedFileExists(pdf.path);
+  return exists ? pdf.path : null;
 }
 
 /**
@@ -53,17 +58,21 @@ export async function parseItem(key, { force = false } = {}) {
     }
   }
 
-  const pdfPath = findPdfPath(item);
-  if (!pdfPath) throw new Error('no PDF attachment available to parse');
+  const pdfRelPath = await findPdfRelPath(item);
+  if (!pdfRelPath) throw new Error('no PDF attachment available to parse');
 
   // Use <key>.pdf as the MinerU file_name so polling can match results back
   // to items by file_name regardless of submission path (single or batch).
   const fileName = `${key}.pdf`;
-  const { batchId } = await submitLocalPdf({
-    filePath: pdfPath,
-    fileName,
-    modelVersion: config.mineru.modelVersion,
-  });
+  // In MinIO mode, download the PDF to a temp file so submitLocalPdf can stream it.
+  const filePath = await downloadToTemp(pdfRelPath);
+  const isTemp = filePath !== resolveStoredPath(pdfRelPath);
+  let batchId;
+  try {
+    ({ batchId } = await submitLocalPdf({ filePath, fileName, modelVersion: config.mineru.modelVersion }));
+  } finally {
+    if (isTemp) try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+  }
 
   // Clean any prior extracted assets so a re-parse starts fresh.
   cleanupAssets(key);
@@ -120,7 +129,7 @@ function backoffDelay(attempt) {
  * Creates a 'submitting' row for each valid item immediately and returns
  * a summary right away — does NOT block on network I/O.
  */
-export function enqueueBatchParse(keys) {
+export async function enqueueBatchParse(keys) {
   let queued = 0;
   let skippedDone = 0;
   let skippedRunning = 0;
@@ -139,8 +148,8 @@ export function enqueueBatchParse(keys) {
       }
     }
 
-    const pdfPath = findPdfPath(item);
-    if (!pdfPath) { noPdf++; continue; }
+    const pdfRelPath = await findPdfRelPath(item);
+    if (!pdfRelPath) { noPdf++; continue; }
 
     // Record immediately so the item is visible in the task log.
     cleanupAssets(key);
@@ -157,7 +166,7 @@ export function enqueueBatchParse(keys) {
       submittedAt: nowStr(),
       completedAt: null,
     });
-    submitQueue.push({ itemId: item.id, key, pdfPath });
+    submitQueue.push({ itemId: item.id, key, pdfRelPath });
     queued++;
   }
 
@@ -196,13 +205,18 @@ async function runSubmitWorker() {
 
 /**
  * Submit a single item to MinerU with 429 backoff retry.
+ * pdfRelPath is the storage-relative path; we download to a temp file if
+ * STORAGE_TYPE=minio before handing off to submitLocalPdf.
  */
-async function submitOne({ itemId, key, pdfPath }) {
+async function submitOne({ itemId, key, pdfRelPath }) {
   let attempt = 0;
   while (true) {
+    // Obtain a real file path. In MinIO mode this downloads to /tmp first.
+    const filePath = await downloadToTemp(pdfRelPath);
+    const isTemp = filePath !== resolveStoredPath(pdfRelPath);
     try {
       const { batchId } = await submitLocalPdf({
-        filePath: pdfPath,
+        filePath,
         fileName: `${key}.pdf`,
         modelVersion: config.mineru.modelVersion,
       });
@@ -231,6 +245,8 @@ async function submitOne({ itemId, key, pdfPath }) {
       });
       console.error(`[fulltext] submit failed for ${key}: ${err.message}`);
       return;
+    } finally {
+      if (isTemp) try { fs.unlinkSync(filePath); } catch { /* ignore */ }
     }
   }
 }
@@ -240,19 +256,19 @@ async function submitOne({ itemId, key, pdfPath }) {
  * previous run that was interrupted. Their MinerU submission never
  * completed, so we retry them.
  */
-export function recoverSubmittingOnStartup() {
+export async function recoverSubmittingOnStartup() {
   const orphans = listSubmittingFullText();
   if (orphans.length === 0) return;
   console.log(`[fulltext] recovering ${orphans.length} interrupted submission(s)`);
   for (const row of orphans) {
     const item = Item.loadById(row.itemID);
     if (!item) continue;
-    const pdfPath = findPdfPath(item);
-    if (!pdfPath) {
+    const pdfRelPath = await findPdfRelPath(item);
+    if (!pdfRelPath) {
       upsertFullText(row.itemID, { state: 'failed', errMsg: 'no PDF attachment' });
       continue;
     }
-    submitQueue.push({ itemId: row.itemID, key: row.itemKey, pdfPath });
+    submitQueue.push({ itemId: row.itemID, key: row.itemKey, pdfRelPath });
   }
   if (!submitQueueRunning && submitQueue.length > 0) drainSubmitQueue();
 }
