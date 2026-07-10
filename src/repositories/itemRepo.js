@@ -347,7 +347,7 @@ export function setItemCreators(itemId, creators) {
 export function getItemCreators(itemId) {
   const db = getDb();
   return db.prepare(`
-    SELECT c.firstName, c.lastName, c.fieldMode, ct.creatorType, ic.orderIndex
+    SELECT c.creatorID AS id, c.firstName, c.lastName, c.fieldMode, ct.creatorType, ic.orderIndex
     FROM itemCreators ic
     JOIN creators c ON c.creatorID = ic.creatorID
     JOIN creatorTypes ct ON ct.creatorTypeID = ic.creatorTypeID
