@@ -10,8 +10,12 @@ services:
     volumes:
       - ./data/minio:/data
     environment:
-      - MINIO_ROOT_USER=otero
-      - MINIO_ROOT_PASSWORD=otero-secret-change-me
+      # MinIO root credentials come from .env (same values the app authenticates
+      # with — see MINIO_ACCESS_KEY / MINIO_SECRET_KEY below).
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY}
+    networks:
+      - otero-net
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 10s
@@ -29,13 +33,28 @@ services:
       - "3001:3000"
     volumes:
       - ./data:/app/data
+    # Inject all app config (MinIO creds/bucket, MinerU token, OpenAI keys,
+    # auth secret, editor whitelist, ...) from .env.
+    env_file:
+      - .env
+    # Container-specific overrides that must differ from .env's host-oriented
+    # values. `environment` takes precedence over `env_file`.
     environment:
       - NODE_ENV=production
       - OTERO_PORT=3000
       - OTERO_HOST=0.0.0.0
-      - STORAGE_TYPE=minio
+      # Reach MinIO by its compose service name on the internal network — NOT
+      # the 127.0.0.1 that .env uses for host-side tooling.
       - MINIO_ENDPOINT=minio
       - MINIO_PORT=9000
-      - MINIO_ACCESS_KEY=otero
-      - MINIO_SECRET_KEY=otero-secret-change-me
-      - MINIO_BUCKET=otero-pdfs
+    networks:
+      - otero-net
+
+# Dedicated bridge network for this project. Naming it explicitly (rather than
+# relying on the implicit <project>_default) keeps both services on the same
+# well-known network and avoids the stale-alias problem that occurs when one
+# container is (re)started outside of `docker compose up`.
+networks:
+  otero-net:
+    name: otero-net
+    driver: bridge
