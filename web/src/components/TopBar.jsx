@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks, GitBranch, MoreHorizontal } from 'lucide-react';
+import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks, GitBranch, Users, MoreHorizontal } from 'lucide-react';
 import { api } from '@/api/client';
 import { toast } from 'sonner';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
@@ -160,6 +160,18 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               <span>Merkle</span>
             </Link>
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            title="学者合作关系图"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <Link to="/authors">
+              <Users className="size-4" />
+              <span>学者关系</span>
+            </Link>
+          </Button>
           {canEdit && (
             <Button
               variant="ghost"
@@ -206,6 +218,11 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               <DropdownMenuItem asChild>
                 <Link to="/merkle" className="flex items-center gap-2">
                   <GitBranch className="size-4" /> Merkle Tree
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/authors" className="flex items-center gap-2">
+                  <Users className="size-4" /> 学者关系图
                 </Link>
               </DropdownMenuItem>
               {canEdit && (

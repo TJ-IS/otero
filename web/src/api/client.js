@@ -92,6 +92,14 @@ export const api = {
   // Journals
   listJournals() { return req('/api/journals').then(r => r.journals); },
 
+  // Authors
+  getAuthorGraph(minPapers = 3) {
+    return req(`/api/authors/graph?minPapers=${encodeURIComponent(minPapers)}`);
+  },
+  getAuthor(id) {
+    return req(`/api/authors/${encodeURIComponent(id)}`);
+  },
+
   // Import
   uploadPdf(file) {
     const fd = new FormData();

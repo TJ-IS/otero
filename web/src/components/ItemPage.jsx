@@ -17,7 +17,8 @@ import {
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
-import { ITEM_TYPE_LABELS, itemTitle, creatorsList } from '@/lib/items';
+import { ITEM_TYPE_LABELS, itemTitle } from '@/lib/items';
+import { AuthorLinks } from './AuthorLinks';
 import { headingId } from '@/lib/fulltext';
 import { cn } from '@/lib/utils';
 import { ChatPanel } from './ChatPanel';
@@ -225,7 +226,7 @@ export const ItemPage = memo(function ItemPage() {
 
   const title = itemTitle(item);
   const typeLabel = ITEM_TYPE_LABELS[item.itemType] || item.itemType;
-  const authors = creatorsList(item.creators);
+  const authors = item.creators || [];
   const doi = item.fields?.DOI || structure?.publisherStamp?.doi || '';
   const url = item.fields?.url;
   const f = item.fields || {};
@@ -320,8 +321,10 @@ export const ItemPage = memo(function ItemPage() {
               <h1 className="text-xl sm:text-2xl font-semibold tracking-tight leading-snug text-balance">
                 {title}
               </h1>
-              {authors && (
-                <p className="text-sm text-muted-foreground leading-relaxed">{authors}</p>
+              {authors.length > 0 && (
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  <AuthorLinks creators={authors} />
+                </p>
               )}
             </header>
 

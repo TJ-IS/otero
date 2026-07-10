@@ -9,8 +9,9 @@ import { cn } from '@/lib/utils';
 import { useAsync } from '@/hooks/useAsync';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { api } from '@/api/client';
-import { ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle, filterTitle, volumeIssuePages } from '@/lib/items';
+import { ITEM_TYPE_LABELS, yearOf, itemTitle, filterTitle, volumeIssuePages } from '@/lib/items';
 import { highlight } from '@/lib/highlight';
+import { AuthorLinks } from '@/components/AuthorLinks';
 import {
   FileText, BookOpen, GraduationCap, BookMarked, Presentation,
   File, ChevronUp, ChevronDown, Sparkles, Loader2, ArrowUpDown,
@@ -259,7 +260,6 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
             {virtualItems.map(virtualRow => {
               const it = sortedItems[virtualRow.index];
               const title = itemTitle(it);
-              const authors = creatorsList(it.creators) || '';
               return (
                 <div
                   key={it.key}
@@ -276,7 +276,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                     {highlight(title, searchQuery)}
                   </div>
                   <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {authors ? highlight(authors, searchQuery) : '—'}
+                    <AuthorLinks creators={it.creators} query={searchQuery} />
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     <span className="tabular-nums">{yearOf(it.fields?.date) || '—'}</span>
@@ -337,7 +337,6 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               {virtualItems.map(virtualRow => {
                 const it = sortedItems[virtualRow.index];
                 const title = itemTitle(it);
-                const authors = creatorsList(it.creators) || '';
                 return (
                   <tr
                     key={it.key}
@@ -353,8 +352,8 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                     <td className="truncate px-3 py-2" title={title}>
                       {highlight(title, searchQuery)}
                     </td>
-                    <td className="w-40 truncate px-3 py-2 text-muted-foreground" title={authors}>
-                      {authors ? highlight(authors, searchQuery) : '—'}
+                    <td className="w-40 truncate px-3 py-2 text-muted-foreground">
+                      <AuthorLinks creators={it.creators} query={searchQuery} className="truncate" />
                     </td>
                     <td className="w-16 px-3 py-2 text-muted-foreground tabular-nums">
                       {yearOf(it.fields?.date) || '—'}

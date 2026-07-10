@@ -16,6 +16,7 @@ import { highlight, snippetAround } from '@/lib/highlight';
 import { cn } from '@/lib/utils';
 import { ItemDetail } from '@/components/ItemDetail';
 import { FloatingDetailPanel } from '@/components/FloatingDetailPanel';
+import { AuthorLinks } from '@/components/AuthorLinks';
 import { toast } from 'sonner';
 import { WalletButton } from '@/components/WalletButton';
 
@@ -80,7 +81,7 @@ function ResultCard({ item, query, onSelect }) {
 
       {authors && (
         <p className="mt-0.5 truncate text-xs text-muted-foreground">
-          {highlight(authors, query)}
+          <AuthorLinks creators={item.creators} query={query} />
         </p>
       )}
 
