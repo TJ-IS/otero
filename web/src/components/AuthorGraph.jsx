@@ -22,6 +22,13 @@ export function AuthorGraph() {
   // hand-rolled drag pattern in LibraryView.jsx).
   const [view, setView] = useState({ x: 0, y: 0, k: 1 });
   const panRef = useRef({ dragging: false, startX: 0, startY: 0, startViewX: 0, startViewY: 0 });
+  // Tracks whether the current mouse/touch gesture moved past a small
+  // threshold, so a pan that ends over a node doesn't also fire its click
+  // and navigate away. Reset at the start of each new gesture (mousedown/
+  // touchstart) rather than at its end, since the click event fires after
+  // mouseup/touchend and needs to see this gesture's result.
+  const dragMovedRef = useRef(false);
+  const DRAG_THRESHOLD = 6;
 
   const loadGraph = useCallback((mp) => {
     setLoading(true);
@@ -71,6 +78,7 @@ export function AuthorGraph() {
 
   const handleMouseDown = useCallback((e) => {
     if (e.button !== 0) return;
+    dragMovedRef.current = false;
     panRef.current = {
       dragging: true,
       startX: e.clientX,
@@ -85,6 +93,7 @@ export function AuthorGraph() {
       if (!panRef.current.dragging) return;
       const dx = e.clientX - panRef.current.startX;
       const dy = e.clientY - panRef.current.startY;
+      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) dragMovedRef.current = true;
       setView((v) => ({ ...v, x: panRef.current.startViewX + dx, y: panRef.current.startViewY + dy }));
     };
     const handleMouseUp = () => { panRef.current.dragging = false; };
@@ -96,6 +105,70 @@ export function AuthorGraph() {
     };
   }, []);
 
+  // Touch pan + pinch-to-zoom. One finger drags the canvas, two fingers pinch
+  // to zoom around their midpoint. e.preventDefault() stops the browser from
+  // scrolling the page while interacting with the graph.
+  const touchRef = useRef({ mode: null, startX: 0, startY: 0, startViewX: 0, startViewY: 0, startDist: 0, startK: 1 });
+
+  const handleTouchStart = useCallback((e) => {
+    if (e.touches.length === 1) {
+      dragMovedRef.current = false;
+      const t = e.touches[0];
+      touchRef.current = {
+        mode: 'pan',
+        startX: t.clientX,
+        startY: t.clientY,
+        startViewX: view.x,
+        startViewY: view.y,
+      };
+    } else if (e.touches.length === 2) {
+      dragMovedRef.current = true; // pinch is never a tap
+
+      const [a, b] = e.touches;
+      const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+      touchRef.current = {
+        mode: 'pinch',
+        startDist: dist,
+        startK: view.k,
+        startViewX: view.x,
+        startViewY: view.y,
+      };
+    }
+  }, [view.x, view.y, view.k]);
+
+  const handleTouchMove = useCallback((e) => {
+    e.preventDefault();
+    const mode = touchRef.current.mode;
+    if (mode === 'pan' && e.touches.length === 1) {
+      const t = e.touches[0];
+      const dx = t.clientX - touchRef.current.startX;
+      const dy = t.clientY - touchRef.current.startY;
+      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) dragMovedRef.current = true;
+      setView((v) => ({ ...v, x: touchRef.current.startViewX + dx, y: touchRef.current.startViewY + dy }));
+    } else if (mode === 'pinch' && e.touches.length === 2) {
+      const [a, b] = e.touches;
+      const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+      const k = Math.min(4, Math.max(0.2, touchRef.current.startK * (dist / touchRef.current.startDist)));
+      setView((v) => ({ ...v, k }));
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((e) => {
+    if (e.touches.length === 0) {
+      touchRef.current.mode = null;
+    } else if (e.touches.length === 1) {
+      // Pinch ended with one finger still down — restart as a pan from here.
+      const t = e.touches[0];
+      touchRef.current = {
+        mode: 'pan',
+        startX: t.clientX,
+        startY: t.clientY,
+        startViewX: view.x,
+        startViewY: view.y,
+      };
+    }
+  }, [view.x, view.y]);
+
   const resetView = () => setView({ x: 0, y: 0, k: 1 });
 
   const hoveredNode = hoveredId != null ? nodes.find(n => n.id === hoveredId) : null;
@@ -103,7 +176,6 @@ export function AuthorGraph() {
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
-        <span className="text-sm font-medium">学者合作关系图</span>
 
         <div className="ml-4 flex items-center gap-2">
           <span className="text-xs text-muted-foreground whitespace-nowrap">最少发文数</span>
@@ -136,7 +208,10 @@ export function AuthorGraph() {
         className="relative min-h-0 flex-1 overflow-hidden"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
-        style={{ cursor: panRef.current.dragging ? 'grabbing' : 'grab' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ cursor: panRef.current.dragging ? 'grabbing' : 'grab', touchAction: 'none' }}
       >
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center gap-3 text-muted-foreground">
@@ -182,7 +257,7 @@ export function AuthorGraph() {
                     transform={`translate(${p.x},${p.y})`}
                     onMouseEnter={() => setHoveredId(n.id)}
                     onMouseLeave={() => setHoveredId((cur) => (cur === n.id ? null : cur))}
-                    onClick={() => navigate(`/authors/${n.id}`)}
+                    onClick={() => { if (!dragMovedRef.current) navigate(`/authors/${n.id}`); }}
                     style={{ cursor: 'pointer' }}
                   >
                     <circle
