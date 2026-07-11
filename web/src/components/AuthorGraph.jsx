@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Moon, Sun, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useForceLayout } from '@/lib/authorGraph';
@@ -12,7 +11,6 @@ const DEFAULT_MIN_PAPERS = 10;
 
 export function AuthorGraph() {
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
   const [minPapers, setMinPapers] = useState(DEFAULT_MIN_PAPERS);
   const [graph, setGraph] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -103,18 +101,8 @@ export function AuthorGraph() {
   const hoveredNode = hoveredId != null ? nodes.find(n => n.id === hoveredId) : null;
 
   return (
-    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/')}
-          title="返回文库"
-          className="shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
-
         <span className="text-sm font-medium">学者合作关系图</span>
 
         <div className="ml-4 flex items-center gap-2">
@@ -139,15 +127,6 @@ export function AuthorGraph() {
         <div className="ml-auto flex items-center gap-1.5">
           <Button variant="outline" size="sm" onClick={resetView} title="重置视图">
             <RefreshCw className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
-            className="shrink-0 text-muted-foreground hover:text-foreground"
-          >
-            {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
         </div>
       </header>

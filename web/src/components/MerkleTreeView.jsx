@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { verifyDoiProofPath } from '@/lib/merkle';
@@ -8,12 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
-  ArrowLeft, Search, GitBranch, RefreshCw, ShieldCheck, ShieldX,
-  Hash, ArrowRight, Check, X, CheckCircle2, Moon, Sun,
+  Search, GitBranch, RefreshCw, ShieldX,
+  Hash, ArrowRight, Check, X, CheckCircle2,
 } from 'lucide-react';
-import { WalletButton } from './WalletButton';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from 'next-themes';
 
 function shortHash(hash) {
   if (!hash) return '—';
@@ -22,8 +19,6 @@ function shortHash(hash) {
 }
 
 export function MerkleTreeView() {
-  const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
   const { canEdit } = useAuth();
   const { data: rootInfo, refresh: refreshRoot } = useAsync(() => api.getMerkleRoot(), []);
   const [doiInput, setDoiInput] = useState('');
@@ -77,19 +72,9 @@ export function MerkleTreeView() {
   };
 
   return (
-    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
       {/* Header — mirrors SearchPage layout */}
       <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/')}
-          title="返回文库"
-          className="shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
-
         <div className="relative flex h-8 flex-1 max-w-md min-w-[160px] items-center">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -118,7 +103,6 @@ export function MerkleTreeView() {
               Root {shortHash(rootInfo.root)} · {rootInfo.leafCount} DOIs
             </Badge>
           )}
-          <WalletButton />
           <Button
             size="sm"
             variant="outline"
@@ -127,15 +111,6 @@ export function MerkleTreeView() {
             title={canEdit ? '重建 Merkle Tree' : '请先连接白名单钱包'}
           >
             <RefreshCw className="size-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
-            className="shrink-0 text-muted-foreground hover:text-foreground"
-          >
-            {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
         </div>
       </header>

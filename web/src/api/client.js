@@ -100,6 +100,14 @@ export const api = {
     return req(`/api/authors/${encodeURIComponent(id)}`);
   },
 
+  // Dashboard stats
+  getStatsOverview() { return req('/api/stats/overview'); },
+  getStatsItemTypes() { return req('/api/stats/item-types').then(r => r.itemTypes); },
+  getStatsYears() { return req('/api/stats/years').then(r => r.years); },
+  getStatsJournals() { return req('/api/stats/journals').then(r => r.journals); },
+  getStatsFulltext() { return req('/api/stats/fulltext').then(r => r.counts); },
+  getStatsIngestion() { return req('/api/stats/ingestion').then(r => r.activity); },
+
   // Import
   uploadPdf(file) {
     const fd = new FormData();

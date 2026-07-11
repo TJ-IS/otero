@@ -36,7 +36,7 @@ export const AuthorPage = memo(function AuthorPage() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => navigate('/authors')}
+          onClick={() => navigate('/dashboard/authors')}
           title="返回学者关系图"
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
@@ -77,7 +77,7 @@ export const AuthorPage = memo(function AuthorPage() {
               <AlertCircle className="size-8" />
               <p>加载失败: {error.message}</p>
               <Button variant="outline" size="sm" asChild>
-                <Link to="/authors">
+                <Link to="/dashboard/authors">
                   <ArrowLeft className="size-4 mr-1" /> 返回学者关系图
                 </Link>
               </Button>

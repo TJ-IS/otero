@@ -15,6 +15,7 @@ import { extractRouter } from './routes/extract.js';
 import { merkleRouter } from './routes/merkle.js';
 import { chatRouter } from './routes/chat.js';
 import { authorsRouter } from './routes/authors.js';
+import { statsRouter } from './routes/stats.js';
 import { authRouter } from './routes/auth.js';
 import { optionalAuth, editorWriteGate } from './middleware/auth.js';
 import { startFullTextWorker } from '../services/fulltextWorker.js';
@@ -40,6 +41,7 @@ export function buildApp() {
   app.use('/api/collections', collectionsRouter);
   app.use('/api/journals', journalsRouter);
   app.use('/api/authors', authorsRouter);
+  app.use('/api/stats', statsRouter);
   app.use('/api/import', importRouter);
   app.use('/api/attachments', attachmentsRouter);
   app.use('/api', fulltextRouter);

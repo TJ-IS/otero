@@ -6,6 +6,10 @@ import { MerkleTreeView } from '@/components/MerkleTreeView';
 import { AuthorGraph } from '@/components/AuthorGraph';
 import { AuthorPage } from '@/components/AuthorPage';
 import { ItemPage } from '@/components/ItemPage';
+import { DashboardLayout } from '@/components/DashboardLayout';
+import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
+import { DashboardJournals } from '@/components/dashboard/DashboardJournals';
+import { DashboardTimeline } from '@/components/dashboard/DashboardTimeline';
 
 export default function App() {
   return (
@@ -13,8 +17,13 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LibraryView />} />
         <Route path="/search" element={<SearchPage />} />
-        <Route path="/merkle" element={<MerkleTreeView />} />
-        <Route path="/authors" element={<AuthorGraph />} />
+        <Route path="/dashboard" element={<DashboardLayout />}>
+          <Route index element={<DashboardOverview />} />
+          <Route path="journals" element={<DashboardJournals />} />
+          <Route path="timeline" element={<DashboardTimeline />} />
+          <Route path="authors" element={<AuthorGraph />} />
+          <Route path="merkle" element={<MerkleTreeView />} />
+        </Route>
         <Route path="/authors/:id" element={<AuthorPage />} />
         <Route path="/items/:key" element={<ItemPage />} />
       </Routes>
