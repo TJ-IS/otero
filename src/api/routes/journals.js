@@ -4,8 +4,8 @@ import { UNFILED } from '../../services/journalWhitelist.js';
 
 export const journalsRouter = Router();
 
-journalsRouter.get('/', (req, res) => {
-  let journals = listJournals();
+journalsRouter.get('/', async (req, res) => {
+  let journals = await listJournals();
   // The "待归档" bucket (unfiled literature) is only visible to whitelisted
   // editors. Anonymous or non-editor sessions never see it.
   if (!req.auth?.canEdit) {

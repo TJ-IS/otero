@@ -1,5 +1,5 @@
 import { Item } from '../models/Item.js';
-import { getDb } from '../db/connection.js';
+import { query } from '../db/connection.js';
 import { getFullText } from './fulltextService.js';
 import { config } from '../config.js';
 import { JOURNAL_WHITELIST, UNFILED } from './journalWhitelist.js';
@@ -16,15 +16,14 @@ const ALLOWED_PUBLICATION_TITLES = [...AIS_BASKET_JOURNALS, UNFILED];
 /**
  * List the field names allowed for a given itemType name.
  */
-function allowedFieldsForType(itemTypeName) {
-  const db = getDb();
-  const rows = db.prepare(`
-    SELECT f.fieldName FROM itemTypeFields itf
-    JOIN fields f ON f.fieldID = itf.fieldID
-    JOIN itemTypes it ON it.itemTypeID = itf.itemTypeID
-    WHERE it.typeName = ?
-    ORDER BY itf.orderIndex
-  `).all(itemTypeName);
+async function allowedFieldsForType(itemTypeName) {
+  const rows = await query(`
+    SELECT f."fieldName" FROM itemTypeFields itf
+    JOIN fields f ON f."fieldID" = itf."fieldID"
+    JOIN itemTypes it ON it."itemTypeID" = itf."itemTypeID"
+    WHERE it."typeName" = $1
+    ORDER BY itf."orderIndex"
+  `, [itemTypeName]);
   return rows.map(r => r.fieldName);
 }
 
@@ -123,7 +122,7 @@ export async function calibrateItem(key) {
   if (!config.llm.apiKey) throw new Error('未配置 OPENAI_API_KEY');
   if (!config.llm.baseURL) throw new Error('未配置 OPENAI_BASE_URL');
 
-  const item = Item.loadByKey(key);
+  const item = await Item.loadByKey(key);
   if (!item) throw new Error('条目未找到');
 
   const ft = await getFullText(key);
@@ -135,7 +134,7 @@ export async function calibrateItem(key) {
   const itemType = json.itemType;
   const fields = json.fields || {};
   const creators = json.creators || [];
-  const allowedFields = allowedFieldsForType(itemType);
+  const allowedFields = await allowedFieldsForType(itemType);
 
   const markdown = ft.markdown.length > config.llm.maxMarkdownChars
     ? ft.markdown.slice(0, config.llm.maxMarkdownChars)

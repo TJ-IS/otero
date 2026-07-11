@@ -51,7 +51,7 @@ function volumeIssuePages(fields) {
  * extract which spend the whole budget on one-shot analysis).
  */
 export async function buildPaperContext(key) {
-  const item = Item.loadByKey(key);
+  const item = await Item.loadByKey(key);
   if (!item) throw new Error('条目未找到');
 
   const json = item.toJSON();

@@ -30,7 +30,7 @@ extractRouter.post('/items/:key/extract/apply', async (req, res) => {
       typeThreshold: Number(req.body?.typeThreshold ?? 0.9),
       overwrite: Boolean(req.body?.overwrite),
     };
-    const applied = applyExtraction(req.params.key, result, opts);
+    const applied = await applyExtraction(req.params.key, result, opts);
     res.json({ extraction: result, applied });
   } catch (err) {
     const status = /未找到|not found/i.test(err.message) ? 404 : 400;
@@ -58,7 +58,7 @@ extractRouter.post('/extract/batch', async (req, res) => {
   const all = [];
   let page = 1;
   while (true) {
-    const { items, total } = listUnfiledWithFulltextDone({ page, pageSize: 200 });
+    const { items, total } = await listUnfiledWithFulltextDone({ page, pageSize: 200 });
     all.push(...items);
     if (all.length >= total || items.length === 0) break;
     page++;
@@ -78,7 +78,7 @@ extractRouter.post('/extract/batch', async (req, res) => {
         results.push({ key: t.key, extraction, applied: null });
         skipped++;
       } else {
-        const apply = applyExtraction(t.key, extraction, {
+        const apply = await applyExtraction(t.key, extraction, {
           fieldThreshold, creatorThreshold: fieldThreshold, typeThreshold, overwrite,
         });
         results.push({ key: t.key, extraction, applied: apply });

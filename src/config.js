@@ -29,7 +29,8 @@ loadDotEnv();
 export const config = {
   projectRoot,
   dataDir: path.join(projectRoot, 'data'),
-  dbPath: path.join(projectRoot, 'data', 'otero.db'),
+  /** PostgreSQL connection string (required). */
+  databaseUrl: process.env.DATABASE_URL || '',
   storageDir: path.join(projectRoot, 'data', 'storage'),
   schemaVersion: 4,
   storage: {

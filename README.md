@@ -1,6 +1,6 @@
 # Otero
 
-面向 **AIS Senior Scholars' Basket of Journals**（信息系统协会资深学者推荐期刊列表，共 11 本）的文献收录与全文管理系统。基于 Zotero 风格的 EAV 数据模型，使用纯 JavaScript + SQLite 存储元数据，配合 MinerU 进行 PDF 全文解析，并提供 Web 界面进行浏览、检索与导出。
+面向 **AIS Senior Scholars' Basket of Journals**（信息系统协会资深学者推荐期刊列表，共 11 本）的文献收录与全文管理系统。基于 Zotero 风格的 EAV 数据模型，使用纯 JavaScript + PostgreSQL 存储元数据，配合 MinerU 进行 PDF 全文解析，并提供 Web 界面进行浏览、检索与导出。
 
 ## 收录期刊
 
@@ -36,40 +36,33 @@
 
 ## 技术栈
 
-- **后端**：Node.js ≥ 20（ESM）、Express、better-sqlite3、pdfjs-dist、adm-zip、zod
+- **后端**：Node.js ≥ 20（ESM）、Express、pg（PostgreSQL）、pdfjs-dist、adm-zip、zod
 - **前端**：Vite + React + shadcn/ui + Tailwind CSS
-- **外部服务**：MinerU（全文解析）、DeepSeek/OpenAI 兼容 API（LLM）、CrossRef/arXiv/OpenLibrary（元数据识别）
+- **外部服务**：PostgreSQL、MinerU（全文解析）、DeepSeek/OpenAI 兼容 API（LLM）、CrossRef/arXiv/OpenLibrary（元数据识别）、可选 MinIO
 
 ## 目录结构
 
 ```
 data/                 运行时数据（gitignored）
-  otero.db            SQLite 数据库
-  storage/<key[0:2]>/<key>/
-    <key>.pdf         原始 PDF
-    fulltext/         MinerU 解压结果（full.md / images/ / content_list.json）
+  storage/            文件系统模式下的 PDF / 全文（STORAGE_TYPE=filesystem）
 src/                  后端（Node.js, ESM）
-  db/                 连接、schema、migrations、seed
-  models/             Item / Collection / Tag / Attachment
-  repositories/       SQL 访问层（itemRepo / fulltextRepo / collectionRepo）
+  db/                 connection（pg Pool）、schema.postgres.sql、migrate、seed
+  models/             Item / Collection / Attachment
+  repositories/       SQL 访问层（itemRepo / fulltextRepo / collectionRepo / …）
   services/           importService / pdfParser / recognizers / mineruService
                        fulltextService / fulltextWorker / journalWhitelist
                        metadataMapper / exportService / storageService
-  api/                Express 服务器 + 路由（items / fulltext / journals / ...）
+  api/                Express 服务器 + 路由
   cli/                commander 命令行入口
   utils/              key / doi / isbn 工具
-  config.js           配置加载（.env + 默认值）
+  config.js           配置加载（.env + 默认值；DATABASE_URL 必填）
   index.js            服务器启动入口
+scripts/              sqlite-to-pg.mjs 等运维脚本
 web/                  前端（Vite + React + shadcn/ui）
-  src/components/     Sidebar / ItemTable / ItemDetail / FullTextView
-                       MineruTaskLog / TopBar + ui/
-  src/api/            REST 客户端
-  src/hooks/          useAsync 数据获取 hook
-docs/                 设计分析笔记
+docs/                 含 postgres-migration.md
 deps/zotero/          Zotero 参考源码（git submodule）
-import_all.mjs        批量 PDF 导入脚本
 Dockerfile            多阶段构建（前端 build + 后端运行）
-docker-compose.yml    单服务部署示例
+docker-compose.yml    postgres + otero（可选）
 ```
 
 ## 环境变量
@@ -92,21 +85,25 @@ OPENAI_MODEL=deepseek-v4-flash
 # 服务器
 OTERO_PORT=3000
 OTERO_HOST=127.0.0.1
+
+# PostgreSQL（必填）
+DATABASE_URL=postgresql://otero:otero-secret-change-me@127.0.0.1:5432/otero
 ```
 
-> ⚠️ `.env` 已在 `.gitignore` 中，切勿提交真实密钥。
+> ⚠️ `.env` 已在 `.gitignore` 中，切勿提交真实密钥。SQLite → PG 步骤见 [`docs/postgres-migration.md`](docs/postgres-migration.md)。
 
 ## 安装与运行
 
 ### 本地开发
 
-后端：
-
 ```bash
+docker compose up -d postgres   # 或自备 PostgreSQL
 npm install
-npm run migrate   # 创建 SQLite schema
+# 可选：从旧 SQLite 导入
+# node scripts/sqlite-to-pg.mjs --wipe
+npm run migrate   # 应用 schema.postgres.sql
 npm run seed      # 写入 itemTypes / fields / creatorTypes
-npm run serve     # 启动 API + Web 服务器（默认 127.0.0.1:3000）
+npm run serve     # 启动 API + Web（默认 127.0.0.1:3000）
 ```
 
 前端（开发模式，热更新）：

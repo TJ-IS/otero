@@ -56,20 +56,20 @@ if (config.storage.type !== 'minio' && !DRY_RUN) {
 const { uploadFile, ensureBucket, objectExists } = await import('../src/services/minioClient.js');
 
 // ---- Load items with PDF attachments from DB --------------------------------
-const { getDb } = await import('../src/db/connection.js');
+const { initDb, closeDb, query } = await import('../src/db/connection.js');
 const { runMigrations } = await import('../src/db/migrate.js');
-runMigrations();
+await initDb();
+await runMigrations();
 
-const db = getDb();
-const rows = db.prepare(`
-  SELECT i.key AS itemKey, a.path AS storedPath
-  FROM itemAttachments a
-  JOIN items i ON i.itemID = a.itemID
-  WHERE a.contentType = 'application/pdf'
+const rows = await query(`
+  SELECT i.key AS "itemKey", a.path AS "storedPath"
+  FROM "itemAttachments" a
+  JOIN items i ON i."itemID" = a."itemID"
+  WHERE a."contentType" = 'application/pdf'
     AND a.path IS NOT NULL
     AND i.deleted = 0
-  ORDER BY i.itemID
-`).all();
+  ORDER BY i."itemID"
+`);
 
 const total = Math.min(rows.length, LIMIT);
 console.log(`Found ${rows.length} PDF attachments.${LIMIT < rows.length ? ` Processing first ${total}.` : ''}`);
@@ -146,3 +146,6 @@ if (!DRY_RUN && failed === 0) {
   console.log('  2. Once confident, you can free disk space by removing the originals:');
   console.log('     find data/storage -name "*.pdf" -delete');
 }
+
+await closeDb();
+

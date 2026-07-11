@@ -1,10 +1,10 @@
 import { Command } from 'commander';
+import { initDb, closeDb } from '../db/connection.js';
 import { runMigrations } from '../db/migrate.js';
 import { seed } from '../db/seed.js';
 import { importPdf } from '../services/importService.js';
 import { Items } from '../models/Item.js';
 import { Collections } from '../models/Collection.js';
-import { closeDb } from '../db/connection.js';
 import { startServer } from '../api/server.js';
 import { parseItem, pollOnce, getFullText, listAll } from '../services/fulltextService.js';
 
@@ -17,19 +17,23 @@ program
 
 program
   .command('migrate')
-  .description('Apply SQLite schema migrations')
-  .action(() => {
-    const res = runMigrations();
+  .description('Apply PostgreSQL schema migrations')
+  .action(async () => {
+    await initDb();
+    const res = await runMigrations();
     console.log(`Migration OK: schema v${res.applied} (previous v${res.previous})`);
+    await closeDb();
   });
 
 program
   .command('seed')
   .description('Seed schema definitions (itemTypes / fields / creatorTypes)')
-  .action(() => {
-    runMigrations();
-    const res = seed();
+  .action(async () => {
+    await initDb();
+    await runMigrations();
+    const res = await seed();
     console.log(`Seed OK: ${res.itemTypes} itemTypes, ${res.fields} fields, ${res.creatorTypes} creatorTypes`);
+    await closeDb();
   });
 
 program
@@ -38,7 +42,8 @@ program
   .argument('<paths...>', 'PDF file paths')
   .option('--no-recognize', 'Skip metadata recognition; only store as attachment')
   .action(async (paths, opts) => {
-    runMigrations();
+    await initDb();
+    await runMigrations();
     let ok = 0, fail = 0;
     for (const p of paths) {
       try {
@@ -53,7 +58,7 @@ program
       }
     }
     console.log(`\nDone: ${ok} ok, ${fail} failed.`);
-    closeDb();
+    await closeDb();
     if (fail > 0) process.exitCode = 1;
   });
 
@@ -63,9 +68,10 @@ program
   .option('--type <type>', 'filter by item type (e.g. journalArticle)')
   .option('--collection <key>', 'filter by collection key')
   .option('--include-deleted', 'include soft-deleted items')
-  .action((opts) => {
-    runMigrations();
-    const items = Items.list({
+  .action(async (opts) => {
+    await initDb();
+    await runMigrations();
+    const items = await Items.list({
       type: opts.type,
       collection: opts.collection,
       includeDeleted: opts.includeDeleted,
@@ -81,18 +87,19 @@ program
       }
     }
     console.log(`\nTotal: ${items.length}`);
-    closeDb();
+    await closeDb();
   });
 
 program
   .command('collections')
   .description('List collections')
-  .action(() => {
-    runMigrations();
-    for (const c of Collections.list()) {
+  .action(async () => {
+    await initDb();
+    await runMigrations();
+    for (const c of await Collections.list()) {
       console.log(`${c.key}\t${c.name}`);
     }
-    closeDb();
+    await closeDb();
   });
 
 program
@@ -101,7 +108,9 @@ program
   .option('-p, --port <port>', 'port number', '3000')
   .option('-H, --host <host>', 'host', '127.0.0.1')
   .action(async (opts) => {
-    runMigrations();
+    await initDb();
+    await runMigrations();
+    await seed();
     await startServer({ port: Number(opts.port), host: opts.host });
     // Server keeps process alive; do not closeDb.
   });
@@ -113,7 +122,8 @@ program
   .option('--force', 're-parse even if already done')
   .option('--wait', 'block until the task completes (polls locally)')
   .action(async (key, opts) => {
-    runMigrations();
+    await initDb();
+    await runMigrations();
     try {
       const r = await parseItem(key, { force: !!opts.force });
       console.log(`Submitted: state=${r.state} batchId=${r.mineruBatchId || '-'}`);
@@ -138,7 +148,7 @@ program
       console.error(`[FAIL] ${err.message}`);
       process.exitCode = 1;
     } finally {
-      closeDb();
+      await closeDb();
     }
   });
 
@@ -148,8 +158,9 @@ program
   .option('--type <type>', 'filter by item type')
   .option('--force', 're-parse even if already done')
   .action(async (opts) => {
-    runMigrations();
-    const items = Items.list({ type: opts.type, topLevelOnly: true });
+    await initDb();
+    await runMigrations();
+    const items = await Items.list({ type: opts.type, topLevelOnly: true });
     let ok = 0, fail = 0;
     for (const it of items) {
       try {
@@ -164,15 +175,16 @@ program
     console.log(`\nSubmitted: ${ok} ok, ${fail} failed. ` +
       `Pending tasks will be advanced by the running server's worker.` +
       (!ok ? '' : ` Run \`otero serve\` or use --wait on \`otero parse\` to advance them.`));
-    closeDb();
+    await closeDb();
   });
 
 program
   .command('parse-status')
   .description('Show MinerU full-text parsing queue status')
-  .action(() => {
-    runMigrations();
-    const all = listAll();
+  .action(async () => {
+    await initDb();
+    await runMigrations();
+    const all = await listAll();
     if (all.length === 0) {
       console.log('(no full-text rows)');
     } else {
@@ -181,7 +193,7 @@ program
       }
     }
     console.log(`\nTotal: ${all.length}`);
-    closeDb();
+    await closeDb();
   });
 
 // Default: print help.

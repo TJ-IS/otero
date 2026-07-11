@@ -1,12 +1,8 @@
-import { getDb } from '../db/connection.js';
-import { fieldIdByName } from './itemRepo.js';
-import { listJournals } from './itemRepo.js';
+import { query, queryOne } from '../db/connection.js';
+import { fieldIdByName, listJournals } from './itemRepo.js';
 import { getFullTextCounts } from './fulltextRepo.js';
 import { JOURNAL_WHITELIST, UNFILED } from '../services/journalWhitelist.js';
 
-// Mirrors the frontend's yearOf() regex (web/src/lib/items.js) so the two
-// sides never disagree on what counts as "a year" inside a free-text date
-// field.
 const YEAR_RE = /\b(1[5-9]|20)\d{2}\b/;
 const MIN_PLAUSIBLE_YEAR = 1990;
 
@@ -20,83 +16,64 @@ function extractYear(dateStr) {
   return year;
 }
 
-/**
- * Top-line counts for the dashboard's overview cards.
- */
-export function getOverviewStats() {
-  const db = getDb();
-  const totalItems = db.prepare(`
-    SELECT COUNT(*) AS n FROM items WHERE deleted = 0 AND parentItemID IS NULL
-  `).get().n;
+export async function getOverviewStats() {
+  const totalItems = (await queryOne(`
+    SELECT COUNT(*)::int AS n FROM items WHERE deleted = 0 AND "parentItemID" IS NULL
+  `)).n;
 
-  const totalCreators = db.prepare(`
-    SELECT COUNT(DISTINCT ic.creatorID) AS n
-    FROM itemCreators ic
-    JOIN items i ON i.itemID = ic.itemID
-    WHERE i.deleted = 0 AND i.parentItemID IS NULL
-  `).get().n;
+  const totalCreators = (await queryOne(`
+    SELECT COUNT(DISTINCT ic."creatorID")::int AS n
+    FROM "itemCreators" ic
+    JOIN items i ON i."itemID" = ic."itemID"
+    WHERE i.deleted = 0 AND i."parentItemID" IS NULL
+  `)).n;
 
-  const doiFieldId = fieldIdByName('DOI');
-  const withDoi = doiFieldId ? db.prepare(`
-    SELECT COUNT(*) AS n
-    FROM itemData d
-    JOIN items i ON i.itemID = d.itemID
-    WHERE d.fieldID = ? AND i.deleted = 0 AND i.parentItemID IS NULL
-  `).get(doiFieldId).n : 0;
+  const doiFieldId = await fieldIdByName('DOI');
+  const withDoi = doiFieldId ? (await queryOne(`
+    SELECT COUNT(*)::int AS n
+    FROM "itemData" d
+    JOIN items i ON i."itemID" = d."itemID"
+    WHERE d."fieldID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL
+  `, [doiFieldId])).n : 0;
 
-  const withAttachment = db.prepare(`
-    SELECT COUNT(DISTINCT ia.parentItemID) AS n
-    FROM itemAttachments ia
-    JOIN items i ON i.itemID = ia.parentItemID
-    WHERE i.deleted = 0 AND i.parentItemID IS NULL
-  `).get().n;
-
-  const journalCount = JOURNAL_WHITELIST.length;
+  const withAttachment = (await queryOne(`
+    SELECT COUNT(DISTINCT ia."parentItemID")::int AS n
+    FROM "itemAttachments" ia
+    JOIN items i ON i."itemID" = ia."parentItemID"
+    WHERE i.deleted = 0 AND i."parentItemID" IS NULL
+  `)).n;
 
   return {
     totalItems,
     totalCreators,
-    journalCount,
+    journalCount: JOURNAL_WHITELIST.length,
     withDoi,
     withAttachment,
   };
 }
 
-/**
- * Item-type distribution across top-level, non-deleted items.
- * Returns [{ itemType, count }], ordered by count descending.
- */
-export function getItemTypeDistribution() {
-  const db = getDb();
-  return db.prepare(`
-    SELECT it.typeName AS itemType, COUNT(*) AS count
+export async function getItemTypeDistribution() {
+  return query(`
+    SELECT it."typeName" AS "itemType", COUNT(*)::int AS count
     FROM items i
-    JOIN itemTypes it ON it.itemTypeID = i.itemTypeID
-    WHERE i.deleted = 0 AND i.parentItemID IS NULL
-    GROUP BY it.typeName
+    JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
+    WHERE i.deleted = 0 AND i."parentItemID" IS NULL
+    GROUP BY it."typeName"
     ORDER BY count DESC
-  `).all();
+  `);
 }
 
-/**
- * Publication-year histogram over top-level, non-deleted items' `date`
- * field. Year extraction happens in JS (not SQL) so the logic can share the
- * exact same regex as the frontend's yearOf(), and so implausible years
- * (OCR/metadata noise like 1900 or 2052) can be dropped consistently.
- * Returns [{ year, count }], sorted by year ascending.
- */
-export function getPublicationYearHistogram() {
-  const db = getDb();
-  const dateFieldId = fieldIdByName('date');
+export async function getPublicationYearHistogram() {
+  const dateFieldId = await fieldIdByName('date');
   if (!dateFieldId) return [];
 
-  const rows = db.prepare(`
+  const rows = await query(`
     SELECT v.value AS date
-    FROM itemData d
-    JOIN itemDataValues v ON v.valueID = d.valueID
-    JOIN items i ON i.itemID = d.itemID
-    WHERE d.fieldID = ? AND i.deleted = 0 AND i.parentItemID IS NULL
-  `).all(dateFieldId);
+    FROM "itemData" d
+    JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+    JOIN items i ON i."itemID" = d."itemID"
+    WHERE d."fieldID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL
+  `, [dateFieldId]);
 
   const counts = new Map();
   for (const r of rows) {
@@ -110,48 +87,41 @@ export function getPublicationYearHistogram() {
     .map(([year, count]) => ({ year, count }));
 }
 
-/**
- * Per-journal item counts (reuses listJournals()) plus, for each journal,
- * its publication-year breakdown — used for the journal detail view's
- * per-journal timeline. Data volume (~8000 items) makes a per-journal pass
- * in JS cheap enough to do on every request rather than caching.
- */
-export function getJournalBreakdown() {
-  const db = getDb();
-  const journals = listJournals();
-  const jfid = fieldIdByName('publicationTitle');
-  const dateFieldId = fieldIdByName('date');
+export async function getJournalBreakdown() {
+  const journals = await listJournals();
+  const jfid = await fieldIdByName('publicationTitle');
+  const dateFieldId = await fieldIdByName('date');
   if (!jfid || !dateFieldId) return journals.map(j => ({ ...j, years: [] }));
 
-  const yearsByJournalStmt = db.prepare(`
-    SELECT v2.value AS date
-    FROM itemData d1
-    JOIN itemDataValues v1 ON v1.valueID = d1.valueID
-    JOIN items i ON i.itemID = d1.itemID
-    JOIN itemData d2 ON d2.itemID = i.itemID AND d2.fieldID = ?
-    JOIN itemDataValues v2 ON v2.valueID = d2.valueID
-    WHERE d1.fieldID = ? AND d1.itemID = i.itemID AND v1.value = ?
-      AND i.deleted = 0 AND i.parentItemID IS NULL
-  `);
+  const placeholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 3}`).join(',');
 
-  const placeholders = JOURNAL_WHITELIST.map(() => '?').join(',');
-  const unfiledYearsStmt = db.prepare(`
-    SELECT v.value AS date
-    FROM itemData d
-    JOIN itemDataValues v ON v.valueID = d.valueID
-    JOIN items i ON i.itemID = d.itemID
-    WHERE d.fieldID = ? AND i.deleted = 0 AND i.parentItemID IS NULL
-      AND NOT EXISTS (
-        SELECT 1 FROM itemData d2
-        JOIN itemDataValues v2 ON v2.valueID = d2.valueID
-        WHERE d2.itemID = i.itemID AND d2.fieldID = ? AND v2.value IN (${placeholders})
-      )
-  `);
-
-  return journals.map((j) => {
-    const rows = j.name === UNFILED
-      ? unfiledYearsStmt.all(dateFieldId, jfid, ...JOURNAL_WHITELIST)
-      : yearsByJournalStmt.all(dateFieldId, jfid, j.name);
+  return Promise.all(journals.map(async (j) => {
+    let rows;
+    if (j.name === UNFILED) {
+      rows = await query(`
+        SELECT v.value AS date
+        FROM "itemData" d
+        JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+        JOIN items i ON i."itemID" = d."itemID"
+        WHERE d."fieldID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM "itemData" d2
+            JOIN "itemDataValues" v2 ON v2."valueID" = d2."valueID"
+            WHERE d2."itemID" = i."itemID" AND d2."fieldID" = $2 AND v2.value IN (${placeholders})
+          )
+      `, [dateFieldId, jfid, ...JOURNAL_WHITELIST]);
+    } else {
+      rows = await query(`
+        SELECT v2.value AS date
+        FROM "itemData" d1
+        JOIN "itemDataValues" v1 ON v1."valueID" = d1."valueID"
+        JOIN items i ON i."itemID" = d1."itemID"
+        JOIN "itemData" d2 ON d2."itemID" = i."itemID" AND d2."fieldID" = $1
+        JOIN "itemDataValues" v2 ON v2."valueID" = d2."valueID"
+        WHERE d1."fieldID" = $2 AND v1.value = $3
+          AND i.deleted = 0 AND i."parentItemID" IS NULL
+      `, [dateFieldId, jfid, j.name]);
+    }
     const counts = new Map();
     for (const r of rows) {
       const year = extractYear(r.date);
@@ -162,38 +132,27 @@ export function getJournalBreakdown() {
       .sort((a, b) => a[0] - b[0])
       .map(([year, count]) => ({ year, count }));
     return { ...j, years };
-  });
+  }));
 }
 
-/**
- * MinerU full-text parse state counts (reuses fulltextRepo.getFullTextCounts()).
- */
-export function getFullTextStatusCounts() {
+export async function getFullTextStatusCounts() {
   return getFullTextCounts();
 }
 
-/**
- * Hourly bucketed MinerU submission/completion activity — an "operational"
- * timeline distinct from the bibliographic publication-year timeline. Useful
- * because dateAdded is nearly worthless for growth-over-time (the whole
- * corpus was bulk-imported in a two-day window); this instead shows the
- * actual full-text parsing throughput over time.
- * Returns [{ hour: 'YYYY-MM-DD HH:00', submitted, completed }].
- */
-export function getIngestionActivity() {
-  const db = getDb();
-  const submitted = db.prepare(`
-    SELECT strftime('%Y-%m-%d %H:00', submittedAt) AS hour, COUNT(*) AS n
-    FROM itemFullText
-    WHERE submittedAt IS NOT NULL
+export async function getIngestionActivity() {
+  // submittedAt/completedAt are TEXT timestamps; truncate to hour via substring.
+  const submitted = await query(`
+    SELECT substring("submittedAt" from 1 for 13) || ':00' AS hour, COUNT(*)::int AS n
+    FROM "itemFullText"
+    WHERE "submittedAt" IS NOT NULL AND length("submittedAt") >= 13
     GROUP BY hour
-  `).all();
-  const completed = db.prepare(`
-    SELECT strftime('%Y-%m-%d %H:00', completedAt) AS hour, COUNT(*) AS n
-    FROM itemFullText
-    WHERE completedAt IS NOT NULL
+  `);
+  const completed = await query(`
+    SELECT substring("completedAt" from 1 for 13) || ':00' AS hour, COUNT(*)::int AS n
+    FROM "itemFullText"
+    WHERE "completedAt" IS NOT NULL AND length("completedAt") >= 13
     GROUP BY hour
-  `).all();
+  `);
 
   const byHour = new Map();
   for (const r of submitted) {

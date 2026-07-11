@@ -5,24 +5,24 @@ import { Item } from '../../models/Item.js';
 export const authorsRouter = Router();
 
 // GET /api/authors/graph?minPapers=3
-authorsRouter.get('/graph', (req, res) => {
+authorsRouter.get('/graph', async (req, res) => {
   const minPapers = Math.max(1, parseInt(req.query.minPapers, 10) || 3);
-  res.json(getCoauthorGraph({ minPapers }));
+  res.json(await getCoauthorGraph({ minPapers }));
 });
 
 // GET /api/authors/:id — author name + all their papers (full item JSON, same
 // shape as GET /api/items), sorted newest first. Registered after '/graph' so
 // that literal path takes precedence over this catch-all param route.
-authorsRouter.get('/:id', (req, res) => {
+authorsRouter.get('/:id', async (req, res) => {
   const creatorId = parseInt(req.params.id, 10);
   if (!Number.isInteger(creatorId)) {
     return res.status(400).json({ error: 'invalid author id' });
   }
-  const detail = getAuthorDetail(creatorId);
+  const detail = await getAuthorDetail(creatorId);
   if (!detail) return res.status(404).json({ error: 'author not found' });
 
-  const items = detail.itemIds
-    .map(id => Item.loadById(id))
+  const loaded = await Promise.all(detail.itemIds.map(id => Item.loadById(id)));
+  const items = loaded
     .filter(Boolean)
     .map(it => it.toJSON())
     .sort((a, b) => (b.fields?.date || '').localeCompare(a.fields?.date || ''));

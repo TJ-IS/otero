@@ -68,7 +68,7 @@ function creatorLabel(c) {
  *   Optional draft overrides so the UI can compare against unsaved edits.
  */
 export async function enrichFromCrossref(key, opts = {}) {
-  const item = Item.loadByKey(key);
+  const item = await Item.loadByKey(key);
   if (!item) throw new Error('item not found');
 
   const doi = (opts.doi || item.getField('DOI') || '').trim();

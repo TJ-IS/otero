@@ -11,7 +11,7 @@ export const chatRouter = Router();
 // TextStreamChatTransport / useChat). Open to all visitors (see
 // editorWriteGate's publicWrites exemption) — no wallet/editor auth.
 chatRouter.post('/items/:key/chat', async (req, res) => {
-  const it = Item.loadByKey(req.params.key);
+  const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
 
   const messages = Array.isArray(req.body?.messages) ? req.body.messages : null;

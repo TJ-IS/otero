@@ -2,23 +2,29 @@
 
 本文档只讲**如何把数据从本地搬到服务器**。代码拉取、Docker 安装、防火墙、Nginx 等部署步骤请自行处理。
 
----
-
-## 需要迁移的三样东西
-
-| # | 内容 | 本地路径 | 大小 | 说明 |
-|---|------|---------|------|------|
-| 1 | SQLite 数据库 | `data/otero.db` | ~32 MB | 所有条目/元数据 |
-| 2 | MinIO 对象数据 | `data/minio/` | ~44 GB | PDF 原文件 + MinerU 全文资产 |
-| 3 | 环境变量 | `.env` | ~2 KB | 含密钥，被 git 忽略，**必须手动传** |
-
-> **不需要迁移** `data/storage/`：里面的 PDF 和全文都已经上传到 MinIO 了（在 `data/minio/` 内），迁移后服务器不再从本地文件系统读取。
->
-> **不需要迁移** Docker 镜像：服务器是 ARM 架构，本地是 x86。镜像必须在服务器上现场 `docker compose build`，不要传本地构建的镜像。
+> **数据库引擎**：应用已硬切换到 PostgreSQL。条目元数据不再依赖运行时的 `otero.db`。
+> 若服务器上仍有旧 SQLite 文件，用 [`docs/postgres-migration.md`](docs/postgres-migration.md) 的 `scripts/sqlite-to-pg.mjs --wipe` 导入。
+> MinIO 资产迁移流程不变。
 
 ---
 
-## 迁移前：干净停掉本地服务
+## 需要迁移的东西
+
+| # | 内容 | 本地路径 | 说明 |
+|---|------|---------|------|
+| 1 | PostgreSQL 数据 **或** 旧 SQLite | `data/postgres/` / `data/otero.db` | 优先在目标机跑 `sqlite-to-pg.mjs`；也可用 `pg_dump` |
+| 2 | MinIO 对象数据 | `data/minio/` | PDF 原文件 + MinerU 全文资产 |
+| 3 | 环境变量 | `.env` | 必须含 `DATABASE_URL` 与 MinIO 凭证 |
+
+详见 [`docs/postgres-migration.md`](docs/postgres-migration.md)。
+
+---
+
+## 历史说明（SQLite 时代）
+
+以下步骤保留作参考：旧版应用直接拷贝 `otero.db`。新部署请改用 Postgres 导入脚本。
+
+### 迁移前：干净停掉本地服务
 
 迁移前务必先停掉本地正在运行的服务，让 SQLite 的 WAL 日志（`otero.db-wal` / `otero.db-shm`）合并回主库文件，否则拷贝过去的数据库可能不完整。
 
@@ -34,7 +40,7 @@ docker compose down
 
 ---
 
-## 第 1 步：传 SQLite 数据库
+## 第 1 步：传 SQLite 数据库（仅用于后续 sqlite-to-pg 导入）
 
 只传主库文件 `otero.db`，**不要**传 `-wal` / `-shm` 临时文件，也不要传 `.bak` 备份文件。
 

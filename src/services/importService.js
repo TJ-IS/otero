@@ -7,7 +7,7 @@ import { storeFile, downloadToTemp } from './storageService.js';
 import { extractPdf } from './pdfParser.js';
 import { recognize } from './recognizers/index.js';
 import { mapRecognized } from './metadataMapper.js';
-import { getDb } from '../db/connection.js';
+import { execute } from '../db/connection.js';
 
 /**
  * Import a PDF file:
@@ -38,7 +38,7 @@ export async function importPdf(pdfPath, opts = {}) {
     md5: stored.md5,
     mtime: stored.mtime,
   });
-  attachment.save();
+  await attachment.save();
 
   if (opts.skipRecognize) {
     return { attachment, parent: null, recognized: null, mapped: null };
@@ -63,17 +63,17 @@ export async function importPdf(pdfPath, opts = {}) {
 
   // 6. Create the parent Item and link the attachment to it.
   const parent = new Item();
-  parent.setItemType(mapped.itemType);
+  await parent.setItemType(mapped.itemType);
   for (const [name, value] of Object.entries(mapped.fields)) {
     if (value === null || value === undefined || value === '') continue;
     try { parent.setField(name, value); }
     catch { /* field not in schema or not allowed for this type — skip */ }
   }
   for (const c of mapped.creators) parent.addCreator(c);
-  parent.save();
+  await parent.save();
 
-  getDb().prepare('UPDATE items SET parentItemID=? WHERE itemID=?').run(parent.id, attachment.id);
-  getDb().prepare('UPDATE itemAttachments SET parentItemID=? WHERE itemID=?').run(parent.id, attachment.id);
+  await execute('UPDATE items SET "parentItemID"=$1 WHERE "itemID"=$2', [parent.id, attachment.id]);
+  await execute('UPDATE "itemAttachments" SET "parentItemID"=$1 WHERE "itemID"=$2', [parent.id, attachment.id]);
 
   return { attachment, parent, recognized, mapped };
 }

@@ -1,376 +1,412 @@
-import { getDb, tx } from '../db/connection.js';
+import { query, queryOne, execute, withTransaction, nowUtc } from '../db/connection.js';
 import { JOURNAL_WHITELIST, UNFILED } from '../services/journalWhitelist.js';
 
 // ---------------------------------------------------------------------------
 // Lookup helpers for schema names <-> IDs
 // ---------------------------------------------------------------------------
-const typeCache = new Map();   // typeName -> itemTypeID
-const fieldCache = new Map();  // fieldName -> fieldID
-const creatorCache = new Map(); // creatorType -> creatorTypeID
+const typeCache = new Map();
+const fieldCache = new Map();
+const creatorCache = new Map();
+let cachesLoaded = false;
 
-function loadCaches() {
-  const db = getDb();
-  for (const r of db.prepare('SELECT itemTypeID, typeName FROM itemTypes').iterate()) {
+async function loadCaches() {
+  if (cachesLoaded) return;
+  for (const r of await query('SELECT "itemTypeID", "typeName" FROM "itemTypes"')) {
     typeCache.set(r.typeName, r.itemTypeID);
   }
-  for (const r of db.prepare('SELECT fieldID, fieldName FROM fields').iterate()) {
+  for (const r of await query('SELECT "fieldID", "fieldName" FROM "fields"')) {
     fieldCache.set(r.fieldName, r.fieldID);
   }
-  for (const r of db.prepare('SELECT creatorTypeID, creatorType FROM creatorTypes').iterate()) {
+  for (const r of await query('SELECT "creatorTypeID", "creatorType" FROM "creatorTypes"')) {
     creatorCache.set(r.creatorType, r.creatorTypeID);
   }
+  cachesLoaded = true;
 }
 
-export function itemTypeIdByName(name) {
-  if (typeCache.size === 0) loadCaches();
+/** Reset caches (e.g. after test wipe + reseed). */
+export function clearSchemaCaches() {
+  typeCache.clear();
+  fieldCache.clear();
+  creatorCache.clear();
+  cachesLoaded = false;
+}
+
+export async function itemTypeIdByName(name) {
+  await loadCaches();
   return typeCache.get(name) ?? null;
 }
 
-export function itemNameById(id) {
-  if (typeCache.size === 0) loadCaches();
+export async function itemNameById(id) {
+  await loadCaches();
   for (const [n, i] of typeCache) if (i === id) return n;
   return null;
 }
 
-export function fieldIdByName(name) {
-  if (fieldCache.size === 0) loadCaches();
+export async function fieldIdByName(name) {
+  await loadCaches();
   return fieldCache.get(name) ?? null;
 }
 
-export function fieldNameById(id) {
-  if (fieldCache.size === 0) loadCaches();
+export async function fieldNameById(id) {
+  await loadCaches();
   for (const [n, i] of fieldCache) if (i === id) return n;
   return null;
 }
 
-export function creatorTypeIdByName(name) {
-  if (creatorCache.size === 0) loadCaches();
+export async function creatorTypeIdByName(name) {
+  await loadCaches();
   return creatorCache.get(name) ?? null;
 }
 
-export function creatorTypeNameById(id) {
-  if (creatorCache.size === 0) loadCaches();
+export async function creatorTypeNameById(id) {
+  await loadCaches();
   for (const [n, i] of creatorCache) if (i === id) return n;
   return null;
 }
 
-/** Validate that fieldID is allowed for the given itemType. */
-export function isFieldAllowedForType(itemTypeId, fieldId) {
-  const db = getDb();
-  return Boolean(
-    db.prepare('SELECT 1 FROM itemTypeFields WHERE itemTypeID=? AND fieldID=?').get(itemTypeId, fieldId)
+export async function isFieldAllowedForType(itemTypeId, fieldId) {
+  const row = await queryOne(
+    'SELECT 1 AS ok FROM "itemTypeFields" WHERE "itemTypeID"=$1 AND "fieldID"=$2',
+    [itemTypeId, fieldId]
   );
+  return Boolean(row);
 }
 
 // ---------------------------------------------------------------------------
-// itemDataValues helpers (deduplicated string storage)
+// "itemDataValues" helpers
 // ---------------------------------------------------------------------------
-/** Find or insert a value in itemDataValues, returning its valueID. */
-export function getOrCreateValueId(value) {
-  const db = getDb();
-  const existing = db.prepare('SELECT valueID FROM itemDataValues WHERE value=?').get(value);
+export async function getOrCreateValueId(value, client = null) {
+  const existing = await queryOne(
+    'SELECT "valueID" FROM "itemDataValues" WHERE md5(value) = md5($1)',
+    [value],
+    client
+  );
   if (existing) return existing.valueID;
-  const info = db.prepare('INSERT INTO itemDataValues(value) VALUES (?)').run(value);
-  return info.lastInsertRowid;
+  const row = await queryOne(
+    'INSERT INTO "itemDataValues"(value) VALUES ($1) RETURNING "valueID"',
+    [value],
+    client
+  );
+  return row.valueID;
 }
 
 // ---------------------------------------------------------------------------
 // Item CRUD
 // ---------------------------------------------------------------------------
-const INSERT_ITEM = `
-  INSERT INTO items(itemTypeID, key, dateAdded, dateModified, version, parentItemID, deleted, inPublications)
-  VALUES (@itemTypeID, @key, @dateAdded, @dateModified, @version, @parentItemID, @deleted, @inPublications)
-`;
-
-/**
- * Insert an items row. Caller supplies: itemTypeID, key, parentItemID (nullable), deleted, inPublications.
- * Returns itemID.
- */
-export function insertItemRow({ itemTypeID, key, parentItemID = null, deleted = 0, inPublications = 0, dateAdded, dateModified, version = 0 }) {
-  const db = getDb();
-  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-  const info = db.prepare(INSERT_ITEM).run({
+export async function insertItemRow({
+  itemTypeID, key, parentItemID = null, deleted = 0, inPublications = 0,
+  dateAdded, dateModified, version = 0,
+}, client = null) {
+  const now = nowUtc();
+  const row = await queryOne(`
+    INSERT INTO items("itemTypeID", key, "dateAdded", "dateModified", version, "parentItemID", deleted, "inPublications")
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    RETURNING "itemID"
+  `, [
     itemTypeID, key,
-    dateAdded: dateAdded ?? now,
-    dateModified: dateModified ?? now,
+    dateAdded ?? now,
+    dateModified ?? now,
     version,
     parentItemID,
     deleted,
     inPublications,
-  });
-  return info.lastInsertRowid;
+  ], client);
+  return row.itemID;
 }
 
-export function updateItemModifiedDate(itemId) {
-  getDb().prepare("UPDATE items SET dateModified = datetime('now') WHERE itemID=?").run(itemId);
+export async function updateItemModifiedDate(itemId, client = null) {
+  await execute(
+    'UPDATE items SET "dateModified" = $1 WHERE "itemID"=$2',
+    [nowUtc(), itemId],
+    client
+  );
 }
 
-export function getItemRow(itemId) {
-  return getDb().prepare('SELECT * FROM items WHERE itemID=?').get(itemId);
+export async function getItemRow(itemId) {
+  return queryOne('SELECT * FROM items WHERE "itemID"=$1', [itemId]);
 }
 
-export function getItemByKey(key) {
-  return getDb().prepare('SELECT * FROM items WHERE key=?').get(key);
+export async function getItemByKey(key) {
+  return queryOne('SELECT * FROM items WHERE key=$1', [key]);
 }
 
-export function listItems({ type, journal, collection, search, includeDeleted = false, topLevelOnly = false } = {}) {
-  const db = getDb();
-  const where = ['i.parentItemID IS NULL'];
+export async function listItems({ type, journal, collection, search, includeDeleted = false } = {}) {
+  const where = ['i."parentItemID" IS NULL'];
   const params = [];
-  if (!includeDeleted) {
-    where.push('i.deleted = 0');
-  }
+  let p = 1;
+
+  if (!includeDeleted) where.push('i.deleted = 0');
+
   if (type) {
-    const typeId = itemTypeIdByName(type);
+    const typeId = await itemTypeIdByName(type);
     if (typeId == null) return [];
-    where.push('i.itemTypeID = ?');
+    where.push(`i."itemTypeID" = $${p++}`);
     params.push(typeId);
   }
+
   if (journal) {
-    const jfid = fieldIdByName('publicationTitle');
+    const jfid = await fieldIdByName('publicationTitle');
     if (jfid) {
       if (journal === UNFILED) {
-        // Items whose publicationTitle is not in the whitelist (or absent).
-        const placeholders = JOURNAL_WHITELIST.map(() => '?').join(',');
-        where.push(`NOT EXISTS (SELECT 1 FROM itemData d JOIN itemDataValues v ON v.valueID=d.valueID WHERE d.itemID=i.itemID AND d.fieldID=? AND v.value IN (${placeholders}))`);
+        const jParam = p++;
+        const wlParams = JOURNAL_WHITELIST.map(() => `$${p++}`).join(',');
+        where.push(`NOT EXISTS (
+          SELECT 1 FROM "itemData" d
+          JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+          WHERE d."itemID"=i."itemID" AND d."fieldID"=$${jParam} AND v.value IN (${wlParams})
+        )`);
         params.push(jfid, ...JOURNAL_WHITELIST);
       } else {
-        where.push(`EXISTS (SELECT 1 FROM itemData d JOIN itemDataValues v ON v.valueID=d.valueID WHERE d.itemID=i.itemID AND d.fieldID=? AND v.value=?)`);
+        where.push(`EXISTS (
+          SELECT 1 FROM "itemData" d
+          JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+          WHERE d."itemID"=i."itemID" AND d."fieldID"=$${p++} AND v.value=$${p++}
+        )`);
         params.push(jfid, journal);
       }
     }
   }
+
   if (collection) {
-    where.push(`EXISTS (SELECT 1 FROM collectionItems ci JOIN collections c ON c.collectionID=ci.collectionID WHERE ci.itemID=i.itemID AND c.key=?)`);
+    where.push(`EXISTS (
+      SELECT 1 FROM "collectionItems" ci
+      JOIN collections c ON c."collectionID"=ci."collectionID"
+      WHERE ci."itemID"=i."itemID" AND c.key=$${p++}
+    )`);
     params.push(collection);
   }
+
   if (search && search.trim()) {
     const like = `%${search.trim()}%`;
-    // Search across the core bibliographic fields (title, abstractNote,
-    // publicationTitle, DOI) plus author names. Restricted by fieldID so we
-    // don't accidentally match values of unrelated fields (volume, url, ...).
-    // COLLATE NOCASE makes ASCII matching case-insensitive, matching the
-    // frontend highlight() which uses toLowerCase().indexOf().
     where.push(`(
       EXISTS (
-        SELECT 1 FROM itemData d1
-        JOIN itemDataValues v1 ON v1.valueID=d1.valueID
-        JOIN fields f1 ON f1.fieldID=d1.fieldID
-        WHERE d1.itemID=i.itemID
-          AND f1.fieldName IN ('title','abstractNote','publicationTitle','DOI')
-          AND v1.value LIKE ? COLLATE NOCASE
+        SELECT 1 FROM "itemData" d1
+        JOIN "itemDataValues" v1 ON v1."valueID"=d1."valueID"
+        JOIN fields f1 ON f1."fieldID"=d1."fieldID"
+        WHERE d1."itemID"=i."itemID"
+          AND f1."fieldName" IN ('title','abstractNote','publicationTitle','DOI')
+          AND v1.value ILIKE $${p++}
       )
       OR EXISTS (
-        SELECT 1 FROM itemCreators ic2
-        JOIN creators c2 ON c2.creatorID=ic2.creatorID
-        WHERE ic2.itemID=i.itemID
-          AND (c2.firstName || ' ' || c2.lastName LIKE ? COLLATE NOCASE
-            OR c2.lastName LIKE ? COLLATE NOCASE
-            OR c2.firstName LIKE ? COLLATE NOCASE)
+        SELECT 1 FROM "itemCreators" ic2
+        JOIN creators c2 ON c2."creatorID"=ic2."creatorID"
+        WHERE ic2."itemID"=i."itemID"
+          AND (COALESCE(c2."firstName",'') || ' ' || COALESCE(c2."lastName",'') ILIKE $${p++}
+            OR c2."lastName" ILIKE $${p++}
+            OR c2."firstName" ILIKE $${p++})
       )
     )`);
     params.push(like, like, like, like);
   }
-  const sql = `SELECT i.* FROM items i WHERE ${where.join(' AND ')} ORDER BY i.dateAdded DESC`;
-  return db.prepare(sql).all(...params);
+
+  return query(
+    `SELECT i.* FROM items i WHERE ${where.join(' AND ')} ORDER BY i."dateAdded" DESC`,
+    params
+  );
 }
 
-export function listJournals() {
-  const db = getDb();
-  const jfid = fieldIdByName('publicationTitle');
+export async function listJournals() {
+  const jfid = await fieldIdByName('publicationTitle');
   if (!jfid) return [];
 
-  // Count per whitelisted journal (exact match on publicationTitle).
-  const countStmt = db.prepare(`
-    SELECT COUNT(*) AS cnt
-    FROM itemData d
-    JOIN itemDataValues v ON v.valueID = d.valueID
-    JOIN items i ON i.itemID = d.itemID
-    WHERE d.fieldID = ? AND i.deleted = 0 AND i.parentItemID IS NULL
-      AND v.value = ?
-  `);
-  const journals = JOURNAL_WHITELIST.map(name => ({
-    name,
-    itemCount: countStmt.get(jfid, name).cnt,
-  }));
+  const journals = [];
+  for (const name of JOURNAL_WHITELIST) {
+    const row = await queryOne(`
+      SELECT COUNT(*)::int AS cnt
+      FROM "itemData" d
+      JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+      JOIN items i ON i."itemID" = d."itemID"
+      WHERE d."fieldID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL
+        AND v.value = $2
+    `, [jfid, name]);
+    journals.push({ name, itemCount: row.cnt });
+  }
 
-  // "待归档": top-level, non-deleted items whose publicationTitle is not in
-  // the whitelist (or has no publicationTitle at all).
-  const placeholders = JOURNAL_WHITELIST.map(() => '?').join(',');
-  const unfiledRow = db.prepare(`
-    SELECT COUNT(*) AS cnt
+  const placeholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 2}`).join(',');
+  const unfiledRow = await queryOne(`
+    SELECT COUNT(*)::int AS cnt
     FROM items i
-    WHERE i.deleted = 0 AND i.parentItemID IS NULL
+    WHERE i.deleted = 0 AND i."parentItemID" IS NULL
       AND NOT EXISTS (
-        SELECT 1 FROM itemData d
-        JOIN itemDataValues v ON v.valueID = d.valueID
-        WHERE d.itemID = i.itemID AND d.fieldID = ? AND v.value IN (${placeholders})
+        SELECT 1 FROM "itemData" d
+        JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+        WHERE d."itemID" = i."itemID" AND d."fieldID" = $1 AND v.value IN (${placeholders})
       )
-  `).get(jfid, ...JOURNAL_WHITELIST);
+  `, [jfid, ...JOURNAL_WHITELIST]);
   journals.push({ name: UNFILED, itemCount: unfiledRow.cnt });
 
   return journals;
 }
 
-/**
- * List top-level, non-deleted items that are bucketed into UNFILED ("待归档")
- * AND have a finished MinerU full-text parse (itemFullText.state='done').
- * Paginated. Used by the batch metadata extraction pipeline.
- *
- * Returns { items: [{ key, itemID, itemTypeID, title }], total }.
- */
-export function listUnfiledWithFulltextDone({ page = 1, pageSize = 100 } = {}) {
-  const db = getDb();
-  const jfid = fieldIdByName('publicationTitle');
+export async function listUnfiledWithFulltextDone({ page = 1, pageSize = 100 } = {}) {
+  const jfid = await fieldIdByName('publicationTitle');
   if (!jfid) return { items: [], total: 0 };
 
-  const placeholders = JOURNAL_WHITELIST.map(() => '?').join(',');
+  const placeholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 2}`).join(',');
   const unfiledClause = `NOT EXISTS (
-    SELECT 1 FROM itemData d
-    JOIN itemDataValues v ON v.valueID = d.valueID
-    WHERE d.itemID = i.itemID AND d.fieldID = ? AND v.value IN (${placeholders})
+    SELECT 1 FROM "itemData" d
+    JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+    WHERE d."itemID" = i."itemID" AND d."fieldID" = $1 AND v.value IN (${placeholders})
   )`;
   const baseParams = [jfid, ...JOURNAL_WHITELIST];
 
-  const total = db.prepare(`
-    SELECT COUNT(*) AS cnt
+  const totalRow = await queryOne(`
+    SELECT COUNT(*)::int AS cnt
     FROM items i
-    JOIN itemFullText ft ON ft.itemID = i.itemID AND ft.state = 'done'
-    WHERE i.deleted = 0 AND i.parentItemID IS NULL AND ${unfiledClause}
-  `).get(...baseParams).cnt;
+    JOIN "itemFullText" ft ON ft."itemID" = i."itemID" AND ft.state = 'done'
+    WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${unfiledClause}
+  `, baseParams);
 
   const limit = Math.max(1, pageSize);
   const offset = Math.max(0, (Math.max(1, page) - 1) * limit);
-  const tfid = fieldIdByName('title');
+  const tfid = await fieldIdByName('title');
+  const titleParam = baseParams.length + 1;
+  const limitParam = baseParams.length + 2;
+  const offsetParam = baseParams.length + 3;
 
-  const rows = db.prepare(`
-    SELECT i.itemID, i.key, i.itemTypeID,
-      (SELECT v.value FROM itemData d JOIN itemDataValues v ON v.valueID=d.valueID
-       WHERE d.itemID=i.itemID AND d.fieldID=?) AS title
+  const rows = await query(`
+    SELECT i."itemID", i.key, i."itemTypeID",
+      (SELECT v.value FROM "itemData" d JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+       WHERE d."itemID"=i."itemID" AND d."fieldID"=$${titleParam}) AS title
     FROM items i
-    JOIN itemFullText ft ON ft.itemID = i.itemID AND ft.state = 'done'
-    WHERE i.deleted = 0 AND i.parentItemID IS NULL AND ${unfiledClause}
-    ORDER BY i.dateAdded DESC
-    LIMIT ? OFFSET ?
-  `).all(...baseParams, tfid, limit, offset);
+    JOIN "itemFullText" ft ON ft."itemID" = i."itemID" AND ft.state = 'done'
+    WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${unfiledClause}
+    ORDER BY i."dateAdded" DESC
+    LIMIT $${limitParam} OFFSET $${offsetParam}
+  `, [...baseParams, tfid, limit, offset]);
 
-  return { items: rows, total };
+  return { items: rows, total: totalRow.cnt };
 }
 
-export function setItemDeleted(itemId, deleted) {
-  getDb().prepare('UPDATE items SET deleted=?, dateModified=datetime(\'now\') WHERE itemID=?')
-    .run(deleted ? 1 : 0, itemId);
+export async function setItemDeleted(itemId, deleted) {
+  await execute(
+    'UPDATE items SET deleted=$1, "dateModified"=$2 WHERE "itemID"=$3',
+    [deleted ? 1 : 0, nowUtc(), itemId]
+  );
 }
 
 // ---------------------------------------------------------------------------
-// itemData (EAV)
+// "itemData" (EAV)
 // ---------------------------------------------------------------------------
-export function setItemField(itemId, fieldId, value) {
-  const db = getDb();
-  const valueId = getOrCreateValueId(String(value));
-  db.prepare('INSERT OR REPLACE INTO itemData(itemID, fieldID, valueID) VALUES (?, ?, ?)')
-    .run(itemId, fieldId, valueId);
+export async function setItemField(itemId, fieldId, value, client = null) {
+  const valueId = await getOrCreateValueId(String(value), client);
+  await execute(`
+    INSERT INTO "itemData"("itemID", "fieldID", "valueID") VALUES ($1, $2, $3)
+    ON CONFLICT ("itemID", "fieldID") DO UPDATE SET "valueID" = EXCLUDED."valueID"
+  `, [itemId, fieldId, valueId], client);
 }
 
-export function deleteItemField(itemId, fieldId) {
-  getDb().prepare('DELETE FROM itemData WHERE itemID=? AND fieldID=?').run(itemId, fieldId);
+export async function deleteItemField(itemId, fieldId, client = null) {
+  await execute(
+    'DELETE FROM "itemData" WHERE "itemID"=$1 AND "fieldID"=$2',
+    [itemId, fieldId],
+    client
+  );
 }
 
-export function getItemFields(itemId) {
-  const db = getDb();
-  return db.prepare(`
-    SELECT f.fieldName AS name, v.value AS value
-    FROM itemData d
-    JOIN fields f ON f.fieldID = d.fieldID
-    JOIN itemDataValues v ON v.valueID = d.valueID
-    WHERE d.itemID = ?
-  `).all(itemId);
+export async function getItemFields(itemId) {
+  return query(`
+    SELECT f."fieldName" AS name, v.value AS value
+    FROM "itemData" d
+    JOIN fields f ON f."fieldID" = d."fieldID"
+    JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+    WHERE d."itemID" = $1
+  `, [itemId]);
 }
 
-export function getItemField(itemId, fieldName) {
-  const fid = fieldIdByName(fieldName);
+export async function getItemField(itemId, fieldName) {
+  const fid = await fieldIdByName(fieldName);
   if (fid == null) return null;
-  const row = getDb().prepare(`
-    SELECT v.value FROM itemData d
-    JOIN itemDataValues v ON v.valueID = d.valueID
-    WHERE d.itemID=? AND d.fieldID=?
-  `).get(itemId, fid);
+  const row = await queryOne(`
+    SELECT v.value FROM "itemData" d
+    JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+    WHERE d."itemID"=$1 AND d."fieldID"=$2
+  `, [itemId, fid]);
   return row?.value ?? null;
 }
 
 // ---------------------------------------------------------------------------
 // creators
 // ---------------------------------------------------------------------------
-export function findCreatorId({ firstName, lastName, fieldMode }) {
-  return getDb().prepare(
-    'SELECT creatorID FROM creators WHERE firstName IS ? AND lastName IS ? AND fieldMode=?'
-  ).get(firstName ?? null, lastName ?? null, fieldMode)?.creatorID ?? null;
+export async function findCreatorId({ firstName, lastName, fieldMode }, client = null) {
+  const row = await queryOne(
+    `SELECT "creatorID" FROM creators
+     WHERE "firstName" IS NOT DISTINCT FROM $1
+       AND "lastName" IS NOT DISTINCT FROM $2
+       AND "fieldMode"=$3`,
+    [firstName ?? null, lastName ?? null, fieldMode],
+    client
+  );
+  return row?.creatorID ?? null;
 }
 
-export function getOrCreateCreatorId({ firstName, lastName, fieldMode }) {
-  const existing = findCreatorId({ firstName, lastName, fieldMode });
+export async function getOrCreateCreatorId({ firstName, lastName, fieldMode }, client = null) {
+  const existing = await findCreatorId({ firstName, lastName, fieldMode }, client);
   if (existing) return existing;
-  const info = getDb().prepare(
-    'INSERT INTO creators(firstName, lastName, fieldMode) VALUES (?, ?, ?)'
-  ).run(firstName ?? null, lastName ?? null, fieldMode);
-  return info.lastInsertRowid;
+  const row = await queryOne(
+    'INSERT INTO creators("firstName", "lastName", "fieldMode") VALUES ($1, $2, $3) RETURNING "creatorID"',
+    [firstName ?? null, lastName ?? null, fieldMode],
+    client
+  );
+  return row.creatorID;
 }
 
-export function setItemCreators(itemId, creators) {
-  // creators: [{ firstName, lastName, fieldMode, creatorType, orderIndex }]
-  const db = getDb();
-  tx(() => {
-    db.prepare('DELETE FROM itemCreators WHERE itemID=?').run(itemId);
-    const stmt = db.prepare(`
-      INSERT OR IGNORE INTO itemCreators(itemID, creatorID, creatorTypeID, orderIndex)
-      VALUES (?, ?, ?, ?)
-    `);
+export async function setItemCreators(itemId, creators) {
+  await withTransaction(async (client) => {
+    await execute('DELETE FROM "itemCreators" WHERE "itemID"=$1', [itemId], client);
     const seen = new Set();
     for (const c of creators) {
-      const cid = getOrCreateCreatorId({
+      const cid = await getOrCreateCreatorId({
         firstName: c.firstName ?? null,
         lastName: c.lastName ?? null,
         fieldMode: c.fieldMode ?? 0,
-      });
-      const ctid = creatorTypeIdByName(c.creatorType) ?? creatorTypeIdByName('author');
-      // Dedupe by (creatorID, creatorTypeID): the same person can appear
-      // twice in CrossRef output (e.g. repeated author), and the PK is
-      // (itemID, creatorID, creatorTypeID).
+      }, client);
+      const ctid = (await creatorTypeIdByName(c.creatorType))
+        ?? (await creatorTypeIdByName('author'));
       const key = `${cid}:${ctid}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      stmt.run(itemId, cid, ctid, c.orderIndex ?? 0);
+      await execute(`
+        INSERT INTO "itemCreators"("itemID", "creatorID", "creatorTypeID", "orderIndex")
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT DO NOTHING
+      `, [itemId, cid, ctid, c.orderIndex ?? 0], client);
     }
   });
 }
 
-export function getItemCreators(itemId) {
-  const db = getDb();
-  return db.prepare(`
-    SELECT c.creatorID AS id, c.firstName, c.lastName, c.fieldMode, ct.creatorType, ic.orderIndex
-    FROM itemCreators ic
-    JOIN creators c ON c.creatorID = ic.creatorID
-    JOIN creatorTypes ct ON ct.creatorTypeID = ic.creatorTypeID
-    WHERE ic.itemID = ?
-    ORDER BY ic.orderIndex
-  `).all(itemId);
+export async function getItemCreators(itemId) {
+  return query(`
+    SELECT c."creatorID" AS id, c."firstName", c."lastName", c."fieldMode",
+           ct."creatorType", ic."orderIndex"
+    FROM "itemCreators" ic
+    JOIN creators c ON c."creatorID" = ic."creatorID"
+    JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
+    WHERE ic."itemID" = $1
+    ORDER BY ic."orderIndex"
+  `, [itemId]);
 }
 
 // ---------------------------------------------------------------------------
-// attachments (file metadata)
+// attachments
 // ---------------------------------------------------------------------------
-export function insertAttachment({ itemId, parentItemId, linkMode, contentType, charset, path, md5, mtime, syncState = null }) {
-  getDb().prepare(`
-    INSERT INTO itemAttachments(itemID, parentItemID, linkMode, contentType, charset, path, syncState, md5, mtime)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(itemId, parentItemId ?? null, linkMode, contentType ?? null, charset ?? null,
-        path ?? null, syncState, md5 ?? null, mtime ?? null);
+export async function insertAttachment({
+  itemId, parentItemId, linkMode, contentType, charset, path, md5, mtime, syncState = null,
+}, client = null) {
+  const mtimeInt = mtime == null ? null : Math.round(Number(mtime));
+  await execute(`
+    INSERT INTO "itemAttachments"("itemID", "parentItemID", "linkMode", "contentType", charset, path, "syncState", md5, mtime)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+  `, [
+    itemId, parentItemId ?? null, linkMode, contentType ?? null, charset ?? null,
+    path ?? null, syncState, md5 ?? null, mtimeInt,
+  ], client);
 }
 
-export function getAttachment(itemId) {
-  return getDb().prepare('SELECT * FROM itemAttachments WHERE itemID=?').get(itemId);
+export async function getAttachment(itemId) {
+  return queryOne('SELECT * FROM "itemAttachments" WHERE "itemID"=$1', [itemId]);
 }
 
-export function getAttachmentsByParent(parentItemId) {
-  return getDb().prepare('SELECT * FROM itemAttachments WHERE parentItemID=?').all(parentItemId);
+export async function getAttachmentsByParent(parentItemId) {
+  return query('SELECT * FROM "itemAttachments" WHERE "parentItemID"=$1', [parentItemId]);
 }

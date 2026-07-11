@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import path from 'node:path';
-import { getDb } from '../../db/connection.js';
+import { queryOne } from '../../db/connection.js';
 import { config } from '../../config.js';
 import { resolveStoredPath, getStoredFileStream, storedFileExists } from '../../services/storageService.js';
 import { resolveFullTextAsset } from '../../services/fulltextService.js';
@@ -12,12 +12,12 @@ export const attachmentsRouter = Router();
  * GET /api/attachments/:key/file
  */
 attachmentsRouter.get('/:key/file', async (req, res) => {
-  const row = getDb().prepare(`
-    SELECT a.path, a.contentType
+  const row = await queryOne(`
+    SELECT a.path, a."contentType" AS "contentType"
     FROM items i
-    JOIN itemAttachments a ON a.itemID = i.itemID
-    WHERE i.key = ? AND i.deleted = 0
-  `).get(req.params.key);
+    JOIN "itemAttachments" a ON a."itemID" = i."itemID"
+    WHERE i.key = $1 AND i.deleted = 0
+  `, [req.params.key]);
 
   if (!row || !row.path) {
     return res.status(404).json({ error: 'attachment not found' });

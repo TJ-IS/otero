@@ -1,4 +1,4 @@
-import { getDb, closeDb, tx } from './connection.js';
+import { initDb, closeDb, withTransaction, execute } from './connection.js';
 
 /**
  * Seed schema definitions (itemTypes, fields, creatorTypes and their join tables).
@@ -59,14 +59,11 @@ const FIELDS = [
   { id: 34, name: 'archiveLocation' },
   { id: 35, name: 'PMID' },
   { id: 36, name: 'PMCID' },
-  { id: 37, name: 'arXivID' }, // Otero extension; stored in `extra` by Zotero
+  { id: 37, name: 'arXivID' },
 ];
 
-// Base-field mappings (target field -> base field). Stored as (baseFieldID, itemTypeID, fieldID).
-// For v1 we keep this minimal: no alternate field names per item type.
 const BASE_FIELD_MAPPINGS = [];
 
-// Item type definitions: name, ordered list of field names, ordered list of creator types, primary creator.
 const ITEM_TYPES = [
   {
     id: 1,
@@ -139,51 +136,73 @@ const ITEM_TYPES = [
   },
 ];
 
-// 'repository' is referenced by preprint but is not in our 38-field list. Add it.
-// (Zotero stores it as a field on preprint; we add it as an extra Otero field.)
 FIELDS.push({ id: 39, name: 'repository' });
 
 const FIELD_BY_NAME = new Map(FIELDS.map(f => [f.name, f]));
 const CREATOR_BY_NAME = new Map(CREATOR_TYPES.map(c => [c.name, c]));
 
 /**
- * Insert schema definitions. Idempotent: uses INSERT OR IGNORE / REPLACE.
+ * Insert schema definitions. Idempotent via ON CONFLICT.
  */
-export function seed() {
-  const db = getDb();
-  tx(() => {
-    const insType = db.prepare('INSERT OR REPLACE INTO itemTypes(itemTypeID, typeName, custom) VALUES (?, ?, 0)');
-    const insField = db.prepare('INSERT OR REPLACE INTO fields(fieldID, fieldName, fieldFormatID) VALUES (?, ?, NULL)');
-    const insCreator = db.prepare('INSERT OR REPLACE INTO creatorTypes(creatorTypeID, creatorType) VALUES (?, ?)');
-    const insTypeField = db.prepare(
-      'INSERT OR REPLACE INTO itemTypeFields(itemTypeID, fieldID, orderIndex) VALUES (?, ?, ?)'
-    );
-    const insTypeCreator = db.prepare(
-      'INSERT OR REPLACE INTO itemTypeCreatorTypes(itemTypeID, creatorTypeID, primaryCreator) VALUES (?, ?, ?)'
-    );
-    const insMapping = db.prepare(
-      'INSERT OR IGNORE INTO baseFieldMappings(baseFieldID, itemTypeID, fieldID) VALUES (?, ?, ?)'
-    );
-
-    for (const f of FIELDS) insField.run(f.id, f.name);
-    for (const c of CREATOR_TYPES) insCreator.run(c.id, c.name);
+export async function seed() {
+  await initDb();
+  await withTransaction(async (client) => {
+    for (const f of FIELDS) {
+      await execute(
+        `INSERT INTO "fields"("fieldID", "fieldName", "fieldFormatID") VALUES ($1, $2, NULL)
+         ON CONFLICT ("fieldID") DO UPDATE SET "fieldName" = EXCLUDED."fieldName"`,
+        [f.id, f.name],
+        client
+      );
+    }
+    for (const c of CREATOR_TYPES) {
+      await execute(
+        `INSERT INTO "creatorTypes"("creatorTypeID", "creatorType") VALUES ($1, $2)
+         ON CONFLICT ("creatorTypeID") DO UPDATE SET "creatorType" = EXCLUDED."creatorType"`,
+        [c.id, c.name],
+        client
+      );
+    }
 
     for (const t of ITEM_TYPES) {
-      insType.run(t.id, t.name);
-      t.fields.forEach((name, idx) => {
+      await execute(
+        `INSERT INTO "itemTypes"("itemTypeID", "typeName", custom) VALUES ($1, $2, 0)
+         ON CONFLICT ("itemTypeID") DO UPDATE SET "typeName" = EXCLUDED."typeName"`,
+        [t.id, t.name],
+        client
+      );
+      for (let idx = 0; idx < t.fields.length; idx++) {
+        const name = t.fields[idx];
         const f = FIELD_BY_NAME.get(name);
         if (!f) throw new Error(`Unknown field "${name}" for itemType "${t.name}"`);
-        insTypeField.run(t.id, f.id, idx);
-      });
-      t.creators.forEach((name) => {
+        await execute(
+          `INSERT INTO "itemTypeFields"("itemTypeID", "fieldID", "orderIndex") VALUES ($1, $2, $3)
+           ON CONFLICT ("itemTypeID", "fieldID") DO UPDATE SET "orderIndex" = EXCLUDED."orderIndex"`,
+          [t.id, f.id, idx],
+          client
+        );
+      }
+      for (const name of t.creators) {
         const c = CREATOR_BY_NAME.get(name);
         if (!c) throw new Error(`Unknown creator type "${name}" for itemType "${t.name}"`);
-        insTypeCreator.run(t.id, c.id, name === t.primary ? 1 : 0);
-      });
+        await execute(
+          `INSERT INTO "itemTypeCreatorTypes"("itemTypeID", "creatorTypeID", "primaryCreator")
+           VALUES ($1, $2, $3)
+           ON CONFLICT ("itemTypeID", "creatorTypeID")
+           DO UPDATE SET "primaryCreator" = EXCLUDED."primaryCreator"`,
+          [t.id, c.id, name === t.primary ? 1 : 0],
+          client
+        );
+      }
     }
 
     for (const m of BASE_FIELD_MAPPINGS) {
-      insMapping.run(m.baseId, m.itemTypeId, m.fieldId);
+      await execute(
+        `INSERT INTO "baseFieldMappings"("baseFieldID", "itemTypeID", "fieldID") VALUES ($1, $2, $3)
+         ON CONFLICT DO NOTHING`,
+        [m.baseId, m.itemTypeId, m.fieldId],
+        client
+      );
     }
   });
 
@@ -197,15 +216,14 @@ export function seed() {
 // CLI entry: `node src/db/seed.js`
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {
-    // Ensure schema exists before seeding.
     const { runMigrations } = await import('./migrate.js');
-    runMigrations();
-    const res = seed();
+    await runMigrations();
+    const res = await seed();
     console.log(`Seed OK: ${res.itemTypes} itemTypes, ${res.fields} fields, ${res.creatorTypes} creatorTypes`);
   } catch (err) {
     console.error('Seed failed:', err);
     process.exitCode = 1;
   } finally {
-    closeDb();
+    await closeDb();
   }
 }

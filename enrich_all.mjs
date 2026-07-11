@@ -20,11 +20,11 @@ import fs from 'node:fs';
 import { ensureDataDirs } from './src/config.js';
 import { runMigrations } from './src/db/migrate.js';
 import { seed } from './src/db/seed.js';
-import { closeDb, getDb } from './src/db/connection.js';
+import { initDb, closeDb, query } from './src/db/connection.js';
 import { fieldIdByName } from './src/repositories/itemRepo.js';
 import { fetchByDoi } from './src/services/recognizers/crossref.js';
 import { mapRecognized } from './src/services/metadataMapper.js';
-import { Item, Items } from './src/models/Item.js';
+import { Item } from './src/models/Item.js';
 
 // ---- CLI args ---------------------------------------------------------------
 const args = parseArgs(process.argv.slice(2));
@@ -58,19 +58,18 @@ const CSV_HEADER = [
 ];
 
 // ---- Query all top-level non-deleted items with a DOI ----------------------
-function listItemsWithDoi() {
-  const db = getDb();
-  const doiFid = fieldIdByName('DOI');
+async function listItemsWithDoi() {
+  const doiFid = await fieldIdByName('DOI');
   if (!doiFid) return [];
 
-  const rows = db.prepare(`
-    SELECT i.key, i.itemID, v.value AS doi
+  const rows = await query(`
+    SELECT i.key, i."itemID", v.value AS doi
     FROM items i
-    JOIN itemData d ON d.itemID = i.itemID AND d.fieldID = ?
-    JOIN itemDataValues v ON v.valueID = d.valueID
-    WHERE i.parentItemID IS NULL AND i.deleted = 0
-    ORDER BY i.dateAdded DESC
-  `).all(doiFid);
+    JOIN "itemData" d ON d."itemID" = i."itemID" AND d."fieldID" = $1
+    JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+    WHERE i."parentItemID" IS NULL AND i.deleted = 0
+    ORDER BY i."dateAdded" DESC
+  `, [doiFid]);
 
   return rows.map(r => ({ key: r.key, itemID: r.itemID, doi: r.doi }));
 }
@@ -111,13 +110,13 @@ async function processOne(item, total) {
       creatorsUpdated = mapped.creators?.length > 0;
       okCount++;
     } else {
-      const it = Item.loadByKey(item.key);
+      const it = await Item.loadByKey(item.key);
       if (!it) throw new Error('Item not found in DB');
 
       // Update itemType if different and valid
       if (mapped.itemType && mapped.itemType !== it.itemType) {
         try {
-          it.setItemType(mapped.itemType);
+          await it.setItemType(mapped.itemType);
         } catch { /* unknown type, keep original */ }
       }
 
@@ -136,7 +135,7 @@ async function processOne(item, total) {
         creatorsUpdated = true;
       }
 
-      it.save();
+      await it.save();
       okCount++;
     }
   } catch (err) {
@@ -156,10 +155,11 @@ async function processOne(item, total) {
 
 async function main() {
   ensureDataDirs();
-  runMigrations();
-  seed();
+  await initDb();
+  await runMigrations();
+  await seed();
 
-  const all = listItemsWithDoi();
+  const all = await listItemsWithDoi();
   const targets = LIMIT > 0 ? all.slice(0, LIMIT) : all;
 
   console.log(`有 DOI 的顶层条目：${all.length} 条`);
@@ -185,10 +185,11 @@ async function main() {
   console.log(`  Time:      ${elapsed}s  (avg ${(processed ? elapsed / processed : 0).toFixed(2)}s/item)`);
   console.log(`  Log:       ${LOG_PATH}`);
 
-  closeDb();
+  await closeDb();
 }
 
-main().catch(err => {
+main().catch(async (err) => {
   console.error('Fatal:', err);
   process.exitCode = 1;
+  try { await closeDb(); } catch { /* ignore */ }
 });

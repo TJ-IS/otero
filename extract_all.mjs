@@ -28,10 +28,9 @@ import fs from 'node:fs';
 import { config, ensureDataDirs } from './src/config.js';
 import { runMigrations } from './src/db/migrate.js';
 import { seed } from './src/db/seed.js';
-import { closeDb } from './src/db/connection.js';
+import { initDb, closeDb } from './src/db/connection.js';
 import { listUnfiledWithFulltextDone } from './src/repositories/itemRepo.js';
 import { extractItem, applyExtraction } from './src/services/extractService.js';
-import { Item } from './src/models/Item.js';
 
 // ---- CLI args ---------------------------------------------------------------
 const args = parseArgs(process.argv.slice(2));
@@ -92,7 +91,7 @@ async function processOne({ key, title }, total) {
     extractedJournal = result.fields.find(f => f.field === 'publicationTitle')?.value || '';
 
     if (!DRY_RUN) {
-      const apply = applyExtraction(key, result, {
+      const apply = await applyExtraction(key, result, {
         fieldThreshold: THRESHOLD,
         creatorThreshold: THRESHOLD,
         typeThreshold: TYPE_THRESHOLD,
@@ -132,8 +131,9 @@ async function processOne({ key, title }, total) {
 
 async function main() {
   ensureDataDirs();
-  runMigrations();
-  seed();
+  await initDb();
+  await runMigrations();
+  await seed();
 
   if (!config.llm.apiKey) {
     console.error('未配置 OPENAI_API_KEY，无法调用 LLM。请在 .env 中设置。');
@@ -145,7 +145,7 @@ async function main() {
   const all = [];
   let page = 1;
   while (true) {
-    const { items, total } = listUnfiledWithFulltextDone({ page, pageSize: 200 });
+    const { items, total } = await listUnfiledWithFulltextDone({ page, pageSize: 200 });
     all.push(...items);
     if (all.length >= total || items.length === 0) break;
     page++;
@@ -172,10 +172,11 @@ async function main() {
   console.log(`  Time:      ${elapsed}s  (avg ${(processed ? elapsed / processed : 0).toFixed(2)}s/item)`);
   console.log(`  Log:       ${LOG_PATH}`);
 
-  closeDb();
+  await closeDb();
 }
 
-main().catch(err => {
+main().catch(async (err) => {
   console.error('Fatal:', err);
   process.exitCode = 1;
+  try { await closeDb(); } catch { /* ignore */ }
 });

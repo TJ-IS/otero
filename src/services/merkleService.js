@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { getDb } from '../db/connection.js';
+import { query } from '../db/connection.js';
 import { fieldIdByName } from '../repositories/itemRepo.js';
 
 const HASH_ALGORITHM = 'sha256';
@@ -62,47 +62,51 @@ function buildTree(dois) {
 class MerkleTree {
   constructor() {
     this._tree = null;
+    this._building = null;
   }
 
   /**
    * Rebuild the tree from the current database state.
    * Returns the tree descriptor for inspection/testing.
    */
-  rebuild() {
-    const db = getDb();
-    const fieldId = fieldIdByName('DOI');
+  async rebuild() {
+    const fieldId = await fieldIdByName('DOI');
     if (!fieldId) {
       this._tree = { leaves: [], levels: [], root: EMPTY_ROOT, doiToIndex: new Map() };
       return this._tree;
     }
 
-    const rows = db.prepare(`
+    const rows = await query(`
       SELECT v.value AS doi
-      FROM itemData d
-      JOIN itemDataValues v ON v.valueID = d.valueID
-      JOIN items i ON i.itemID = d.itemID
-      WHERE d.fieldID = ?
+      FROM "itemData" d
+      JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+      JOIN items i ON i."itemID" = d."itemID"
+      WHERE d."fieldID" = $1
         AND i.deleted = 0
-        AND i.parentItemID IS NULL
-    `).all(fieldId);
+        AND i."parentItemID" IS NULL
+    `, [fieldId]);
 
     this._tree = buildTree(rows.map((r) => r.doi));
     return this._tree;
   }
 
-  _ensureBuilt() {
-    if (!this._tree) this.rebuild();
+  async _ensureBuilt() {
+    if (this._tree) return;
+    if (!this._building) {
+      this._building = this.rebuild().finally(() => { this._building = null; });
+    }
+    await this._building;
   }
 
   /** Return the current Merkle root (or null if no DOIs). */
-  getRoot() {
-    this._ensureBuilt();
+  async getRoot() {
+    await this._ensureBuilt();
     return this._tree.root;
   }
 
   /** Return the number of unique DOIs in the tree. */
-  getLeafCount() {
-    this._ensureBuilt();
+  async getLeafCount() {
+    await this._ensureBuilt();
     return this._tree.leaves.length;
   }
 
@@ -110,8 +114,8 @@ class MerkleTree {
    * Check whether a DOI exists in the current tree.
    * This is a plain membership test; for a proof use getProof().
    */
-  exists(doi) {
-    this._ensureBuilt();
+  async exists(doi) {
+    await this._ensureBuilt();
     return this._tree.doiToIndex.has(normalizeDoi(doi));
   }
 
@@ -141,8 +145,8 @@ class MerkleTree {
    *
    * `side` indicates where the sibling sits when recombining hashes.
    */
-  getProof(doi) {
-    this._ensureBuilt();
+  async getProof(doi) {
+    await this._ensureBuilt();
     const { root, levels, doiToIndex } = this._tree;
     if (!root) return null;
 

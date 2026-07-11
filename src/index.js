@@ -1,3 +1,4 @@
+import { initDb } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { seed } from './db/seed.js';
 import { startServer } from './api/server.js';
@@ -10,8 +11,9 @@ import { config } from './config.js';
 const args = process.argv.slice(2);
 
 async function main() {
-  runMigrations();
-  seed();
+  await initDb();
+  await runMigrations();
+  await seed();
   if (args.includes('--migrate-only')) {
     return;
   }

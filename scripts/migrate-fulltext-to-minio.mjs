@@ -38,7 +38,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(__dirname, '..');
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
@@ -55,18 +54,21 @@ const CONCURRENCY = (() => {
 const { config } = await import('../src/config.js');
 const { uploadDir } = await import('../src/services/storageService.js');
 const { ensureBucket, objectExists } = await import('../src/services/minioClient.js');
-const { getDb } = await import('../src/db/connection.js');
+const { initDb, closeDb, query, execute } = await import('../src/db/connection.js');
 const { runMigrations } = await import('../src/db/migrate.js');
-runMigrations();
+const { seed } = await import('../src/db/seed.js');
 
-const db = getDb();
-const rows = db.prepare(`
-  SELECT f.itemID AS itemID, i.key AS itemKey, f.markdownPath, f.assetDir
-  FROM itemFullText f
-  JOIN items i ON i.itemID = f.itemID
-  WHERE f.state = 'done' AND f.assetDir IS NOT NULL AND i.deleted = 0
-  ORDER BY f.itemID
-`).all();
+await initDb();
+await runMigrations();
+await seed();
+
+const rows = await query(`
+  SELECT f."itemID" AS "itemID", i.key AS "itemKey", f."markdownPath", f."assetDir"
+  FROM "itemFullText" f
+  JOIN items i ON i."itemID" = f."itemID"
+  WHERE f.state = 'done' AND f."assetDir" IS NOT NULL AND i.deleted = 0
+  ORDER BY f."itemID"
+`);
 
 function fulltextDirFor(key) {
   return path.join(config.storageDir, key.slice(0, 2), key, 'fulltext');
@@ -138,8 +140,10 @@ async function processOne(row) {
     if (!exists) throw new Error(`post-upload check failed: ${prefix}/${relMd} not found in MinIO`);
   }
 
-  db.prepare('UPDATE itemFullText SET markdownPath=?, assetDir=? WHERE itemID=?')
-    .run(relMd ? `${prefix}/${relMd}` : null, prefix, row.itemID);
+  await execute(
+    'UPDATE itemFullText SET "markdownPath"=$1, "assetDir"=$2 WHERE "itemID"=$3',
+    [relMd ? `${prefix}/${relMd}` : null, prefix, row.itemID],
+  );
 
   if (DELETE_LOCAL) {
     fs.rmSync(localDir, { recursive: true, force: true });
@@ -148,35 +152,39 @@ async function processOne(row) {
   done++;
 }
 
-if (!DRY_RUN) await ensureBucket();
+try {
+  if (!DRY_RUN) await ensureBucket();
 
-const queue = rows.slice(0, total);
-let qi = 0;
-async function worker() {
-  while (qi < queue.length) {
-    const row = queue[qi++];
-    try {
-      await processOne(row);
-    } catch (err) {
-      errors.push(`ERROR: ${row.itemKey} - ${err.message}`);
-      failed++;
+  const queue = rows.slice(0, total);
+  let qi = 0;
+  async function worker() {
+    while (qi < queue.length) {
+      const row = queue[qi++];
+      try {
+        await processOne(row);
+      } catch (err) {
+        errors.push(`ERROR: ${row.itemKey} - ${err.message}`);
+        failed++;
+      }
+      progress();
     }
-    progress();
   }
-}
-await Promise.all(Array.from({ length: Math.min(CONCURRENCY, total || 1) }, worker));
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, total || 1) }, worker));
 
-const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-console.log('\n');
-console.log(`Done in ${elapsed}s: ${done} migrated, ${skippedMigrated} already migrated, ${skippedMissing} missing locally, ${failed} failed`);
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log('\n');
+  console.log(`Done in ${elapsed}s: ${done} migrated, ${skippedMigrated} already migrated, ${skippedMissing} missing locally, ${failed} failed`);
 
-if (errors.length > 0) {
-  console.log('\nErrors:');
-  for (const e of errors) console.log(' ', e);
-}
+  if (errors.length > 0) {
+    console.log('\nErrors:');
+    for (const e of errors) console.log(' ', e);
+  }
 
-if (!DRY_RUN && failed === 0 && done > 0) {
-  console.log('\nNext steps:');
-  console.log('  1. Verify the app renders full text correctly with STORAGE_TYPE=minio.');
-  console.log('  2. Re-run with --delete-local once confident, to free local disk space.');
+  if (!DRY_RUN && failed === 0 && done > 0) {
+    console.log('\nNext steps:');
+    console.log('  1. Verify the app renders full text correctly with STORAGE_TYPE=minio.');
+    console.log('  2. Re-run with --delete-local once confident, to free local disk space.');
+  }
+} finally {
+  await closeDb();
 }

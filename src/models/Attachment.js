@@ -1,20 +1,10 @@
 import { Item } from './Item.js';
 import { generateKey } from '../utils/key.js';
-import { getDb, tx } from '../db/connection.js';
+import { execute, withTransaction } from '../db/connection.js';
 import {
-  insertItemRow, insertAttachment, getAttachment, getAttachmentsByParent,
+  insertAttachment, getAttachment, getAttachmentsByParent,
 } from '../repositories/itemRepo.js';
 
-/**
- * File attachment. Wraps an `items` row whose itemType is `attachment`.
- *
- * Link modes (matches Zotero):
- *   0 = imported file (stored in our data/storage)
- *   1 = imported url (web snapshot)
- *   2 = linked file (external file path)
- *   3 = linked url
- *   4 = embedded image
- */
 export const LinkMode = {
   IMPORTED_FILE: 0,
   IMPORTED_URL: 1,
@@ -42,27 +32,24 @@ export class Attachment extends Item {
 
   isPdf() { return this._contentType === 'application/pdf'; }
 
-  save() {
+  async save() {
     if (this._itemTypeID == null) {
-      // attachment is a built-in item type concept; we represent it with a
-      // dedicated flag rather than a row in `itemTypes` (which only holds
-      // user-facing types). For Otero v1 we store attachments as items whose
-      // itemType is 'document' plus an itemAttachments row carrying the
-      // content-type / path / link-mode. This keeps the EAV tables happy
-      // without seeding a synthetic `attachment` item type.
-      this.setItemType('document');
+      await this.setItemType('document');
     }
-    super.save();
-    tx(() => {
-      const existing = getAttachment(this._id);
+    await super.save();
+    await withTransaction(async (client) => {
+      const existing = await getAttachment(this._id);
       if (existing) {
-        getDb().prepare(`
-          UPDATE itemAttachments
-          SET parentItemID=?, linkMode=?, contentType=?, charset=?, path=?, md5=?, mtime=?
-          WHERE itemID=?
-        `).run(this._parentItemID, this._linkMode, this._contentType, this._charset, this._path, this._md5, this._mtime, this._id);
+        await execute(`
+          UPDATE "itemAttachments"
+          SET "parentItemID"=$1, "linkMode"=$2, "contentType"=$3, charset=$4, path=$5, md5=$6, mtime=$7
+          WHERE "itemID"=$8
+        `, [
+          this._parentItemID, this._linkMode, this._contentType, this._charset,
+          this._path, this._md5, this._mtime == null ? null : Math.round(Number(this._mtime)), this._id,
+        ], client);
       } else {
-        insertAttachment({
+        await insertAttachment({
           itemId: this._id,
           parentItemId: this._parentItemID,
           linkMode: this._linkMode,
@@ -71,21 +58,27 @@ export class Attachment extends Item {
           path: this._path,
           md5: this._md5,
           mtime: this._mtime,
-        });
+        }, client);
       }
     });
     return this;
   }
 
   toJSON() {
-    return { ...super.toJSON(), linkMode: this._linkMode, contentType: this._contentType,
-             path: this._path, md5: this._md5, mtime: this._mtime };
+    return {
+      ...super.toJSON(),
+      linkMode: this._linkMode,
+      contentType: this._contentType,
+      path: this._path,
+      md5: this._md5,
+      mtime: this._mtime,
+    };
   }
 
-  static loadById(id) {
-    const row = getAttachment(id);
+  static async loadById(id) {
+    const row = await getAttachment(id);
     if (!row) return null;
-    const item = Item.loadById(id);
+    const item = await Item.loadById(id);
     if (!item) return null;
     return new Attachment({
       ...item.toJSON(),
@@ -103,13 +96,20 @@ export class Attachment extends Item {
     });
   }
 
-  static listByParent(parentItemId) {
-    return getAttachmentsByParent(parentItemId).map(r => Attachment.loadById(r.itemID)).filter(Boolean);
+  static async listByParent(parentItemId) {
+    const rows = await getAttachmentsByParent(parentItemId);
+    const out = [];
+    for (const r of rows) {
+      const att = await Attachment.loadById(r.itemID);
+      if (att) out.push(att);
+    }
+    return out;
   }
 }
 
-/** Convenience: create a stored PDF attachment from a stored file path. */
-export function createPdfAttachment({ parentItemID, storedPath, md5, mtime, contentType = 'application/pdf' }) {
+export async function createPdfAttachment({
+  parentItemID, storedPath, md5, mtime, contentType = 'application/pdf',
+}) {
   const att = new Attachment({
     itemTypeID: null,
     key: generateKey(),
@@ -120,6 +120,6 @@ export function createPdfAttachment({ parentItemID, storedPath, md5, mtime, cont
     mtime,
     parentItemID,
   });
-  att.save();
+  await att.save();
   return att;
 }

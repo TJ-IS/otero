@@ -1,8 +1,8 @@
 import { Item } from '../models/Item.js';
-import { getDb } from '../db/connection.js';
+import { query } from '../db/connection.js';
 import { getFullText, getContentListBlocks } from './fulltextService.js';
 import { config } from '../config.js';
-import { itemTypeIdByName, itemNameById } from '../repositories/itemRepo.js';
+import { itemTypeIdByName } from '../repositories/itemRepo.js';
 import { JOURNAL_WHITELIST } from './journalWhitelist.js';
 
 /**
@@ -53,15 +53,14 @@ const TARGET_FIELDS = [
 /**
  * List the field names allowed for a given itemType name.
  */
-function allowedFieldsForType(itemTypeName) {
-  const db = getDb();
-  const rows = db.prepare(`
-    SELECT f.fieldName FROM itemTypeFields itf
-    JOIN fields f ON f.fieldID = itf.fieldID
-    JOIN itemTypes it ON it.itemTypeID = itf.itemTypeID
-    WHERE it.typeName = ?
-    ORDER BY itf.orderIndex
-  `).all(itemTypeName);
+async function allowedFieldsForType(itemTypeName) {
+  const rows = await query(`
+    SELECT f."fieldName" FROM itemTypeFields itf
+    JOIN fields f ON f."fieldID" = itf."fieldID"
+    JOIN itemTypes it ON it."itemTypeID" = itf."itemTypeID"
+    WHERE it."typeName" = $1
+    ORDER BY itf."orderIndex"
+  `, [itemTypeName]);
   return rows.map(r => r.fieldName);
 }
 
@@ -288,7 +287,7 @@ export async function extractItem(key) {
   if (!config.llm.apiKey) throw new Error('未配置 OPENAI_API_KEY');
   if (!config.llm.baseURL) throw new Error('未配置 OPENAI_BASE_URL');
 
-  const item = Item.loadByKey(key);
+  const item = await Item.loadByKey(key);
   if (!item) throw new Error('条目未找到');
 
   const ft = await getFullText(key);
@@ -499,13 +498,13 @@ function computeOverall(fields, creators, itemTypeConfidence) {
  * @param {boolean} opts.overwrite         default false (only fill empty fields)
  * @returns {object} { appliedFields, skippedFields, typeChanged, appliedCreators, skippedCreators }
  */
-export function applyExtraction(key, result, opts = {}) {
+export async function applyExtraction(key, result, opts = {}) {
   const fieldThreshold = opts.fieldThreshold ?? 0.8;
   const creatorThreshold = opts.creatorThreshold ?? 0.8;
   const typeThreshold = opts.typeThreshold ?? 0.9;
   const overwrite = opts.overwrite ?? false;
 
-  const item = Item.loadByKey(key);
+  const item = await Item.loadByKey(key);
   if (!item) throw new Error('条目未找到');
 
   const targetType = result.suggestedItemType;
@@ -532,16 +531,16 @@ export function applyExtraction(key, result, opts = {}) {
   let typeChanged = false;
   if (
     targetType !== item.itemType &&
-    itemTypeIdByName(targetType) != null &&
+    (await itemTypeIdByName(targetType)) != null &&
     (result.itemTypeConfidence >= typeThreshold || hasScholarlyEvidence)
   ) {
-    item.setItemType(targetType);
+    await item.setItemType(targetType);
     typeChanged = true;
   }
 
   // Use the EFFECTIVE type (after potential conversion) for field validation.
   const effectiveType = item.itemType;
-  const allowedFields = new Set(allowedFieldsForType(effectiveType));
+  const allowedFields = new Set(await allowedFieldsForType(effectiveType));
 
   const appliedFields = [];
   const skippedFields = [];
@@ -586,7 +585,7 @@ export function applyExtraction(key, result, opts = {}) {
     }
   }
 
-  item.save();
+  await item.save();
 
   return {
     typeChanged,

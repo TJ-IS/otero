@@ -22,6 +22,28 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: otero-postgres
+    restart: unless-stopped
+    ports:
+      # Host access for local tooling / future app migration. Inside the
+      # compose network other services reach it as hostname `postgres:5432`.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-otero}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-otero}
+      - POSTGRES_DB=${POSTGRES_DB:-otero}
+    networks:
+      - otero-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-otero} -d ${POSTGRES_DB:-otero}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   otero:
     build: .
     container_name: otero
@@ -29,8 +51,10 @@ services:
     depends_on:
       minio:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     ports:
-      - "5432:3000"
+      - "4321:3000"
     volumes:
       - ./data:/app/data
     # Inject all app config (MinIO creds/bucket, MinerU token, OpenAI keys,
@@ -47,6 +71,8 @@ services:
       # the 127.0.0.1 that .env uses for host-side tooling.
       - MINIO_ENDPOINT=minio
       - MINIO_PORT=9000
+      # Same for Postgres once the app switches off SQLite.
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-otero}:${POSTGRES_PASSWORD:-otero}@postgres:5432/${POSTGRES_DB:-otero}
     networks:
       - otero-net
 

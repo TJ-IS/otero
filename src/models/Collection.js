@@ -1,6 +1,6 @@
 import { DataObject } from './DataObject.js';
 import { generateKey } from '../utils/key.js';
-import { getDb } from '../db/connection.js';
+import { execute } from '../db/connection.js';
 import {
   insertCollection, getCollectionByKey, getCollectionById,
   listCollections as repoListCollections,
@@ -21,38 +21,42 @@ export class Collection extends DataObject {
   setName(name) { this._name = name; return this; }
   setParent(id) { this._parentCollectionID = id; return this; }
 
-  save() {
+  async save() {
     if (this._id == null) {
-      const { id, key } = insertCollection({ name: this._name, parentCollectionID: this._parentCollectionID, key: this._key ?? generateKey() });
+      const { id, key } = await insertCollection({
+        name: this._name,
+        parentCollectionID: this._parentCollectionID,
+        key: this._key ?? generateKey(),
+      });
       this._id = id;
       this._key = key;
     } else {
-      renameCollection(this._id, this._name);
+      await renameCollection(this._id, this._name);
     }
     return this;
   }
 
-  delete(permanent = false) {
+  async delete(permanent = false) {
     if (this._id == null) return;
     if (permanent) {
-      getDb().prepare('DELETE FROM collections WHERE collectionID=?').run(this._id);
+      await execute('DELETE FROM collections WHERE "collectionID"=$1', [this._id]);
       this._id = null;
     } else {
-      setCollectionDeleted(this._id, true);
+      await setCollectionDeleted(this._id, true);
     }
   }
 
-  addItem(itemId, orderIndex = 0) {
-    addChildItem(this._id, itemId, orderIndex);
+  async addItem(itemId, orderIndex = 0) {
+    await addChildItem(this._id, itemId, orderIndex);
     return this;
   }
 
-  removeItem(itemId) {
-    removeChildItem(this._id, itemId);
+  async removeItem(itemId) {
+    await removeChildItem(this._id, itemId);
     return this;
   }
 
-  items() {
+  async items() {
     return getCollectionItems(this._id);
   }
 
@@ -60,49 +64,36 @@ export class Collection extends DataObject {
     return { ...super.toJSON(), name: this._name, parentCollectionID: this._parentCollectionID };
   }
 
-  static loadByKey(key) {
-    const row = getCollectionByKey(key);
+  static async loadByKey(key) {
+    const row = await getCollectionByKey(key);
     if (!row) return null;
-    return new Collection({
-      id: row.collectionID,
-      key: row.key,
-      name: row.collectionName,
-      parentCollectionID: row.parentCollectionID,
-      dateAdded: row.dateAdded,
-      dateModified: row.dateModified,
-      version: row.version,
-      deleted: row.deleted,
-    });
+    return _rowToCollection(row);
   }
 
-  static loadById(id) {
-    const row = getCollectionById(id);
+  static async loadById(id) {
+    const row = await getCollectionById(id);
     if (!row) return null;
-    return new Collection({
-      id: row.collectionID,
-      key: row.key,
-      name: row.collectionName,
-      parentCollectionID: row.parentCollectionID,
-      dateAdded: row.dateAdded,
-      dateModified: row.dateModified,
-      version: row.version,
-      deleted: row.deleted,
-    });
+    return _rowToCollection(row);
   }
 }
 
+function _rowToCollection(row) {
+  return new Collection({
+    id: row.collectionID,
+    key: row.key,
+    name: row.collectionName,
+    parentCollectionID: row.parentCollectionID,
+    dateAdded: row.dateAdded,
+    dateModified: row.dateModified,
+    version: row.version,
+    deleted: row.deleted,
+  });
+}
+
 export const Collections = {
-  list(opts) {
-    return repoListCollections(opts).map(row => new Collection({
-      id: row.collectionID,
-      key: row.key,
-      name: row.collectionName,
-      parentCollectionID: row.parentCollectionID,
-      dateAdded: row.dateAdded,
-      dateModified: row.dateModified,
-      version: row.version,
-      deleted: row.deleted,
-    }));
+  async list(opts) {
+    const rows = await repoListCollections(opts);
+    return rows.map(_rowToCollection);
   },
   loadByKey(key) { return Collection.loadByKey(key); },
 };

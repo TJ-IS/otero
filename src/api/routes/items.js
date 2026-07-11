@@ -1,13 +1,12 @@
 import { Router } from 'express';
 import { Items, Item } from '../../models/Item.js';
-import { getDb } from '../../db/connection.js';
 import { toBibtex, toRis, toBibtexBatch, toRisBatch } from '../../services/exportService.js';
 import { UNFILED } from '../../services/journalWhitelist.js';
 
 export const itemsRouter = Router();
 
 // GET /api/items
-itemsRouter.get('/', (req, res) => {
+itemsRouter.get('/', async (req, res) => {
   const { type, journal, collection, search, includeDeleted } = req.query;
   // The "待归档" bucket (unfiled literature) is editor-only. Non-editors get
   // an empty result rather than the unfiled items.
@@ -15,7 +14,7 @@ itemsRouter.get('/', (req, res) => {
     return res.json({ items: [] });
   }
   const topLevel = req.query.topLevel !== 'false' && req.query.topLevel !== '0';
-  const items = Items.list({
+  const items = await Items.list({
     type,
     journal,
     collection,
@@ -27,9 +26,9 @@ itemsRouter.get('/', (req, res) => {
 });
 
 // GET /api/items/export?format=bibtex|ris
-itemsRouter.get('/export', (req, res) => {
+itemsRouter.get('/export', async (req, res) => {
   const { format, type, journal, search } = req.query;
-  const items = Items.list({ type, journal, search, includeDeleted: false, topLevelOnly: true });
+  const items = await Items.list({ type, journal, search, includeDeleted: false, topLevelOnly: true });
   if (format === 'ris') {
     res.setHeader('Content-Type', 'application/x-research-info-systems');
     res.setHeader('Content-Disposition', 'attachment; filename="otero-export.ris"');
@@ -42,8 +41,8 @@ itemsRouter.get('/export', (req, res) => {
 });
 
 // GET /api/items/:key/export?format=bibtex|ris
-itemsRouter.get('/:key/export', (req, res) => {
-  const it = Item.loadByKey(req.params.key);
+itemsRouter.get('/:key/export', async (req, res) => {
+  const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   const json = it.toJSON();
   const format = req.query.format || 'bibtex';
@@ -57,30 +56,30 @@ itemsRouter.get('/:key/export', (req, res) => {
 });
 
 // GET /api/items/:key
-itemsRouter.get('/:key', (req, res) => {
-  const it = Item.loadByKey(req.params.key);
+itemsRouter.get('/:key', async (req, res) => {
+  const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   res.json(it.toJSON());
 });
 
 // POST /api/items
-itemsRouter.post('/', (req, res) => {
+itemsRouter.post('/', async (req, res) => {
   const body = req.body ?? {};
   const it = new Item();
   if (!body.itemType) return res.status(400).json({ error: 'itemType required' });
-  it.setItemType(body.itemType);
+  await it.setItemType(body.itemType);
   if (body.fields) for (const [k, v] of Object.entries(body.fields)) it.setField(k, v);
   if (body.creators) it.setCreators(body.creators);
-  it.save();
+  await it.save();
   res.status(201).json(it.toJSON());
 });
 
 // PATCH /api/items/:key
-itemsRouter.patch('/:key', (req, res) => {
-  const it = Item.loadByKey(req.params.key);
+itemsRouter.patch('/:key', async (req, res) => {
+  const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   const body = req.body ?? {};
-  if (body.itemType) it.setItemType(body.itemType);
+  if (body.itemType) await it.setItemType(body.itemType);
   if (body.fields) {
     for (const [k, v] of Object.entries(body.fields)) {
       if (v === null) it.setField(k, null);
@@ -88,24 +87,24 @@ itemsRouter.patch('/:key', (req, res) => {
     }
   }
   if (body.creators) it.setCreators(body.creators);
-  it.save();
+  await it.save();
   res.json(it.toJSON());
 });
 
 // DELETE /api/items/:key
-itemsRouter.delete('/:key', (req, res) => {
-  const it = Item.loadByKey(req.params.key);
+itemsRouter.delete('/:key', async (req, res) => {
+  const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   const permanent = req.query.permanent === 'true' || req.query.permanent === '1';
-  it.delete(permanent);
+  await it.delete(permanent);
   res.json({ deleted: true, permanent });
 });
 
 // GET /api/items/:key/attachments
 itemsRouter.get('/:key/attachments', async (req, res) => {
-  const it = Item.loadByKey(req.params.key);
+  const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   const { Attachment } = await import('../../models/Attachment.js');
-  const atts = Attachment.listByParent(it.id);
+  const atts = await Attachment.listByParent(it.id);
   res.json({ attachments: atts.map(a => a.toJSON()) });
 });

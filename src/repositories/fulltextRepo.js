@@ -1,143 +1,145 @@
-import { getDb } from '../db/connection.js';
+import { query, queryOne, execute, nowUtc } from '../db/connection.js';
 
-export function getFullTextRow(itemId) {
-  return getDb().prepare('SELECT * FROM itemFullText WHERE itemID=?').get(itemId);
+export async function getFullTextRow(itemId) {
+  return queryOne('SELECT * FROM "itemFullText" WHERE "itemID"=$1', [itemId]);
 }
 
-export function getFullTextRowByKey(key) {
-  return getDb().prepare(`
-    SELECT f.* FROM itemFullText f
-    JOIN items i ON i.itemID = f.itemID
-    WHERE i.key = ?
-  `).get(key);
+export async function getFullTextRowByKey(key) {
+  return queryOne(`
+    SELECT f.* FROM "itemFullText" f
+    JOIN items i ON i."itemID" = f."itemID"
+    WHERE i.key = $1
+  `, [key]);
 }
 
 /**
  * Upsert a full-text row. Pass partial fields; nulls clear.
  */
-export function upsertFullText(itemId, patch) {
-  const db = getDb();
-  const existing = getFullTextRow(itemId);
+export async function upsertFullText(itemId, patch) {
+  const existing = await getFullTextRow(itemId);
   const cols = [
     'state', 'mineruBatchId', 'modelVersion', 'extractedPages', 'totalPages',
     'markdownPath', 'assetDir', 'errCode', 'errMsg', 'submittedAt', 'completedAt',
   ];
   if (existing) {
-    const sets = ['dateModified = datetime(\'now\')'];
-    const vals = [];
+    const sets = ['"dateModified" = $1'];
+    const vals = [nowUtc()];
+    let p = 2;
     for (const c of cols) {
       if (patch[c] !== undefined) {
-        sets.push(`${c} = ?`);
+        sets.push(`"${c}" = $${p++}`);
         vals.push(patch[c] ?? null);
       }
     }
-    if (sets.length === 1) return existing; // nothing to update
+    if (sets.length === 1) return existing;
     vals.push(itemId);
-    db.prepare(`UPDATE itemFullText SET ${sets.join(', ')} WHERE itemID=?`).run(...vals);
+    await execute(
+      `UPDATE "itemFullText" SET ${sets.join(', ')} WHERE "itemID"=$${p}`,
+      vals
+    );
   } else {
-    const colNames = ['itemID'];
+    const colNames = ['"itemID"'];
+    const placeholders = ['$1'];
     const colVals = [itemId];
+    let p = 2;
     for (const c of cols) {
       if (patch[c] !== undefined) {
-        colNames.push(c);
+        colNames.push(`"${c}"`);
+        placeholders.push(`$${p++}`);
         colVals.push(patch[c] ?? null);
       }
     }
-    db.prepare(`INSERT INTO itemFullText (${colNames.join(', ')}) VALUES (${colNames.map(() => '?').join(', ')})`)
-      .run(...colVals);
+    await execute(
+      `INSERT INTO "itemFullText" (${colNames.join(', ')}) VALUES (${placeholders.join(', ')})`,
+      colVals
+    );
   }
   return getFullTextRow(itemId);
 }
 
-export function listPendingFullText() {
-  return getDb().prepare(`
-    SELECT f.*, i.key AS itemKey FROM itemFullText f
-    JOIN items i ON i.itemID = f.itemID
+export async function listPendingFullText() {
+  return query(`
+    SELECT f.*, i.key AS "itemKey" FROM "itemFullText" f
+    JOIN items i ON i."itemID" = f."itemID"
     WHERE f.state IN ('pending','running','converting')
-  `).all();
+  `);
 }
 
-export function listSubmittingFullText() {
-  return getDb().prepare(`
-    SELECT f.*, i.key AS itemKey FROM itemFullText f
-    JOIN items i ON i.itemID = f.itemID
+export async function listSubmittingFullText() {
+  return query(`
+    SELECT f.*, i.key AS "itemKey" FROM "itemFullText" f
+    JOIN items i ON i."itemID" = f."itemID"
     WHERE f.state = 'submitting'
-  `).all();
+  `);
 }
 
-export function listFailedFullText() {
-  return getDb().prepare(`
-    SELECT f.*, i.key AS itemKey FROM itemFullText f
-    JOIN items i ON i.itemID = f.itemID
+export async function listFailedFullText() {
+  return query(`
+    SELECT f.*, i.key AS "itemKey" FROM "itemFullText" f
+    JOIN items i ON i."itemID" = f."itemID"
     WHERE f.state = 'failed'
-    ORDER BY f.dateModified ASC
-  `).all();
+    ORDER BY f."dateModified" ASC
+  `);
 }
 
-export function listAllFullText() {
-  return getDb().prepare(`
-    SELECT f.*, i.key AS itemKey,
-      (SELECT v.value FROM itemData d
-        JOIN itemDataValues v ON v.valueID = d.valueID
-        WHERE d.itemID = i.itemID
-          AND d.fieldID = (SELECT fieldID FROM fields WHERE fieldName = 'title')
+export async function listAllFullText() {
+  return query(`
+    SELECT f.*, i.key AS "itemKey",
+      (SELECT v.value FROM "itemData" d
+        JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+        WHERE d."itemID" = i."itemID"
+          AND d."fieldID" = (SELECT "fieldID" FROM fields WHERE "fieldName" = 'title')
       ) AS title
-    FROM itemFullText f
-    JOIN items i ON i.itemID = f.itemID
-    ORDER BY f.dateModified DESC
-  `).all();
+    FROM "itemFullText" f
+    JOIN items i ON i."itemID" = f."itemID"
+    ORDER BY f."dateModified" DESC
+  `);
 }
 
-// State groups for the filter tabs in the task log UI.
 const STATE_GROUPS = {
-  all:      null,
-  active:   ['submitting', 'pending', 'running', 'converting'],
-  done:     ['done'],
-  failed:   ['failed'],
+  all: null,
+  active: ['submitting', 'pending', 'running', 'converting'],
+  done: ['done'],
+  failed: ['failed'],
 };
 
-/**
- * Paged query for the task log. `filter` is one of STATE_GROUPS keys.
- * Returns { items, total } where total is the count for that filter
- * (used to render pagination controls).
- */
-export function listFullTextPaged({ filter = 'all', page = 1, pageSize = 50 } = {}) {
-  const db = getDb();
+export async function listFullTextPaged({ filter = 'all', page = 1, pageSize = 50 } = {}) {
   const states = STATE_GROUPS[filter] ?? null;
-  const where = states && states.length
-    ? `WHERE f.state IN (${states.map(() => '?').join(',')})`
-    : '';
-  const total = db.prepare(`SELECT COUNT(*) AS n FROM itemFullText f ${where}`).get(...(states || [])).n;
+  let where = '';
+  const params = [];
+  let p = 1;
+  if (states && states.length) {
+    where = `WHERE f.state IN (${states.map(() => `$${p++}`).join(',')})`;
+    params.push(...states);
+  }
+  const totalRow = await queryOne(
+    `SELECT COUNT(*)::int AS n FROM "itemFullText" f ${where}`,
+    params
+  );
   const offset = Math.max(0, (page - 1) * pageSize);
-  const items = db.prepare(`
-    SELECT f.*, i.key AS itemKey,
-      (SELECT v.value FROM itemData d
-        JOIN itemDataValues v ON v.valueID = d.valueID
-        WHERE d.itemID = i.itemID
-          AND d.fieldID = (SELECT fieldID FROM fields WHERE fieldName = 'title')
+  const items = await query(`
+    SELECT f.*, i.key AS "itemKey",
+      (SELECT v.value FROM "itemData" d
+        JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+        WHERE d."itemID" = i."itemID"
+          AND d."fieldID" = (SELECT "fieldID" FROM fields WHERE "fieldName" = 'title')
       ) AS title
-    FROM itemFullText f
-    JOIN items i ON i.itemID = f.itemID
+    FROM "itemFullText" f
+    JOIN items i ON i."itemID" = f."itemID"
     ${where}
-    ORDER BY f.dateModified DESC
-    LIMIT ? OFFSET ?
-  `).all(...(states || []), pageSize, offset);
-  return { items, total };
+    ORDER BY f."dateModified" DESC
+    LIMIT $${p++} OFFSET $${p++}
+  `, [...params, pageSize, offset]);
+  return { items, total: totalRow.n };
 }
 
-/**
- * Per-state counts for the task log summary line. Returns an object keyed
- * by state name; missing states default to 0 on the caller side.
- */
-export function getFullTextCounts() {
-  const rows = getDb().prepare(`
-    SELECT state, COUNT(*) AS n FROM itemFullText GROUP BY state
-  `).all();
+export async function getFullTextCounts() {
+  const rows = await query('SELECT state, COUNT(*)::int AS n FROM "itemFullText" GROUP BY state');
   const out = {};
   for (const r of rows) out[r.state] = r.n;
   return out;
 }
 
-export function deleteFullTextRow(itemId) {
-  getDb().prepare('DELETE FROM itemFullText WHERE itemID=?').run(itemId);
+export async function deleteFullTextRow(itemId) {
+  await execute('DELETE FROM "itemFullText" WHERE "itemID"=$1', [itemId]);
 }

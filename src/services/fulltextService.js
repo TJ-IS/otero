@@ -70,7 +70,7 @@ export function pickContentListObjectName(names) {
  * lazily when we actually need the file).
  */
 async function findPdfRelPath(item) {
-  const atts = Attachment.listByParent(item.id);
+  const atts = await Attachment.listByParent(item.id);
   const pdf = atts.find(a => (a.contentType || '').includes('pdf'));
   if (!pdf || !pdf.path) return null;
   const exists = await storedFileExists(pdf.path);
@@ -83,10 +83,10 @@ async function findPdfRelPath(item) {
  * resubmitting.
  */
 export async function parseItem(key, { force = false } = {}) {
-  const item = Item.loadByKey(key);
+  const item = await Item.loadByKey(key);
   if (!item) throw new Error('item not found');
 
-  const existing = getFullTextRow(item.id);
+  const existing = await getFullTextRow(item.id);
   if (existing && !force) {
     if (['submitting', 'pending', 'running', 'converting'].includes(existing.state)) {
       return { ...existing, itemKey: key, alreadyRunning: true };
@@ -115,7 +115,7 @@ export async function parseItem(key, { force = false } = {}) {
   // Clean any prior extracted assets so a re-parse starts fresh.
   await cleanupAssets(key);
 
-  const row = upsertFullText(item.id, {
+  const row = await upsertFullText(item.id, {
     state: 'pending',
     mineruBatchId: batchId,
     modelVersion: config.mineru.modelVersion,
@@ -175,10 +175,10 @@ export async function enqueueBatchParse(keys) {
   let notFound = 0;
 
   for (const key of keys) {
-    const item = Item.loadByKey(key);
+    const item = await Item.loadByKey(key);
     if (!item) { notFound++; continue; }
 
-    const existing = getFullTextRow(item.id);
+    const existing = await getFullTextRow(item.id);
     if (existing) {
       if (existing.state === 'done') { skippedDone++; continue; }
       if (['submitting', 'pending', 'running', 'converting'].includes(existing.state)) {
@@ -191,7 +191,7 @@ export async function enqueueBatchParse(keys) {
 
     // Record immediately so the item is visible in the task log.
     await cleanupAssets(key);
-    upsertFullText(item.id, {
+    await upsertFullText(item.id, {
       state: 'submitting',
       mineruBatchId: null,
       modelVersion: config.mineru.modelVersion,
@@ -258,7 +258,7 @@ async function submitOne({ itemId, key, pdfRelPath }) {
         fileName: `${key}.pdf`,
         modelVersion: config.mineru.modelVersion,
       });
-      upsertFullText(itemId, {
+      await upsertFullText(itemId, {
         state: 'pending',
         mineruBatchId: batchId,
         errMsg: null,
@@ -272,11 +272,11 @@ async function submitOne({ itemId, key, pdfRelPath }) {
         const delay = backoffDelay(attempt);
         attempt++;
         console.warn(`[fulltext] submit ${key} throttled (HTTP ${status}); retry ${attempt}/${SUBMIT_MAX_RETRIES} after ${delay}ms`);
-        upsertFullText(itemId, { state: 'submitting', errMsg: `rate-limited, retry ${attempt}/${SUBMIT_MAX_RETRIES}` });
+        await upsertFullText(itemId, { state: 'submitting', errMsg: `rate-limited, retry ${attempt}/${SUBMIT_MAX_RETRIES}` });
         await sleep(delay);
         continue;
       }
-      upsertFullText(itemId, {
+      await upsertFullText(itemId, {
         state: 'failed',
         errMsg: err.message,
         errCode: status != null ? String(status) : String(err.mineruCode ?? ''),
@@ -295,15 +295,15 @@ async function submitOne({ itemId, key, pdfRelPath }) {
  * completed, so we retry them.
  */
 export async function recoverSubmittingOnStartup() {
-  const orphans = listSubmittingFullText();
+  const orphans = await listSubmittingFullText();
   if (orphans.length === 0) return;
   console.log(`[fulltext] recovering ${orphans.length} interrupted submission(s)`);
   for (const row of orphans) {
-    const item = Item.loadById(row.itemID);
+    const item = await Item.loadById(row.itemID);
     if (!item) continue;
     const pdfRelPath = await findPdfRelPath(item);
     if (!pdfRelPath) {
-      upsertFullText(row.itemID, { state: 'failed', errMsg: 'no PDF attachment' });
+      await upsertFullText(row.itemID, { state: 'failed', errMsg: 'no PDF attachment' });
       continue;
     }
     submitQueue.push({ itemId: row.itemID, key: row.itemKey, pdfRelPath });
@@ -314,8 +314,8 @@ export async function recoverSubmittingOnStartup() {
 /**
  * Re-enqueue every row currently in 'failed' state.
  */
-export function retryFailed() {
-  const failed = listFailedFullText();
+export async function retryFailed() {
+  const failed = await listFailedFullText();
   const keys = failed.map(r => r.itemKey).filter(Boolean);
   if (keys.length === 0) return { queued: 0, skippedDone: 0, skippedRunning: 0, noPdf: 0, notFound: 0, total: 0 };
   return enqueueBatchParse(keys);
@@ -329,7 +329,7 @@ export function retryFailed() {
  * Concurrency is capped at config.mineru.maxConcurrent.
  */
 export async function pollOnce() {
-  const pending = listPendingFullText();
+  const pending = await listPendingFullText();
   if (pending.length === 0) return { checked: 0, finalized: 0, failed: 0 };
 
   // Group rows by batchId so each batch is queried only once.
@@ -364,14 +364,14 @@ export async function pollOnce() {
             await finalizeDone(row, r.full_zip_url);
             finalized++;
           } else if (r.state === 'failed') {
-            upsertFullText(row.itemID, {
+            await upsertFullText(row.itemID, {
               state: 'failed',
               errMsg: r.err_msg || 'parse failed',
             });
             failed++;
           } else {
             const prog = r.extract_progress || {};
-            upsertFullText(row.itemID, {
+            await upsertFullText(row.itemID, {
               state: mapState(r.state),
               extractedPages: prog.extracted_pages ?? null,
               totalPages: prog.total_pages ?? null,
@@ -386,7 +386,7 @@ export async function pollOnce() {
         // A0202/A0211: invalid/expired token — same treatment.
         if (mineruCode === -60012 || mineruCode === 'A0202' || mineruCode === 'A0211') {
           for (const row of rows) {
-            upsertFullText(row.itemID, {
+            await upsertFullText(row.itemID, {
               state: 'failed',
               errMsg: err.message,
               errCode: String(mineruCode),
@@ -438,7 +438,7 @@ async function finalizeDone(row, zipUrl) {
     assetDir = relToStorage(localDir);
   }
 
-  upsertFullText(row.itemID, {
+  await upsertFullText(row.itemID, {
     state: 'done',
     markdownPath,
     assetDir,
@@ -452,7 +452,7 @@ async function finalizeDone(row, zipUrl) {
 
 /** Public read API: status + inline markdown content (when done). */
 export async function getFullText(key) {
-  const row = getFullTextRowByKey(key);
+  const row = await getFullTextRowByKey(key);
   if (!row) return { state: 'idle', itemKey: key };
   const result = { ...row, itemKey: key };
   if (row.state === 'done' && row.markdownPath) {
@@ -545,7 +545,7 @@ export async function getContentListBlocks(key) {
  * exists, so the article page can render rich assets even when full.md is absent.
  */
 export async function getFullTextStructure(key) {
-  const row = getFullTextRowByKey(key);
+  const row = await getFullTextRowByKey(key);
   const base = {
     state: row?.state || 'idle',
     itemKey: key,
@@ -638,10 +638,10 @@ export async function getFullTextStructure(key) {
 
 /** Remove extracted assets + DB row so a fresh parse can be triggered. */
 export async function deleteFullText(key) {
-  const row = getFullTextRowByKey(key);
+  const row = await getFullTextRowByKey(key);
   if (!row) return { deleted: false };
   await cleanupAssets(key);
-  deleteFullTextRow(row.itemID);
+  await deleteFullTextRow(row.itemID);
   return { deleted: true };
 }
 
@@ -659,7 +659,7 @@ function nowStr() {
 }
 
 /** List all full-text rows (for admin/queue view). */
-export function listAll() {
+export async function listAll() {
   return listAllFullText();
 }
 
