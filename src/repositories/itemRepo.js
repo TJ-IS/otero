@@ -7,6 +7,9 @@ import { JOURNAL_WHITELIST, UNFILED } from '../services/journalWhitelist.js';
 const typeCache = new Map();
 const fieldCache = new Map();
 const creatorCache = new Map();
+// itemTypeID -> Set<fieldID> of fields allowed for that type. Preloaded so
+// Item.save() can check allowance from memory instead of a query per field.
+const allowedFieldsCache = new Map();
 let cachesLoaded = false;
 
 async function loadCaches() {
@@ -20,6 +23,10 @@ async function loadCaches() {
   for (const r of await query('SELECT "creatorTypeID", "creatorType" FROM "creatorTypes"')) {
     creatorCache.set(r.creatorType, r.creatorTypeID);
   }
+  for (const r of await query('SELECT "itemTypeID", "fieldID" FROM "itemTypeFields"')) {
+    if (!allowedFieldsCache.has(r.itemTypeID)) allowedFieldsCache.set(r.itemTypeID, new Set());
+    allowedFieldsCache.get(r.itemTypeID).add(r.fieldID);
+  }
   cachesLoaded = true;
 }
 
@@ -28,6 +35,7 @@ export function clearSchemaCaches() {
   typeCache.clear();
   fieldCache.clear();
   creatorCache.clear();
+  allowedFieldsCache.clear();
   cachesLoaded = false;
 }
 
@@ -65,11 +73,8 @@ export async function creatorTypeNameById(id) {
 }
 
 export async function isFieldAllowedForType(itemTypeId, fieldId) {
-  const row = await queryOne(
-    'SELECT 1 AS ok FROM "itemTypeFields" WHERE "itemTypeID"=$1 AND "fieldID"=$2',
-    [itemTypeId, fieldId]
-  );
-  return Boolean(row);
+  await loadCaches();
+  return allowedFieldsCache.get(itemTypeId)?.has(fieldId) ?? false;
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +211,30 @@ export async function listItems({ type, journal, collection, search, includeDele
   }
 
   return query(
-    `SELECT i.* FROM items i WHERE ${where.join(' AND ')} ORDER BY i."dateAdded" DESC`,
+    `SELECT i.*, it."typeName" AS "itemTypeName",
+       COALESCE(fields_agg.fields, '{}'::json) AS fields,
+       COALESCE(creators_agg.creators, '[]'::json) AS creators
+     FROM items i
+     JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
+     LEFT JOIN LATERAL (
+       SELECT json_object_agg(f."fieldName", v.value) AS fields
+       FROM "itemData" d
+       JOIN fields f ON f."fieldID" = d."fieldID"
+       JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+       WHERE d."itemID" = i."itemID"
+     ) fields_agg ON true
+     LEFT JOIN LATERAL (
+       SELECT json_agg(json_build_object(
+         'id', c."creatorID", 'firstName', c."firstName", 'lastName', c."lastName",
+         'fieldMode', c."fieldMode", 'creatorType', ct."creatorType", 'orderIndex', ic."orderIndex"
+       ) ORDER BY ic."orderIndex") AS creators
+       FROM "itemCreators" ic
+       JOIN creators c ON c."creatorID" = ic."creatorID"
+       JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
+       WHERE ic."itemID" = i."itemID"
+     ) creators_agg ON true
+     WHERE ${where.join(' AND ')}
+     ORDER BY i."dateAdded" DESC`,
     params
   );
 }
