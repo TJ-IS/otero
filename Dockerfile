@@ -11,6 +11,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 COPY src/ src/
+COPY target_dois.txt target_dois.txt
 COPY --from=frontend-builder /app/web/dist web/dist/
 RUN mkdir -p data/storage
 COPY docker-entrypoint.sh /usr/local/bin/
