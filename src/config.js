@@ -46,7 +46,7 @@ export const config = {
   /** PostgreSQL connection string (required). */
   databaseUrl: process.env.DATABASE_URL || '',
   storageDir: path.join(projectRoot, 'data', 'storage'),
-  schemaVersion: 4,
+  schemaVersion: 5,
   storage: {
     // 'filesystem' keeps PDFs on disk; 's3' uses any S3-compatible API
     // (Cloudflare R2, AWS S3, local MinIO, …). Legacy value 'minio' maps to 's3'.

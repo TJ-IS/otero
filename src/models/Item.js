@@ -25,6 +25,9 @@ export class Item extends DataObject {
     this._creators = opts.creators ?? [];
     this._changedFields = new Set();
     this._creatorsChanged = !!opts.creators;
+    // Optional search extras (list/search responses only).
+    this.fulltextSnippet = opts.fulltextSnippet ?? null;
+    this.fulltextHit = !!opts.fulltextHit;
   }
 
   get itemType() { return this._itemTypeName; }
@@ -146,6 +149,12 @@ export class Item extends DataObject {
       parentItemID: this._parentItemID,
       fields: { ...this._fieldValues },
       creators: this._creators,
+      ...(this.fulltextHit || this.fulltextSnippet
+        ? {
+            fulltextHit: this.fulltextHit,
+            fulltextSnippet: this.fulltextSnippet,
+          }
+        : {}),
     };
   }
 
@@ -199,6 +208,8 @@ function _bulkRowToItem(row) {
     parentItemID: row.parentItemID,
     fields: row.fields,
     creators: row.creators,
+    fulltextSnippet: row.fulltextSnippet ?? null,
+    fulltextHit: !!row.fulltextHit,
   });
 }
 

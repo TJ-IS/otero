@@ -196,6 +196,37 @@ program
     await closeDb();
   });
 
+program
+  .command('index-fulltext')
+  .description('Build Postgres FTS index from MinerU markdown (additive; never deletes data)')
+  .option('--force', 're-index even if tsv already present')
+  .option('--limit <n>', 'max rows to process', (v) => parseInt(v, 10))
+  .option('--concurrency <n>', 'parallel workers', (v) => parseInt(v, 10), 4)
+  .action(async (opts) => {
+    const { backfillFullTextIndex, countUnindexedFullText } = await import(
+      '../services/fulltextIndexService.js'
+    );
+    await initDb();
+    await runMigrations();
+    const pending = await countUnindexedFullText();
+    console.log(`Unindexed done rows: ${pending}` + (opts.force ? ' (force re-index all done)' : ''));
+    let lastLog = 0;
+    const res = await backfillFullTextIndex({
+      force: !!opts.force,
+      limit: opts.limit || 0,
+      concurrency: opts.concurrency || 4,
+      onProgress: ({ done, total, itemKey, ok, reason }) => {
+        if (done - lastLog >= 25 || done === total) {
+          lastLog = done;
+          process.stdout.write(`[${done}/${total}] ${itemKey} ${ok ? 'ok' : reason || 'fail'}\n`);
+        }
+      },
+    });
+    console.log(`\nIndexed: ${res.ok} ok, ${res.fail} failed, ${res.total} considered.`);
+    await closeDb();
+    if (res.fail > 0) process.exitCode = 1;
+  });
+
 // Default: print help.
 program.parseAsync(process.argv).catch(err => {
   console.error(err);

@@ -46,7 +46,12 @@ function matchInfo(item, q) {
   const abstractHit = abstract.toLowerCase().includes(ql);
   const authors = creatorsList(item.creators) || '';
   const authorsHit = authors.toLowerCase().includes(ql);
-  return { titleHit, doiHit, journalHit, abstractHit, authorsHit, abstract, authors };
+  const fulltextHit = !!item.fulltextHit;
+  const fulltextSnippet = item.fulltextSnippet || null;
+  return {
+    titleHit, doiHit, journalHit, abstractHit, authorsHit, authors, abstract,
+    fulltextHit, fulltextSnippet,
+  };
 }
 
 function ResultCard({ item, query, onSelect }) {
@@ -57,11 +62,14 @@ function ResultCard({ item, query, onSelect }) {
   const jBadge = journalBadgeProps(item.fields?.publicationTitle);
   const doi = item.fields?.DOI || '';
 
-  // Pick the snippet source: abstract first (richest context), then journal,
-  // then DOI. Authors-only hits show no snippet (the authors line is already
-  // shown in full).
+  // Prefer MinerU body snippet when the hit is from full text; otherwise
+  // fall back to abstract / journal / DOI metadata snippets.
   let snippet = null;
-  if (m?.abstractHit) snippet = snippetAround(m.abstract, query);
+  let snippetFromFulltext = false;
+  if (m?.fulltextHit && m.fulltextSnippet) {
+    snippet = m.fulltextSnippet;
+    snippetFromFulltext = true;
+  } else if (m?.abstractHit) snippet = snippetAround(m.abstract, query);
   else if (m?.journalHit) snippet = item.fields?.publicationTitle || null;
   else if (m?.doiHit) snippet = doi || null;
 
@@ -77,6 +85,9 @@ function ResultCard({ item, query, onSelect }) {
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-primary group-hover:underline">
           {highlight(title, query)}
         </h3>
+        {snippetFromFulltext ? (
+          <Badge variant="outline" className="shrink-0 font-normal text-[10px]">正文</Badge>
+        ) : null}
       </div>
 
       {authors && (
@@ -223,7 +234,7 @@ export const SearchPage = memo(function SearchPage() {
           <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={inputRef}
-            placeholder="搜索标题、作者、DOI..."
+            placeholder="搜索标题、作者、DOI、全文..."
             value={input}
             onChange={e => setInput(e.target.value)}
             className="h-8 w-full pl-8 pr-8"
@@ -264,7 +275,7 @@ export const SearchPage = memo(function SearchPage() {
             <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground">
               <FileText className="size-8 opacity-30" />
               <p className="mt-3 text-sm">输入关键词搜索文献</p>
-              <p className="mt-1 text-xs">匹配标题、摘要、期刊、DOI 与作者</p>
+              <p className="mt-1 text-xs">匹配标题、摘要、期刊、DOI、作者与已解析全文</p>
             </div>
           ) : loading && items.length === 0 ? (
             <ResultsSkeleton />

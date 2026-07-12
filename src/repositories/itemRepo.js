@@ -212,8 +212,15 @@ async function _buildItemFilter({ type, journal, collection, search, includeDele
     params.push(collection);
   }
 
+  let searchQuery = null;
   if (search && search.trim()) {
-    const like = `%${search.trim()}%`;
+    searchQuery = search.trim();
+    const like = `%${searchQuery}%`;
+    const qParam = p++;
+    const like1 = p++;
+    const like2 = p++;
+    const like3 = p++;
+    const like4 = p++;
     where.push(`(
       EXISTS (
         SELECT 1 FROM "itemData" d1
@@ -221,21 +228,28 @@ async function _buildItemFilter({ type, journal, collection, search, includeDele
         JOIN fields f1 ON f1."fieldID"=d1."fieldID"
         WHERE d1."itemID"=i."itemID"
           AND f1."fieldName" IN ('title','abstractNote','publicationTitle','DOI')
-          AND v1.value ILIKE $${p++}
+          AND v1.value ILIKE $${like1}
       )
       OR EXISTS (
         SELECT 1 FROM "itemCreators" ic2
         JOIN creators c2 ON c2."creatorID"=ic2."creatorID"
         WHERE ic2."itemID"=i."itemID"
-          AND (COALESCE(c2."firstName",'') || ' ' || COALESCE(c2."lastName",'') ILIKE $${p++}
-            OR c2."lastName" ILIKE $${p++}
-            OR c2."firstName" ILIKE $${p++})
+          AND (COALESCE(c2."firstName",'') || ' ' || COALESCE(c2."lastName",'') ILIKE $${like2}
+            OR c2."lastName" ILIKE $${like3}
+            OR c2."firstName" ILIKE $${like4})
+      )
+      OR EXISTS (
+        SELECT 1 FROM "itemFullText" ft
+        WHERE ft."itemID"=i."itemID"
+          AND ft.state='done'
+          AND ft.tsv IS NOT NULL
+          AND ft.tsv @@ plainto_tsquery('simple', $${qParam})
       )
     )`);
-    params.push(like, like, like, like);
+    params.push(searchQuery, like, like, like, like);
   }
 
-  return { where, params, p };
+  return { where, params, p, searchQuery };
 }
 
 export async function listItems({
@@ -253,7 +267,7 @@ export async function listItems({
   const empty = { items: [], total: 0, page: validPage, pageSize: validPageSize, totalPages: 0 };
   const filter = await _buildItemFilter({ type, journal, collection, search, includeDeleted });
   if (!filter) return empty;
-  const { where, params } = filter;
+  const { where, params, searchQuery } = filter;
   let { p } = filter;
 
   const countRow = await queryOne(
@@ -263,10 +277,47 @@ export async function listItems({
   const total = countRow?.cnt || 0;
 
   const offset = (validPage - 1) * validPageSize;
+  const listParams = [...params];
+  let ftsSelect = `NULL::text AS "fulltextSnippet", false AS "fulltextHit", 0::float4 AS "fulltextRank"`;
+  let ftsJoin = '';
+  let orderBy = orderByExpr;
+  if (searchQuery) {
+    const qIdx = p++;
+    listParams.push(searchQuery);
+    ftsSelect = `
+       ft_hit."fulltextSnippet" AS "fulltextSnippet",
+       COALESCE(ft_hit."fulltextHit", false) AS "fulltextHit",
+       COALESCE(ft_hit."fulltextRank", 0)::float4 AS "fulltextRank"`;
+    ftsJoin = `
+     LEFT JOIN LATERAL (
+       SELECT
+         regexp_replace(
+           ts_headline(
+             'simple',
+             ft."plainText",
+             plainto_tsquery('simple', $${qIdx}),
+             'MaxFragments=2, MaxWords=25, MinWords=5, FragmentDelimiter= … '
+           ),
+           '</?b>',
+           '',
+           'g'
+         ) AS "fulltextSnippet",
+         (ft.tsv @@ plainto_tsquery('simple', $${qIdx})) AS "fulltextHit",
+         ts_rank(ft.tsv, plainto_tsquery('simple', $${qIdx})) AS "fulltextRank"
+       FROM "itemFullText" ft
+       WHERE ft."itemID" = i."itemID"
+         AND ft.state = 'done'
+         AND ft.tsv IS NOT NULL
+         AND ft."plainText" IS NOT NULL
+     ) ft_hit ON true`;
+    orderBy = `COALESCE(ft_hit."fulltextRank", 0) DESC, ${orderByExpr}`;
+  }
+
   const rows = await query(
     `SELECT i.*, it."typeName" AS "itemTypeName",
        COALESCE(fields_agg.fields, '{}'::json) AS fields,
-       COALESCE(creators_agg.creators, '[]'::json) AS creators
+       COALESCE(creators_agg.creators, '[]'::json) AS creators,
+       ${ftsSelect}
      FROM items i
      JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
      LEFT JOIN LATERAL (
@@ -286,10 +337,11 @@ export async function listItems({
        JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
        WHERE ic."itemID" = i."itemID"
      ) creators_agg ON true
+     ${ftsJoin}
      WHERE ${where.join(' AND ')}
-     ORDER BY ${orderByExpr}
+     ORDER BY ${orderBy}
      LIMIT $${p++} OFFSET $${p++}`,
-    [...params, validPageSize, offset]
+    [...listParams, validPageSize, offset]
   );
 
   return {

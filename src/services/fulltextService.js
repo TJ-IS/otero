@@ -470,6 +470,19 @@ async function finalizeDone(row, zipUrl) {
     errMsg: null,
     completedAt: nowStr(),
   });
+
+  // Build Postgres FTS index from the freshly extracted markdown (best-effort).
+  try {
+    const { indexFullText } = await import('./fulltextIndexService.js');
+    let markdown = null;
+    try {
+      const buf = await readStoredFile(markdownPath);
+      markdown = buf.toString('utf8');
+    } catch { /* indexFullText will re-read if needed */ }
+    await indexFullText(row.itemID, { markdown, markdownPath });
+  } catch (err) {
+    console.error(`[fulltext-index] post-parse index failed itemID=${row.itemID}:`, err.message);
+  }
 }
 
 /** Public read API: status + inline markdown content (when done). */

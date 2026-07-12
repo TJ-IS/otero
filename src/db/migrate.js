@@ -10,8 +10,46 @@ const SCHEMA_PATH = path.join(__dirname, 'schema.postgres.sql');
 const TARGET_VERSION = config.schemaVersion;
 
 /**
+ * Additive column upgrades for existing databases.
+ * CREATE TABLE IF NOT EXISTS does not add new columns to pre-existing tables,
+ * so each version bump that widens a table must ALTER here.
+ * NEVER DROP / TRUNCATE / DELETE business data in these steps.
+ *
+ * Each entry is checked first via information_schema so we do not take an
+ * AccessExclusiveLock on every server boot once the column already exists.
+ */
+const ADDITIVE_COLUMNS = [
+  // v5: MinerU full-text search columns on itemFullText
+  { table: 'itemFullText', column: 'plainText', ddl: 'ALTER TABLE "itemFullText" ADD COLUMN IF NOT EXISTS "plainText" TEXT' },
+  { table: 'itemFullText', column: 'tsv', ddl: 'ALTER TABLE "itemFullText" ADD COLUMN IF NOT EXISTS tsv tsvector' },
+  { table: 'itemFullText', column: 'indexedAt', ddl: 'ALTER TABLE "itemFullText" ADD COLUMN IF NOT EXISTS "indexedAt" TEXT' },
+];
+
+const ADDITIVE_INDEXES = [
+  { name: 'itemFullText_tsv_gin', ddl: 'CREATE INDEX IF NOT EXISTS "itemFullText_tsv_gin" ON "itemFullText" USING GIN (tsv)' },
+];
+
+async function columnExists(table, column) {
+  const row = await queryOne(
+    `SELECT 1 AS ok
+     FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
+    [table, column]
+  );
+  return !!row;
+}
+
+async function indexExists(name) {
+  const row = await queryOne(
+    `SELECT 1 AS ok FROM pg_indexes WHERE schemaname = 'public' AND indexname = $1`,
+    [name]
+  );
+  return !!row;
+}
+
+/**
  * Apply schema.postgres.sql and record the schema version.
- * Safe to run repeatedly: uses CREATE TABLE IF NOT EXISTS.
+ * Safe to run repeatedly: uses CREATE TABLE IF NOT EXISTS + ADD COLUMN IF NOT EXISTS.
  * Legacy SQLite data-fix migrations (v1–v4) are not replayed on empty PG
  * databases; fresh installs seed directly at TARGET_VERSION.
  */
@@ -20,6 +58,17 @@ export async function runMigrations() {
   await initDb();
   const sql = fs.readFileSync(SCHEMA_PATH, 'utf8');
   await execute(sql);
+
+  for (const { table, column, ddl } of ADDITIVE_COLUMNS) {
+    if (!(await columnExists(table, column))) {
+      await execute(ddl);
+    }
+  }
+  for (const { name, ddl } of ADDITIVE_INDEXES) {
+    if (!(await indexExists(name))) {
+      await execute(ddl);
+    }
+  }
 
   const row = await queryOne(
     'SELECT version FROM "schemaVersion" ORDER BY version DESC LIMIT 1'

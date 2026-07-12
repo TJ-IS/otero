@@ -184,10 +184,16 @@ CREATE TABLE IF NOT EXISTS "itemFullText" (
   "errMsg"          TEXT,
   "submittedAt"     TEXT,
   "completedAt"     TEXT,
-  "dateModified"    TEXT NOT NULL DEFAULT (to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'))
+  "dateModified"    TEXT NOT NULL DEFAULT (to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')),
+  -- Full-text search mirror of MinerU markdown (populated after parse completes).
+  "plainText"       TEXT,
+  tsv               tsvector,
+  "indexedAt"       TEXT
 );
 
 CREATE INDEX IF NOT EXISTS "itemFullText_state_idx" ON "itemFullText"(state);
+-- GIN(tsv) is created in migrate.js ADDITIVE_ALTERS so existing DBs get
+-- the column first via ALTER TABLE ... ADD COLUMN IF NOT EXISTS.
 
 CREATE TABLE IF NOT EXISTS "schemaVersion" (
   version INTEGER PRIMARY KEY,

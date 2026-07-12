@@ -110,7 +110,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
         <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={searchRef}
-          placeholder="搜索标题、作者、DOI..."
+          placeholder="搜索标题、作者、DOI、全文..."
           value={searchValue}
           onChange={e => setSearchValue(e.target.value)}
           onKeyDown={e => {
