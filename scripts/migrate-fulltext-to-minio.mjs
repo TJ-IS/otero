@@ -1,6 +1,7 @@
 /**
  * Migrate MinerU full-text extraction output (full.md, content_list.json,
- * images/, and other assets) from local filesystem storage to MinIO.
+ * images/, and other kept assets) from local filesystem storage to MinIO.
+ * Skips unused MinerU dumps: layout.json, *_model.json, *_origin.pdf.
  *
  * Usage:
  *   node scripts/migrate-fulltext-to-minio.mjs [--dry-run] [--limit N] [--concurrency N] [--delete-local]
@@ -24,8 +25,8 @@
  * no key-shard subdirectory) are skipped.
  *
  * This migrates ASSETS only — it does not change STORAGE_TYPE. The app only reads
- * full-text assets from MinIO when STORAGE_TYPE=minio (see fulltextService.js's
- * useMinio() checks), so set that in .env once you've validated the migration.
+ * full-text assets from MinIO when STORAGE_TYPE=s3 (see fulltextService.js's
+ * useS3() checks), so set that in .env once you've validated the migration.
  *
  * Rollback:
  *   Local files are untouched unless --delete-local was passed, so restoring
@@ -53,7 +54,7 @@ const CONCURRENCY = (() => {
 
 const { config } = await import('../src/config.js');
 const { uploadDir } = await import('../src/services/storageService.js');
-const { ensureBucket, objectExists } = await import('../src/services/minioClient.js');
+const { ensureBucket, objectExists } = await import('../src/services/s3Client.js');
 const { initDb, closeDb, query, execute } = await import('../src/db/connection.js');
 const { runMigrations } = await import('../src/db/migrate.js');
 const { seed } = await import('../src/db/seed.js');
@@ -124,10 +125,15 @@ async function processOne(row) {
 
   if (DRY_RUN) { done++; return; }
 
-  // Skip MinerU's bundled copy of the source PDF — duplicates the PDF we
-  // already store separately as the item's attachment.
+  // Skip unused MinerU artifacts (same policy as fulltextService.pruneUnusedMineruFiles).
   for (const f of fs.readdirSync(localDir, { recursive: true })) {
-    if (typeof f === 'string' && f.endsWith('_origin.pdf')) {
+    if (typeof f !== 'string') continue;
+    const base = path.basename(f);
+    if (
+      base.endsWith('_origin.pdf')
+      || base === 'layout.json'
+      || base.endsWith('_model.json')
+    ) {
       try { fs.unlinkSync(path.join(localDir, f)); } catch { /* ignore */ }
     }
   }
@@ -182,7 +188,7 @@ try {
 
   if (!DRY_RUN && failed === 0 && done > 0) {
     console.log('\nNext steps:');
-    console.log('  1. Verify the app renders full text correctly with STORAGE_TYPE=minio.');
+    console.log('  1. Verify the app renders full text correctly with STORAGE_TYPE=s3.');
     console.log('  2. Re-run with --delete-local once confident, to free local disk space.');
   }
 } finally {

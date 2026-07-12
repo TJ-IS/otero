@@ -161,8 +161,9 @@ export async function getBatchResult(batchId) {
 
 /**
  * Download the full_zip_url and extract its contents into destDir.
- * Only keeps full.md, images/, and content_list.json (best-effort).
- * Returns { fullMdPath, hasImages, contentListPath? }.
+ * Caller should prune unused MinerU artifacts (layout.json, *_model.json,
+ * *_origin.pdf) before persisting — see fulltextService.pruneUnusedMineruFiles.
+ * Returns { fullMdPath, contentListPath?, imagesDir? }.
  */
 export async function downloadAndExtract(zipUrl, destDir) {
   fs.mkdirSync(destDir, { recursive: true });

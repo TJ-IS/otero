@@ -6,6 +6,7 @@ import {
   getJournalBreakdown,
   getFullTextStatusCounts,
   getIngestionActivity,
+  getDoiCoverageStats,
 } from '../../repositories/statsRepo.js';
 import { UNFILED } from '../../services/journalWhitelist.js';
 
@@ -13,6 +14,10 @@ export const statsRouter = Router();
 
 statsRouter.get('/overview', async (req, res) => {
   res.json(await getOverviewStats());
+});
+
+statsRouter.get('/doi-coverage', async (req, res) => {
+  res.json(await getDoiCoverageStats());
 });
 
 statsRouter.get('/item-types', async (req, res) => {

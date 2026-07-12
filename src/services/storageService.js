@@ -3,13 +3,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import { config, ensureDataDirs } from '../config.js';
-import { uploadFile, getObjectStream, deleteObject, objectExists, listObjectNames, deleteObjectsWithPrefix } from './minioClient.js';
+import { uploadFile, getObjectStream, deleteObject, objectExists, listObjectNames, deleteObjectsWithPrefix } from './s3Client.js';
 
-export const useMinio = () => config.storage.type === 'minio';
+export const useS3 = () => config.storage.type === 's3';
 
 /**
  * Storage layout (filesystem):  data/storage/<key[0:2]>/<key>.<ext>
- * Storage layout (MinIO):        <key[0:2]>/<key>.<ext>  (same logical path as object name)
+ * Storage layout (S3):          <key[0:2]>/<key>.<ext>  (same logical path as object name)
  */
 export function storagePathForKey(key, ext = 'pdf') {
   return path.join(key.slice(0, 2), `${key}.${ext}`);
@@ -42,7 +42,7 @@ export async function storeFile(srcPath, key, { move = false, ext } = {}) {
   const size = stat.size;
   const mtime = stat.mtimeMs;
 
-  if (useMinio()) {
+  if (useS3()) {
     await uploadFile(srcPath, relPath);
     if (move) fs.unlinkSync(srcPath);
     return { path: relPath, md5, mtime, size };
@@ -68,7 +68,7 @@ export function resolveStoredPath(relPath) {
  * for single files; large-scale bulk reads go through streaming).
  */
 export async function readStoredFile(relPath) {
-  if (useMinio()) {
+  if (useS3()) {
     const stream = await getObjectStream(relPath);
     return new Promise((resolve, reject) => {
       const chunks = [];
@@ -85,7 +85,7 @@ export async function readStoredFile(relPath) {
  * Use this in HTTP handlers to avoid buffering large files.
  */
 export async function getStoredFileStream(relPath) {
-  if (useMinio()) {
+  if (useS3()) {
     return getObjectStream(relPath);
   }
   return fs.createReadStream(resolveStoredPath(relPath));
@@ -93,7 +93,7 @@ export async function getStoredFileStream(relPath) {
 
 /** Remove a stored file. */
 export async function deleteStoredFile(relPath) {
-  if (useMinio()) {
+  if (useS3()) {
     await deleteObject(relPath);
     return;
   }
@@ -103,7 +103,7 @@ export async function deleteStoredFile(relPath) {
 
 /** Check whether a stored file exists. */
 export async function storedFileExists(relPath) {
-  if (useMinio()) {
+  if (useS3()) {
     return objectExists(relPath);
   }
   return fs.existsSync(resolveStoredPath(relPath));
@@ -115,7 +115,7 @@ export async function storedFileExists(relPath) {
  * The caller is responsible for deleting the temp file when done.
  */
 export async function downloadToTemp(relPath) {
-  if (!useMinio()) {
+  if (!useS3()) {
     return resolveStoredPath(relPath);
   }
   const ext = path.extname(relPath) || '.bin';
@@ -159,7 +159,7 @@ export async function uploadDir(localDir, objectPrefix) {
  * No-op in filesystem mode.
  */
 export async function deleteStoredPrefix(prefix) {
-  if (!useMinio()) return;
+  if (!useS3()) return;
   await deleteObjectsWithPrefix(prefix);
 }
 
@@ -168,6 +168,6 @@ export async function deleteStoredPrefix(prefix) {
  * Returns [] in filesystem mode.
  */
 export async function listStoredPrefix(prefix) {
-  if (!useMinio()) return [];
+  if (!useS3()) return [];
   return listObjectNames(prefix);
 }

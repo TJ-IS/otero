@@ -11,6 +11,7 @@ import { ITEM_TYPE_LABELS } from '@/lib/items';
 import {
   colorForItemType, colorForFulltextState, FULLTEXT_STATE_LABELS,
 } from '@/lib/chartColors';
+import { DoiCoverageVenn } from '@/components/dashboard/DoiCoverageVenn';
 
 function shortHash(hash) {
   if (!hash) return '—';
@@ -82,6 +83,7 @@ export function DashboardOverview() {
   const { data: overview, error: overviewError, loading: overviewLoading } = useAsync(() => api.getStatsOverview(), []);
   const { data: itemTypes, loading: itemTypesLoading } = useAsync(() => api.getStatsItemTypes(), []);
   const { data: fulltext, loading: fulltextLoading } = useAsync(() => api.getStatsFulltext(), []);
+  const { data: coverage, loading: coverageLoading } = useAsync(() => api.getStatsDoiCoverage(), []);
   const { data: merkleRoot } = useAsync(() => api.getMerkleRoot(), []);
 
   const itemTypeData = useMemo(() => (itemTypes || []).map(t => ({
@@ -144,6 +146,26 @@ export function DashboardOverview() {
           <MerkleRootCard merkleRoot={merkleRoot} />
         </div>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">AIS Basket 收录进度</CardTitle>
+          <CardDescription>
+            左侧为 target_dois.txt 目标清单，右侧为文库已有 DOI；重叠区域为已收录篇目
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {coverageLoading ? (
+            <div className="flex h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> 加载中…
+            </div>
+          ) : !coverage ? (
+            <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">暂无数据</div>
+          ) : (
+            <DoiCoverageVenn data={coverage} />
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

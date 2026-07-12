@@ -19,7 +19,17 @@ export async function initDb() {
   if (!config.databaseUrl) {
     throw new Error('DATABASE_URL is required (PostgreSQL connection string)');
   }
-  pool = new Pool({ connectionString: config.databaseUrl });
+  pool = new Pool({
+    connectionString: config.databaseUrl,
+    // Remote links drop often; keep idle clients from holding dead sockets forever.
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 20_000,
+    max: 10,
+  });
+  // Prevent idle-client EPIPE / "Connection terminated" from crashing the process.
+  pool.on('error', (err) => {
+    console.error('[pg pool]', err.message);
+  });
   // Fail fast if the server is unreachable.
   const client = await pool.connect();
   client.release();

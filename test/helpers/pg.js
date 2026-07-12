@@ -1,31 +1,32 @@
 /**
  * Shared PostgreSQL test bootstrap.
- * Requires DATABASE_URL (compose postgres). Each suite should call
- * resetTestDb() in before() to get a clean schema + seed.
+ *
+ * IMPORTANT: This helper NEVER truncates, drops, or deletes library data.
+ * A previous TRUNCATE … CASCADE here wiped the remote production DB when
+ * DATABASE_URL pointed at it. Do not reintroduce wipe/reset SQL.
  */
-import { initDb, closeDb, execute, setPool } from '../../src/db/connection.js';
+import { initDb, closeDb, setPool } from '../../src/db/connection.js';
 import { runMigrations } from '../../src/db/migrate.js';
 import { seed } from '../../src/db/seed.js';
 import { clearSchemaCaches } from '../../src/repositories/itemRepo.js';
 
-const WIPE_SQL = `
-  TRUNCATE
-    "itemTypeCreatorTypes", "itemTypeFields", "baseFieldMappings",
-    "itemCreators", "itemData", "itemAttachments", "itemNotes",
-    "itemAnnotations", "itemRelations", "itemFullText", "collectionItems",
-    "collections", "items", "creators", "itemDataValues",
-    "itemTypes", "fields", "creatorTypes", "settings", "schemaVersion"
-  RESTART IDENTITY CASCADE
-`;
-
-export async function resetTestDb() {
+/**
+ * Ensure schema + dictionary seed exist. Idempotent. Does not touch items.
+ */
+export async function prepareTestDb() {
   clearSchemaCaches();
   await initDb();
   await runMigrations();
-  await execute(WIPE_SQL);
-  clearSchemaCaches();
   await seed();
   clearSchemaCaches();
+}
+
+/**
+ * @deprecated Alias of prepareTestDb. Kept so older test imports still work.
+ * Does NOT wipe the database.
+ */
+export async function resetTestDb() {
+  return prepareTestDb();
 }
 
 export { closeDb, setPool };

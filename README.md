@@ -57,7 +57,7 @@ src/                  后端（Node.js, ESM）
   utils/              key / doi / isbn 工具
   config.js           配置加载（.env + 默认值；DATABASE_URL 必填）
   index.js            服务器启动入口
-scripts/              sqlite-to-pg.mjs 等运维脚本
+scripts/              运维脚本（导入 PDF、对象存储迁移等）
 web/                  前端（Vite + React + shadcn/ui）
 docs/                 含 postgres-migration.md
 deps/zotero/          Zotero 参考源码（git submodule）
@@ -99,10 +99,8 @@ DATABASE_URL=postgresql://otero:otero-secret-change-me@127.0.0.1:5432/otero
 ```bash
 docker compose up -d postgres   # 或自备 PostgreSQL
 npm install
-# 可选：从旧 SQLite 导入
-# node scripts/sqlite-to-pg.mjs --wipe
 npm run migrate   # 应用 schema.postgres.sql
-npm run seed      # 写入 itemTypes / fields / creatorTypes
+npm run seed      # 写入 itemTypes / fields / creatorTypes（幂等，不清空业务数据）
 npm run serve     # 启动 API + Web（默认 127.0.0.1:3000）
 ```
 

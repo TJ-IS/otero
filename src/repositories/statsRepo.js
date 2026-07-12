@@ -2,6 +2,7 @@ import { query, queryOne } from '../db/connection.js';
 import { fieldIdByName, listJournals } from './itemRepo.js';
 import { getFullTextCounts } from './fulltextRepo.js';
 import { JOURNAL_WHITELIST, UNFILED } from '../services/journalWhitelist.js';
+import { doiCompareKey, getTargetDoiKeys } from '../services/targetDois.js';
 
 const YEAR_RE = /\b(1[5-9]|20)\d{2}\b/;
 const MIN_PLAUSIBLE_YEAR = 1990;
@@ -165,4 +166,52 @@ export async function getIngestionActivity() {
   }
 
   return [...byHour.values()].sort((a, b) => a.hour.localeCompare(b.hour));
+}
+
+/**
+ * AIS Basket target list (target_dois.txt) vs DOIs already in the library.
+ * All counts are unique normalized DOI keys.
+ */
+export async function getDoiCoverageStats() {
+  const targetKeys = getTargetDoiKeys();
+  const doiFieldId = await fieldIdByName('DOI');
+
+  const collectedKeys = new Set();
+  if (doiFieldId) {
+    const rows = await query(`
+      SELECT v.value AS doi
+      FROM "itemData" d
+      JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+      JOIN items i ON i."itemID" = d."itemID"
+      WHERE d."fieldID" = $1
+        AND i.deleted = 0
+        AND i."parentItemID" IS NULL
+    `, [doiFieldId]);
+    for (const r of rows) {
+      const key = doiCompareKey(r.doi);
+      if (key) collectedKeys.add(key);
+    }
+  }
+
+  let intersection = 0;
+  for (const key of targetKeys) {
+    if (collectedKeys.has(key)) intersection += 1;
+  }
+
+  const targetTotal = targetKeys.size;
+  const collectedTotal = collectedKeys.size;
+  const targetOnly = targetTotal - intersection;
+  const collectedOnly = collectedTotal - intersection;
+  const coveragePct = targetTotal === 0
+    ? 0
+    : Math.round((intersection / targetTotal) * 1000) / 10;
+
+  return {
+    targetTotal,
+    collectedTotal,
+    intersection,
+    targetOnly,
+    collectedOnly,
+    coveragePct,
+  };
 }

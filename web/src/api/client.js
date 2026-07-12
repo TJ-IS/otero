@@ -107,6 +107,7 @@ export const api = {
   getStatsJournals() { return req('/api/stats/journals').then(r => r.journals); },
   getStatsFulltext() { return req('/api/stats/fulltext').then(r => r.counts); },
   getStatsIngestion() { return req('/api/stats/ingestion').then(r => r.activity); },
+  getStatsDoiCoverage() { return req('/api/stats/doi-coverage'); },
 
   // Import
   uploadPdf(file) {

@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { Item } from '../models/Item.js';
 import { Attachment } from '../models/Attachment.js';
 import {
-  resolveStoredPath, storedFileExists, downloadToTemp, useMinio,
+  resolveStoredPath, storedFileExists, downloadToTemp, useS3,
   uploadDir, deleteStoredPrefix, listStoredPrefix, readStoredFile, getStoredFileStream,
 } from './storageService.js';
 import {
@@ -35,11 +35,21 @@ function fulltextPrefixFor(key) {
   return `${key.slice(0, 2)}/${key}/fulltext`;
 }
 
-/** Remove MinerU's bundled copy of the source PDF (duplicates the PDF we
- * already store separately as the item's attachment). */
-function removeOriginPdfs(dir) {
+/**
+ * Drop MinerU artifacts we never read: source-PDF duplicate, layout debug
+ * dump, and per-page model output. Keeps full.md, content_list.json, images/.
+ */
+function pruneUnusedMineruFiles(dir) {
   for (const p of walk(dir)) {
-    if (p.endsWith('_origin.pdf')) {
+    let st;
+    try { st = fs.statSync(p); } catch { continue; }
+    if (!st.isFile()) continue;
+    const base = path.basename(p);
+    if (
+      base.endsWith('_origin.pdf')
+      || base === 'layout.json'
+      || base.endsWith('_model.json')
+    ) {
       try { fs.unlinkSync(p); } catch { /* ignore */ }
     }
   }
@@ -244,7 +254,7 @@ async function runSubmitWorker() {
 /**
  * Submit a single item to MinerU with 429 backoff retry.
  * pdfRelPath is the storage-relative path; we download to a temp file if
- * STORAGE_TYPE=minio before handing off to submitLocalPdf.
+ * STORAGE_TYPE=s3 before handing off to submitLocalPdf.
  */
 async function submitOne({ itemId, key, pdfRelPath }) {
   let attempt = 0;
@@ -416,16 +426,16 @@ async function finalizeDone(row, zipUrl) {
   // MinerU's zip extraction (AdmZip) needs a real directory, so we always
   // extract locally first. In MinIO mode, the local dir is a throwaway temp
   // dir: after extraction we upload every file to MinIO and delete it.
-  const localDir = useMinio()
+  const localDir = useS3()
     ? path.join(os.tmpdir(), `otero-fulltext-${row.itemKey}-${Date.now()}`)
     : fulltextDirFor(row.itemKey);
 
   const { fullMdPath } = await downloadAndExtract(zipUrl, localDir);
   rewriteAssetPaths(fullMdPath, row.itemKey);
-  removeOriginPdfs(localDir); // duplicate of the already-stored source PDF
+  pruneUnusedMineruFiles(localDir);
 
   let markdownPath, assetDir;
-  if (useMinio()) {
+  if (useS3()) {
     const prefix = fulltextPrefixFor(row.itemKey);
     await deleteStoredPrefix(prefix); // clear any partial prior upload
     await uploadDir(localDir, prefix);
@@ -511,7 +521,7 @@ function findContentListRecursive(dir) {
  * Returns null if no content_list.json can be found or parsed.
  */
 export async function getContentListBlocks(key) {
-  if (useMinio()) {
+  if (useS3()) {
     const prefix = fulltextPrefixFor(key);
     const names = await listStoredPrefix(prefix);
     const relNames = names
@@ -646,7 +656,7 @@ export async function deleteFullText(key) {
 }
 
 async function cleanupAssets(key) {
-  if (useMinio()) {
+  if (useS3()) {
     await deleteStoredPrefix(fulltextPrefixFor(key));
     return;
   }
@@ -671,7 +681,7 @@ export async function listAll() {
  * root or the asset doesn't exist.
  */
 export async function resolveFullTextAsset(key, subPath) {
-  if (useMinio()) {
+  if (useS3()) {
     const clean = path.posix.normalize(String(subPath || '').replace(/\\/g, '/')).replace(/^\/+/, '');
     if (!clean || clean === '.' || clean.startsWith('..') || clean.includes('/../')) return null;
     const objectName = `${fulltextPrefixFor(key)}/${clean}`;

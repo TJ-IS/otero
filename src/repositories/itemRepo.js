@@ -82,11 +82,17 @@ export async function getOrCreateValueId(value, client = null) {
     client
   );
   if (existing) return existing.valueID;
-  const row = await queryOne(
-    'INSERT INTO "itemDataValues"(value) VALUES ($1) RETURNING "valueID"',
-    [value],
-    client
-  );
+
+  // Upsert so concurrent inserts of the same value never abort the
+  // surrounding transaction and always return a valueID.
+  const row = await queryOne(`
+    INSERT INTO "itemDataValues"(value) VALUES ($1)
+    ON CONFLICT ((md5(value))) DO UPDATE SET value = "itemDataValues".value
+    RETURNING "valueID"
+  `, [value], client);
+  if (!row?.valueID) {
+    throw new Error(`getOrCreateValueId failed for value length=${String(value).length}`);
+  }
   return row.valueID;
 }
 

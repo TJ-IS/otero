@@ -26,6 +26,20 @@ function loadDotEnv() {
 }
 loadDotEnv();
 
+/** Prefer the first defined env key (supports renamed vars + legacy aliases). */
+function envFirst(...keys) {
+  for (const key of keys) {
+    const val = process.env[key];
+    if (val !== undefined && val !== '') return val;
+  }
+  return undefined;
+}
+
+function normalizeStorageType(type) {
+  if (type === 'minio') return 's3'; // legacy alias
+  return type;
+}
+
 export const config = {
   projectRoot,
   dataDir: path.join(projectRoot, 'data'),
@@ -34,15 +48,21 @@ export const config = {
   storageDir: path.join(projectRoot, 'data', 'storage'),
   schemaVersion: 4,
   storage: {
-    // 'filesystem' keeps the original behaviour; 'minio' routes all PDF reads/writes through MinIO.
-    type: process.env.STORAGE_TYPE || 'filesystem',
-    minio: {
-      endpoint: process.env.MINIO_ENDPOINT || '127.0.0.1',
-      port: Number(process.env.MINIO_PORT ?? 9000),
-      useSSL: process.env.MINIO_USE_SSL === 'true',
-      accessKey: process.env.MINIO_ACCESS_KEY || 'otero',
-      secretKey: process.env.MINIO_SECRET_KEY || 'otero-secret-change-me',
-      bucket: process.env.MINIO_BUCKET || 'otero-pdfs',
+    // 'filesystem' keeps PDFs on disk; 's3' uses any S3-compatible API
+    // (Cloudflare R2, AWS S3, local MinIO, …). Legacy value 'minio' maps to 's3'.
+    type: normalizeStorageType(process.env.STORAGE_TYPE || 'filesystem'),
+    s3: {
+      endpoint: envFirst('S3_ENDPOINT', 'MINIO_ENDPOINT') || '127.0.0.1',
+      port: Number(envFirst('S3_PORT', 'MINIO_PORT') ?? 9000),
+      useSSL: envFirst('S3_USE_SSL', 'MINIO_USE_SSL') === 'true',
+      accessKey: envFirst('S3_ACCESS_KEY', 'MINIO_ACCESS_KEY') || 'otero',
+      secretKey: envFirst('S3_SECRET_KEY', 'MINIO_SECRET_KEY') || 'otero-secret-change-me',
+      bucket: envFirst('S3_BUCKET', 'MINIO_BUCKET') || 'otero-pdfs',
+      // R2 requires "auto". Other S3 APIs accept it too.
+      region: envFirst('S3_REGION', 'MINIO_REGION') || 'auto',
+      // Hosted buckets are created in the dashboard — default off for safety.
+      // Set S3_CREATE_BUCKET=true only for local bootstrap.
+      createBucket: envFirst('S3_CREATE_BUCKET', 'MINIO_CREATE_BUCKET') === 'true',
     },
   },
   api: {

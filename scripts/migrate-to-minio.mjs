@@ -15,7 +15,7 @@
  * is NOT deleted — it acts as the rollback copy. Once you've verified everything
  * works, you can remove the files with a follow-up script or manually.
  *
- * Set STORAGE_TYPE=minio in your .env (or environment) BEFORE running so that
+ * Set STORAGE_TYPE=s3 in your .env (or environment) BEFORE running so that
  * the server also reads from MinIO.
  *
  * Rollback:
@@ -47,13 +47,13 @@ const CONCURRENCY = (() => {
 // Bootstrap config (loads .env)
 const { config } = await import('../src/config.js');
 
-if (config.storage.type !== 'minio' && !DRY_RUN) {
-  console.error('ERROR: STORAGE_TYPE is not "minio". Set STORAGE_TYPE=minio in .env before running.');
-  console.error('       Use --dry-run to preview without writing to MinIO.');
+if (config.storage.type !== 's3' && !DRY_RUN) {
+  console.error('ERROR: STORAGE_TYPE is not "s3". Set STORAGE_TYPE=s3 in .env before running.');
+  console.error('       Use --dry-run to preview without writing to object storage.');
   process.exit(1);
 }
 
-const { uploadFile, ensureBucket, objectExists } = await import('../src/services/minioClient.js');
+const { uploadFile, ensureBucket, objectExists } = await import('../src/services/s3Client.js');
 
 // ---- Load items with PDF attachments from DB --------------------------------
 const { initDb, closeDb, query } = await import('../src/db/connection.js');
@@ -142,7 +142,7 @@ if (errors.length > 0) {
 
 if (!DRY_RUN && failed === 0) {
   console.log('\nAll PDFs are in MinIO. Next steps:');
-  console.log('  1. Verify the app works with STORAGE_TYPE=minio');
+  console.log('  1. Verify the app works with STORAGE_TYPE=s3');
   console.log('  2. Once confident, you can free disk space by removing the originals:');
   console.log('     find data/storage -name "*.pdf" -delete');
 }
