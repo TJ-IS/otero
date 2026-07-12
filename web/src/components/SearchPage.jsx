@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Search as SearchIcon, X, FileText, Moon, Sun } from 'lucide-react';
+import { ArrowLeft, Search as SearchIcon, X, FileText, Moon, Sun, Loader2 } from 'lucide-react';
 import { api } from '@/api/client';
-import { useAsync } from '@/hooks/useAsync';
+import { useInfiniteItems } from '@/hooks/useInfiniteItems';
 import {
   ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle,
   AIS_BASKET_JOURNALS, UNFILED,
@@ -149,10 +149,12 @@ export const SearchPage = memo(function SearchPage() {
     }
   }, [submitted]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const { data: items, error, loading } = useAsync(
-    () => submitted ? api.listItems({ search: submitted }) : Promise.resolve([]),
-    [submitted]
-  );
+  const filter = useMemo(() => ({ search: submitted }), [submitted]);
+  const { items, total, error, loading, loadingMore, hasMore, loadMore } = useInfiniteItems({
+    filter,
+    pageSize: 50,
+    enabled: Boolean(submitted),
+  });
 
   const onSubmit = useCallback((e) => {
     e?.preventDefault?.();
@@ -191,8 +193,15 @@ export const SearchPage = memo(function SearchPage() {
     setSelectedKey(null);
   }, [detailDirty]);
 
-  const resultCount = items?.length || 0;
+  const resultCount = total || 0;
   const hasQuery = Boolean(submitted);
+
+  // Load the next page when the user scrolls near the bottom of the results.
+  const onResultsScroll = useCallback((e) => {
+    const el = e.currentTarget;
+    if (!hasMore || loadingMore || loading) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) loadMore();
+  }, [hasMore, loadingMore, loading, loadMore]);
 
   return (
     <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
@@ -245,7 +254,7 @@ export const SearchPage = memo(function SearchPage() {
       </header>
 
       {/* Results */}
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-4" onScroll={onResultsScroll}>
         <div className="mx-auto max-w-2xl">
           {error ? (
             <div className="py-16 text-center text-sm text-destructive">
@@ -257,7 +266,7 @@ export const SearchPage = memo(function SearchPage() {
               <p className="mt-3 text-sm">输入关键词搜索文献</p>
               <p className="mt-1 text-xs">匹配标题、摘要、期刊、DOI 与作者</p>
             </div>
-          ) : loading && (items || []).length === 0 ? (
+          ) : loading && items.length === 0 ? (
             <ResultsSkeleton />
           ) : resultCount === 0 ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
@@ -273,6 +282,11 @@ export const SearchPage = memo(function SearchPage() {
                   <ResultCard key={it.key} item={it} query={submitted} onSelect={onSelect} />
                 ))}
               </div>
+              {loadingMore && (
+                <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+                  <Loader2 className="size-3 animate-spin" /> 加载更多...
+                </div>
+              )}
             </>
           )}
         </div>

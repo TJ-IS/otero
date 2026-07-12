@@ -6,7 +6,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { useAsync } from '@/hooks/useAsync';
+import { useInfiniteItems } from '@/hooks/useInfiniteItems';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { api } from '@/api/client';
 import { ITEM_TYPE_LABELS, yearOf, itemTitle, filterTitle, volumeIssuePages } from '@/lib/items';
@@ -40,19 +40,6 @@ const SORT_OPTIONS = [
   { value: 'itemType', label: '类型' },
 ];
 
-// Numeric-first comparison for the 卷/期/页码 column. Compares volume, then
-// issue, then page start (leading number of `pages`). Missing values sort
-// last so populated rows surface first regardless of direction intent.
-function numOrInf(v) {
-  const n = parseInt(String(v ?? '').trim(), 10);
-  return Number.isNaN(n) ? Infinity : n;
-}
-function cmpVip(a, b) {
-  return (numOrInf(a?.volume) - numOrInf(b?.volume))
-    || (numOrInf(a?.issue) - numOrInf(b?.issue))
-    || (numOrInf(a?.pages) - numOrInf(b?.pages));
-}
-
 function SortIcon({ field, sortField, sortDir }) {
   if (sortField !== field) return <ChevronDown className="size-3 opacity-25 ml-0.5" />;
   return sortDir === 'asc'
@@ -63,42 +50,21 @@ function SortIcon({ field, sortField, sortDir }) {
 export const ItemTable = memo(function ItemTable({ filter, version, selectedKey, onSelect }) {
   const { canEdit } = useAuth();
   const isMobile = useIsMobile();
-  const { data: items, error, loading } = useAsync(
-    () => api.listItems({ type: filter?.type, journal: filter?.journal, collection: filter?.collection, search: filter?.search }),
-    [filter?.type, filter?.journal, filter?.collection, filter?.search, version],
-  );
 
   const [sortField, setSortField] = useState('dateModified');
   const [sortDir, setSortDir] = useState('desc');
   const scrollRef = useRef(null);
   const [batchParsing, setBatchParsing] = useState(false);
 
-  const sortedItems = useMemo(() => {
-    if (!items) return [];
-    return [...items].sort((a, b) => {
-      let av, bv;
-      if (sortField === 'title') {
-        av = itemTitle(a).toLowerCase();
-        bv = itemTitle(b).toLowerCase();
-      } else if (sortField === 'date') {
-        av = yearOf(a.fields?.date) || '';
-        bv = yearOf(b.fields?.date) || '';
-      } else if (sortField === 'itemType') {
-        av = ITEM_TYPE_LABELS[a.itemType] || a.itemType;
-        bv = ITEM_TYPE_LABELS[b.itemType] || b.itemType;
-      } else if (sortField === 'vip') {
-        // Volume/issue/pages sort numerically (volume → issue → page start),
-        // so "10" sorts after "2". Missing parts sort last within their level.
-        const cmp = cmpVip(a.fields, b.fields);
-        return sortDir === 'asc' ? cmp : -cmp;
-      } else {
-        av = a.dateModified || '';
-        bv = b.dateModified || '';
-      }
-      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [items, sortField, sortDir]);
+  // Server-side pagination + sort. Changing sort/filter re-queries from page 1;
+  // scrolling near the bottom appends the next page (see onScroll below).
+  const { items: sortedItems, total, error, loading, loadingMore, hasMore, loadMore } = useInfiniteItems({
+    filter,
+    sortField,
+    sortDir,
+    pageSize: 100,
+    version,
+  });
 
   // O(1) key -> index lookup for keyboard nav and scroll-into-view
   const keyToIndex = useMemo(() => {
@@ -113,6 +79,13 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     estimateSize: () => (isMobile ? MOBILE_ROW_HEIGHT : ROW_HEIGHT),
     overscan: 8,
   });
+
+  // Trigger loadMore when the user scrolls within ~600px of the bottom.
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el || !hasMore || loadingMore || loading) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) loadMore();
+  }, [hasMore, loadingMore, loading, loadMore]);
 
   const toggleSort = useCallback((field) => {
     setSortField(prev => {
@@ -130,11 +103,21 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
       toast.error('请先连接白名单钱包');
       return;
     }
-    if (!sortedItems.length || batchParsing) return;
-    const keys = sortedItems.map(it => it.key);
+    if (!total || batchParsing) return;
     setBatchParsing(true);
-    const tid = toast.loading(`正在入队 ${keys.length} 篇全文解析...`);
+    const tid = toast.loading('正在收集条目并入队全文解析...');
     try {
+      // The table only holds loaded pages; fetch every matching key so batch
+      // parse covers the whole filtered set, not just what's scrolled into view.
+      const keys = await api.listItemKeys({
+        type: filter?.type, journal: filter?.journal,
+        collection: filter?.collection, search: filter?.search,
+      });
+      if (!keys.length) {
+        toast.info('没有可解析的条目', { id: tid });
+        return;
+      }
+      toast.loading(`正在入队 ${keys.length} 篇全文解析...`, { id: tid });
       const res = await api.parseFulltextBatch(keys);
       const s = res.summary || {};
       const parts = [];
@@ -154,7 +137,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     } finally {
       setBatchParsing(false);
     }
-  }, [sortedItems, batchParsing]);
+  }, [canEdit, total, batchParsing, filter?.type, filter?.journal, filter?.collection, filter?.search]);
 
   // Keyboard navigation
   const onKeyDown = useCallback((e) => {
@@ -200,19 +183,19 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
       <div className="flex items-baseline justify-between gap-3 border-b px-4 py-2">
         <span className="truncate text-sm font-medium" title={title}>{title}</span>
         <div className="flex items-center gap-3">
-          {canEdit && sortedItems.length > 0 && (
+          {canEdit && total > 0 && (
             <button
               onClick={batchParseAll}
               disabled={batchParsing}
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
-              title="将当前列表中的所有条目提交给 MinerU 解析为 Markdown 全文"
+              title="将当前筛选下的所有条目提交给 MinerU 解析为 Markdown 全文"
             >
               {batchParsing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
               批量解析全文
             </button>
           )}
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            {loading ? '加载中...' : `${sortedItems.length} 个条目`}
+            {loading ? '加载中...' : `${total} 个条目`}
           </span>
         </div>
       </div>
@@ -245,10 +228,11 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
         className="min-h-0 flex-1 overflow-auto outline-none"
         tabIndex={0}
         onKeyDown={onKeyDown}
+        onScroll={onScroll}
       >
         {isMobile ? (
           <div>
-            {loading && (items || []).length === 0 && <CardSkeleton />}
+            {loading && sortedItems.length === 0 && <CardSkeleton />}
             {!loading && sortedItems.length === 0 && (
               <div className="px-3 py-16 text-center text-muted-foreground">
                 {hasActiveFilter
@@ -290,6 +274,11 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               );
             })}
             {paddingBottom > 0 && <div style={{ height: paddingBottom }} />}
+            {loadingMore && (
+              <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
+                <Loader2 className="size-3 animate-spin" /> 加载更多...
+              </div>
+            )}
           </div>
         ) : (
           <table className="w-full table-fixed text-sm">
@@ -319,7 +308,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               </tr>
             </thead>
             <tbody>
-              {loading && (items || []).length === 0 && <TableSkeleton />}
+              {loading && sortedItems.length === 0 && <TableSkeleton />}
               {!loading && sortedItems.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-3 py-16 text-center text-muted-foreground">
@@ -373,6 +362,15 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               {paddingBottom > 0 && (
                 <tr key="__pad-bottom" aria-hidden="true" style={{ height: paddingBottom }}>
                   <td colSpan={5} style={{ padding: 0, border: 'none' }} />
+                </tr>
+              )}
+              {loadingMore && (
+                <tr key="__loading-more">
+                  <td colSpan={5} className="py-4 text-center text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="size-3 animate-spin" /> 加载更多...
+                    </span>
+                  </td>
                 </tr>
               )}
             </tbody>

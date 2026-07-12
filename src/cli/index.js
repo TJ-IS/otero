@@ -71,7 +71,7 @@ program
   .action(async (opts) => {
     await initDb();
     await runMigrations();
-    const items = await Items.list({
+    const items = await Items.listAll({
       type: opts.type,
       collection: opts.collection,
       includeDeleted: opts.includeDeleted,
@@ -160,7 +160,7 @@ program
   .action(async (opts) => {
     await initDb();
     await runMigrations();
-    const items = await Items.list({ type: opts.type, topLevelOnly: true });
+    const items = await Items.listAll({ type: opts.type, topLevelOnly: true });
     let ok = 0, fail = 0;
     for (const it of items) {
       try {

@@ -5,7 +5,8 @@ import {
   itemTypeIdByName, itemNameById,
   fieldIdByName,
   isFieldAllowedForType,
-  insertItemRow, getItemRow, getItemByKey, listItems as repoListItems,
+  insertItemRow, getItemRow, getItemByKey,
+  listItems as repoListItems, listItemKeys as repoListItemKeys,
   setItemField, deleteItemField, getItemFields,
   setItemCreators, getItemCreators,
   setItemDeleted, updateItemModifiedDate,
@@ -203,9 +204,19 @@ function _bulkRowToItem(row) {
 
 export const Items = {
   async list(opts) {
-    const rows = await repoListItems(opts);
-    return rows.map(_bulkRowToItem);
+    const result = await repoListItems(opts);
+    return {
+      ...result,
+      items: result.items.map(_bulkRowToItem),
+    };
   },
+  // Legacy: return a flat array for export (no pagination needed).
+  async listAll(opts) {
+    const result = await repoListItems({ ...opts, page: 1, pageSize: 10000 });
+    return result.items.map(_bulkRowToItem);
+  },
+  // Keys of every item matching a filter — for batch actions over the full set.
+  listKeys(opts) { return repoListItemKeys(opts); },
   loadByKey(key) { return Item.loadByKey(key); },
   loadById(id) { return Item.loadById(id); },
 };

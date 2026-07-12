@@ -7,28 +7,36 @@ export const itemsRouter = Router();
 
 // GET /api/items
 itemsRouter.get('/', async (req, res) => {
-  const { type, journal, collection, search, includeDeleted } = req.query;
-  // The "待归档" bucket (unfiled literature) is editor-only. Non-editors get
-  // an empty result rather than the unfiled items.
+  const { type, journal, collection, search, includeDeleted, page, pageSize, sortField, sortDir } = req.query;
   if (journal === UNFILED && !req.auth?.canEdit) {
-    return res.json({ items: [] });
+    return res.json({ items: [], total: 0, page: 1, pageSize: 100, totalPages: 0 });
   }
   const topLevel = req.query.topLevel !== 'false' && req.query.topLevel !== '0';
-  const items = await Items.list({
+  const result = await Items.list({
     type,
     journal,
     collection,
     search,
     includeDeleted: includeDeleted === 'true' || includeDeleted === '1',
     topLevelOnly: topLevel,
+    page: page ? parseInt(page, 10) : 1,
+    pageSize: pageSize ? parseInt(pageSize, 10) : 100,
+    sortField: sortField || 'dateModified',
+    sortDir: sortDir || 'desc',
   });
-  res.json({ items: items.map(it => it.toJSON()) });
+  res.json({
+    items: result.items.map(it => it.toJSON()),
+    total: result.total,
+    page: result.page,
+    pageSize: result.pageSize,
+    totalPages: result.totalPages,
+  });
 });
 
 // GET /api/items/export?format=bibtex|ris
 itemsRouter.get('/export', async (req, res) => {
   const { format, type, journal, search } = req.query;
-  const items = await Items.list({ type, journal, search, includeDeleted: false, topLevelOnly: true });
+  const items = await Items.listAll({ type, journal, search, includeDeleted: false, topLevelOnly: true });
   if (format === 'ris') {
     res.setHeader('Content-Type', 'application/x-research-info-systems');
     res.setHeader('Content-Disposition', 'attachment; filename="otero-export.ris"');
@@ -38,6 +46,22 @@ itemsRouter.get('/export', async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="otero-export.bib"');
     res.send(toBibtexBatch(items));
   }
+});
+
+// GET /api/items/keys — all item keys matching a filter (for batch actions).
+itemsRouter.get('/keys', async (req, res) => {
+  const { type, journal, collection, search, includeDeleted } = req.query;
+  if (journal === UNFILED && !req.auth?.canEdit) {
+    return res.json({ keys: [] });
+  }
+  const keys = await Items.listKeys({
+    type,
+    journal,
+    collection,
+    search,
+    includeDeleted: includeDeleted === 'true' || includeDeleted === '1',
+  });
+  res.json({ keys });
 });
 
 // GET /api/items/:key/export?format=bibtex|ris

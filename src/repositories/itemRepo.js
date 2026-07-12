@@ -141,7 +141,32 @@ export async function getItemByKey(key) {
   return queryOne('SELECT * FROM items WHERE key=$1', [key]);
 }
 
-export async function listItems({ type, journal, collection, search, includeDeleted = false } = {}) {
+// Whitelisted ORDER BY column expressions. Never interpolate raw user input
+// into SQL; callers pass a sortField key that maps to one of these fixed
+// expression lists. The sort direction is applied to every column so that a
+// multi-column sort (vip) reverses consistently, not just on its last key.
+const ITEM_SORT_FIELDS = {
+  title: ["LOWER(fields_agg.fields->>'title')"],
+  date: ["SUBSTRING(fields_agg.fields->>'date', 1, 4)"],
+  // Volume → issue → page-start, numeric. Only the leading digits of each are
+  // used (fields may hold "3-4", "12A", etc.), and missing/non-numeric parts
+  // sort last (999999). Matches the frontend's old numeric-first comparison.
+  vip: [
+    "COALESCE(NULLIF(SUBSTRING(fields_agg.fields->>'volume' FROM '^[0-9]+'),'')::INTEGER, 999999)",
+    "COALESCE(NULLIF(SUBSTRING(fields_agg.fields->>'issue' FROM '^[0-9]+'),'')::INTEGER, 999999)",
+    "COALESCE(NULLIF(SUBSTRING(fields_agg.fields->>'pages' FROM '^[0-9]+'),'')::INTEGER, 999999)",
+  ],
+  itemType: ['it."typeName"'],
+  dateModified: ['i."dateModified"'],
+  dateAdded: ['i."dateAdded"'],
+};
+
+/**
+ * Build the shared WHERE clause + params for item list/count/keys queries.
+ * Returns { where, params, p } or null when a filter can never match
+ * (e.g. an unknown type name), letting callers short-circuit to an empty result.
+ */
+async function _buildItemFilter({ type, journal, collection, search, includeDeleted = false }) {
   const where = ['i."parentItemID" IS NULL'];
   const params = [];
   let p = 1;
@@ -150,7 +175,7 @@ export async function listItems({ type, journal, collection, search, includeDele
 
   if (type) {
     const typeId = await itemTypeIdByName(type);
-    if (typeId == null) return [];
+    if (typeId == null) return null;
     where.push(`i."itemTypeID" = $${p++}`);
     params.push(typeId);
   }
@@ -210,7 +235,35 @@ export async function listItems({ type, journal, collection, search, includeDele
     params.push(like, like, like, like);
   }
 
-  return query(
+  return { where, params, p };
+}
+
+export async function listItems({
+  type, journal, collection, search, includeDeleted = false,
+  page = 1, pageSize = 100, sortField = 'dateModified', sortDir = 'desc',
+} = {}) {
+  const validPage = Math.max(1, parseInt(page, 10) || 1);
+  const validPageSize = Math.min(200, Math.max(1, parseInt(pageSize, 10) || 100));
+  const validSortDir = sortDir === 'asc' ? 'ASC' : 'DESC';
+  const sortCols = ITEM_SORT_FIELDS[sortField] || ITEM_SORT_FIELDS.dateModified;
+  // Tie-break on itemID so pagination is stable when the sort key has ties
+  // (e.g. many items share a year), preventing duplicated/skipped rows.
+  const orderByExpr = `${sortCols.map(c => `${c} ${validSortDir}`).join(', ')}, i."itemID" ${validSortDir}`;
+
+  const empty = { items: [], total: 0, page: validPage, pageSize: validPageSize, totalPages: 0 };
+  const filter = await _buildItemFilter({ type, journal, collection, search, includeDeleted });
+  if (!filter) return empty;
+  const { where, params } = filter;
+  let { p } = filter;
+
+  const countRow = await queryOne(
+    `SELECT COUNT(*)::int AS cnt FROM items i WHERE ${where.join(' AND ')}`,
+    params
+  );
+  const total = countRow?.cnt || 0;
+
+  const offset = (validPage - 1) * validPageSize;
+  const rows = await query(
     `SELECT i.*, it."typeName" AS "itemTypeName",
        COALESCE(fields_agg.fields, '{}'::json) AS fields,
        COALESCE(creators_agg.creators, '[]'::json) AS creators
@@ -234,9 +287,35 @@ export async function listItems({ type, journal, collection, search, includeDele
        WHERE ic."itemID" = i."itemID"
      ) creators_agg ON true
      WHERE ${where.join(' AND ')}
-     ORDER BY i."dateAdded" DESC`,
+     ORDER BY ${orderByExpr}
+     LIMIT $${p++} OFFSET $${p++}`,
+    [...params, validPageSize, offset]
+  );
+
+  return {
+    items: rows,
+    total,
+    page: validPage,
+    pageSize: validPageSize,
+    totalPages: Math.ceil(total / validPageSize),
+  };
+}
+
+/**
+ * Return only the keys of items matching a filter (no field/creator joins).
+ * Used by the "batch parse all" editor action, which needs every key in the
+ * filtered set even though the paginated table only holds the loaded pages.
+ * Payload is tiny (8-char keys) so this stays cheap even for large libraries.
+ */
+export async function listItemKeys({ type, journal, collection, search, includeDeleted = false } = {}) {
+  const filter = await _buildItemFilter({ type, journal, collection, search, includeDeleted });
+  if (!filter) return [];
+  const { where, params } = filter;
+  const rows = await query(
+    `SELECT i.key FROM items i WHERE ${where.join(' AND ')} ORDER BY i."dateAdded" DESC`,
     params
   );
+  return rows.map(r => r.key);
 }
 
 export async function listJournals() {

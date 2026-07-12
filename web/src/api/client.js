@@ -44,7 +44,7 @@ export const api = {
   },
 
   // Items
-  listItems({ type, journal, collection, search, topLevel = true, includeDeleted = false } = {}) {
+  listItems({ type, journal, collection, search, topLevel = true, includeDeleted = false, page = 1, pageSize = 100, sortField = 'dateModified', sortDir = 'desc' } = {}) {
     const qs = new URLSearchParams();
     if (type) qs.set('type', type);
     if (journal) qs.set('journal', journal);
@@ -52,7 +52,20 @@ export const api = {
     if (search) qs.set('search', search);
     qs.set('topLevel', String(topLevel));
     if (includeDeleted) qs.set('includeDeleted', 'true');
-    return req(`/api/items?${qs.toString()}`).then(r => r.items);
+    qs.set('page', String(page));
+    qs.set('pageSize', String(pageSize));
+    qs.set('sortField', sortField);
+    qs.set('sortDir', sortDir);
+    return req(`/api/items?${qs.toString()}`);
+  },
+  listItemKeys({ type, journal, collection, search, includeDeleted = false } = {}) {
+    const qs = new URLSearchParams();
+    if (type) qs.set('type', type);
+    if (journal) qs.set('journal', journal);
+    if (collection) qs.set('collection', collection);
+    if (search) qs.set('search', search);
+    if (includeDeleted) qs.set('includeDeleted', 'true');
+    return req(`/api/items/keys?${qs.toString()}`).then(r => r.keys);
   },
   async fetchItemExport(key, format = 'bibtex') {
     const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
