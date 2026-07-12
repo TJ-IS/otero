@@ -10,6 +10,7 @@ import { DashboardLayout } from '@/components/DashboardLayout';
 import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
 import { DashboardJournals } from '@/components/dashboard/DashboardJournals';
 import { DashboardTimeline } from '@/components/dashboard/DashboardTimeline';
+import { DashboardAuthorStats } from '@/components/dashboard/DashboardAuthorStats';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="journals" element={<DashboardJournals />} />
           <Route path="timeline" element={<DashboardTimeline />} />
           <Route path="authors" element={<AuthorGraph />} />
+          <Route path="authors/stats" element={<DashboardAuthorStats />} />
           <Route path="merkle" element={<MerkleTreeView />} />
         </Route>
         <Route path="/authors/:id" element={<AuthorPage />} />

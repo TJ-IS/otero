@@ -9,6 +9,7 @@ import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { UNFILED } from '@/lib/items';
 import { CATEGORICAL_COLORS, SINGLE_SERIES_COLOR } from '@/lib/chartColors';
+import { BasketCoveragePanel } from '@/components/dashboard/BasketCoveragePanel';
 
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -76,6 +77,8 @@ export function DashboardJournals() {
           <p>加载失败: {error.message}</p>
         </div>
       )}
+
+      {!loading && !error && <BasketCoveragePanel />}
 
       {journals && (
         <>

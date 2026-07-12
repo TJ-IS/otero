@@ -7,6 +7,8 @@ import {
   getFullTextStatusCounts,
   getIngestionActivity,
   getDoiCoverageStats,
+  getDoiCoverageBreakdown,
+  getMissingTargetDois,
 } from '../../repositories/statsRepo.js';
 import { UNFILED } from '../../services/journalWhitelist.js';
 
@@ -18,6 +20,22 @@ statsRouter.get('/overview', async (req, res) => {
 
 statsRouter.get('/doi-coverage', async (req, res) => {
   res.json(await getDoiCoverageStats());
+});
+
+statsRouter.get('/doi-coverage/breakdown', async (req, res) => {
+  res.json(await getDoiCoverageBreakdown());
+});
+
+statsRouter.get('/doi-coverage/missing', async (req, res) => {
+  const journal = typeof req.query.journal === 'string' && req.query.journal
+    ? req.query.journal
+    : null;
+  const yearRaw = req.query.year;
+  const year = yearRaw != null && yearRaw !== '' ? Number(yearRaw) : null;
+  res.json(await getMissingTargetDois({
+    journal,
+    year: Number.isFinite(year) ? year : null,
+  }));
 });
 
 statsRouter.get('/item-types', async (req, res) => {

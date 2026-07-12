@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, BarChart3 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useForceLayout } from '@/lib/authorGraph';
@@ -177,7 +177,7 @@ export function AuthorGraph() {
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
       <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
 
-        <div className="ml-4 flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground whitespace-nowrap">最少发文数</span>
           <input
             type="range"
@@ -197,6 +197,15 @@ export function AuthorGraph() {
         )}
 
         <div className="ml-auto flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate('/dashboard/authors/stats')}
+            title="学者统计"
+          >
+            <BarChart3 className="size-4" />
+            <span className="hidden sm:inline">学者统计</span>
+          </Button>
           <Button variant="outline" size="sm" onClick={resetView} title="重置视图">
             <RefreshCw className="size-4" />
           </Button>

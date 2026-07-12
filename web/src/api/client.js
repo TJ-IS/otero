@@ -108,6 +108,21 @@ export const api = {
   getStatsFulltext() { return req('/api/stats/fulltext').then(r => r.counts); },
   getStatsIngestion() { return req('/api/stats/ingestion').then(r => r.activity); },
   getStatsDoiCoverage() { return req('/api/stats/doi-coverage'); },
+  getStatsDoiCoverageBreakdown() { return req('/api/stats/doi-coverage/breakdown'); },
+  getStatsDoiCoverageMissing({ journal, year } = {}) {
+    const qs = new URLSearchParams();
+    if (journal) qs.set('journal', journal);
+    if (year != null && year !== '') qs.set('year', String(year));
+    const q = qs.toString();
+    return req(`/api/stats/doi-coverage/missing${q ? `?${q}` : ''}`);
+  },
+  getAuthorAnalytics({ topN, coreN } = {}) {
+    const qs = new URLSearchParams();
+    if (topN != null) qs.set('topN', String(topN));
+    if (coreN != null) qs.set('coreN', String(coreN));
+    const q = qs.toString();
+    return req(`/api/authors/analytics${q ? `?${q}` : ''}`);
+  },
 
   // Import
   uploadPdf(file) {

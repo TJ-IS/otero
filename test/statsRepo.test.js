@@ -12,6 +12,8 @@ import {
   getFullTextStatusCounts,
   getIngestionActivity,
   getDoiCoverageStats,
+  getDoiCoverageBreakdown,
+  getMissingTargetDois,
 } from '../src/repositories/statsRepo.js';
 import { JOURNAL_WHITELIST, UNFILED } from '../src/services/journalWhitelist.js';
 import { getTargetDoiKeys } from '../src/services/targetDois.js';
@@ -182,3 +184,28 @@ test('getDoiCoverageStats: intersects library DOIs with AIS Basket target list',
   assert.ok(cov.collectedTotal >= before.collectedTotal);
   assert.ok(cov.collectedOnly >= before.collectedOnly);
 });
+
+test('getMissingTargetDois: lists target DOIs absent from the library', async () => {
+  const missing = await getMissingTargetDois();
+  const cov = await getDoiCoverageStats();
+  assert.equal(missing.total, cov.targetOnly);
+  assert.equal(missing.dois.length, cov.targetOnly);
+  assert.ok(missing.dois.every((d) => typeof d === 'string' && d.startsWith('10.')));
+  for (let i = 1; i < missing.dois.length; i++) {
+    assert.ok(missing.dois[i - 1] <= missing.dois[i]);
+  }
+});
+
+test('getDoiCoverageBreakdown: per-journal totals reconcile with overall coverage', async () => {
+  const breakdown = await getDoiCoverageBreakdown();
+  const cov = await getDoiCoverageStats();
+  assert.equal(breakdown.targetTotal, cov.targetTotal);
+  assert.equal(breakdown.collectedTotal, cov.intersection);
+  const journalTarget = breakdown.journals.reduce((s, j) => s + j.target, 0)
+    + (breakdown.unattributed?.target || 0);
+  assert.equal(journalTarget, cov.targetTotal);
+  const journalMissing = breakdown.journals.reduce((s, j) => s + j.missing, 0)
+    + (breakdown.unattributed?.missing || 0);
+  assert.equal(journalMissing, cov.targetOnly);
+});
+

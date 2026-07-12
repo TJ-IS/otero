@@ -19,45 +19,27 @@ function shortHash(hash) {
   return `${hash.slice(0, 8)}…${hash.slice(-8)}`;
 }
 
-function StatCard({ icon, label, value, sub }) {
+function StatCard({ icon, label, value, sub, valueTitle, mono }) {
   return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
+    <Card className="min-w-0">
+      <CardContent className="flex h-full items-center gap-3 p-4">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
           {icon}
         </div>
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="text-lg font-semibold tabular-nums leading-tight">{value}</p>
-          {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function MerkleRootCard({ merkleRoot }) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Hash className="size-4" />
-        </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-muted-foreground">Merkle Root</p>
-          {merkleRoot ? (
-            <>
-              <code
-                className="mt-0.5 block w-fit max-w-full truncate rounded bg-muted px-1.5 py-0.5 font-mono text-xs leading-tight"
-                title={merkleRoot.root}
-              >
-                {shortHash(merkleRoot.root)}
-              </code>
-              <p className="mt-1 truncate text-xs text-muted-foreground">{merkleRoot.leafCount} 个 DOI 叶子</p>
-            </>
-          ) : (
-            <p className="text-lg font-semibold leading-tight">—</p>
-          )}
+          <p className="truncate text-xs text-muted-foreground">{label}</p>
+          <p
+            className={`truncate leading-tight tracking-tight tabular-nums ${
+              mono ? 'font-mono text-sm font-semibold' : 'text-lg font-semibold'
+            }`}
+            title={valueTitle ?? (value != null ? String(value) : undefined)}
+          >
+            {value}
+          </p>
+          {/* Reserve one line so cards with/without sub stay the same height */}
+          <p className="truncate text-xs leading-4 text-muted-foreground">
+            {sub || '\u00A0'}
+          </p>
         </div>
       </CardContent>
     </Card>
@@ -127,7 +109,7 @@ export function DashboardOverview() {
       )}
 
       {overview && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <StatCard icon={<FileText className="size-4" />} label="文献总数" value={overview.totalItems} />
           <StatCard icon={<BookMarked className="size-4" />} label="收录期刊数" value={overview.journalCount} />
           <StatCard icon={<Users className="size-4" />} label="学者/创作者数" value={overview.totalCreators} />
@@ -143,7 +125,14 @@ export function DashboardOverview() {
             value={overview.withAttachment}
             sub={fulltextDoneRatio != null ? `解析完成 ${fulltextDoneRatio}%` : undefined}
           />
-          <MerkleRootCard merkleRoot={merkleRoot} />
+          <StatCard
+            icon={<Hash className="size-4" />}
+            label="Merkle Root"
+            value={merkleRoot ? shortHash(merkleRoot.root) : '—'}
+            valueTitle={merkleRoot?.root}
+            sub={merkleRoot ? `${merkleRoot.leafCount} 个 DOI 叶子` : undefined}
+            mono
+          />
         </div>
       )}
 
@@ -151,7 +140,7 @@ export function DashboardOverview() {
         <CardHeader>
           <CardTitle className="text-base">AIS Basket 收录进度</CardTitle>
           <CardDescription>
-            左侧为 target_dois.txt 目标清单，右侧为文库已有 DOI；重叠区域为已收录篇目
+            左侧为 target_dois.txt 目标清单，右侧为文库已有 DOI；重叠区域为已收录篇目。点击「目标未收录」可查看缺失 DOI 列表。
           </CardDescription>
         </CardHeader>
         <CardContent>

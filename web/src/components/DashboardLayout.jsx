@@ -12,6 +12,7 @@ const TABS = [
   { to: '/dashboard/merkle', label: 'Merkle Tree' },
 ];
 
+
 export function DashboardLayout() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();

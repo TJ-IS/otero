@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getCoauthorGraph, getAuthorDetail } from '../../repositories/authorRepo.js';
+import { getCoauthorGraph, getAuthorDetail, getAuthorAnalytics } from '../../repositories/authorRepo.js';
 import { Item } from '../../models/Item.js';
 
 export const authorsRouter = Router();
@@ -10,9 +10,16 @@ authorsRouter.get('/graph', async (req, res) => {
   res.json(await getCoauthorGraph({ minPapers }));
 });
 
+// GET /api/authors/analytics
+authorsRouter.get('/analytics', async (req, res) => {
+  const topN = Math.min(100, Math.max(5, parseInt(req.query.topN, 10) || 25));
+  const coreN = Math.min(20, Math.max(3, parseInt(req.query.coreN, 10) || 5));
+  res.json(await getAuthorAnalytics({ topN, coreN }));
+});
+
 // GET /api/authors/:id — author name + all their papers (full item JSON, same
-// shape as GET /api/items), sorted newest first. Registered after '/graph' so
-// that literal path takes precedence over this catch-all param route.
+// shape as GET /api/items), sorted newest first. Registered after '/graph' /
+// '/analytics' so literal paths take precedence over this catch-all.
 authorsRouter.get('/:id', async (req, res) => {
   const creatorId = parseInt(req.params.id, 10);
   if (!Number.isInteger(creatorId)) {

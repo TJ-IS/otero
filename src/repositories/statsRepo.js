@@ -1,8 +1,13 @@
 import { query, queryOne } from '../db/connection.js';
 import { fieldIdByName, listJournals } from './itemRepo.js';
 import { getFullTextCounts } from './fulltextRepo.js';
-import { JOURNAL_WHITELIST, UNFILED } from '../services/journalWhitelist.js';
+import { JOURNAL_WHITELIST, UNFILED, classifyJournal } from '../services/journalWhitelist.js';
 import { doiCompareKey, getTargetDoiKeys } from '../services/targetDois.js';
+import {
+  basketJournalOrder,
+  inferJournalFromDoi,
+  inferYearFromDoi,
+} from '../services/targetDoiMeta.js';
 
 const YEAR_RE = /\b(1[5-9]|20)\d{2}\b/;
 const MIN_PLAUSIBLE_YEAR = 1990;
@@ -168,30 +173,35 @@ export async function getIngestionActivity() {
   return [...byHour.values()].sort((a, b) => a.hour.localeCompare(b.hour));
 }
 
+/** Unique normalized DOI keys present in the library (non-deleted top-level items). */
+async function getCollectedDoiKeys() {
+  const doiFieldId = await fieldIdByName('DOI');
+  const collectedKeys = new Set();
+  if (!doiFieldId) return collectedKeys;
+
+  const rows = await query(`
+    SELECT v.value AS doi
+    FROM "itemData" d
+    JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+    JOIN items i ON i."itemID" = d."itemID"
+    WHERE d."fieldID" = $1
+      AND i.deleted = 0
+      AND i."parentItemID" IS NULL
+  `, [doiFieldId]);
+  for (const r of rows) {
+    const key = doiCompareKey(r.doi);
+    if (key) collectedKeys.add(key);
+  }
+  return collectedKeys;
+}
+
 /**
  * AIS Basket target list (target_dois.txt) vs DOIs already in the library.
  * All counts are unique normalized DOI keys.
  */
 export async function getDoiCoverageStats() {
   const targetKeys = getTargetDoiKeys();
-  const doiFieldId = await fieldIdByName('DOI');
-
-  const collectedKeys = new Set();
-  if (doiFieldId) {
-    const rows = await query(`
-      SELECT v.value AS doi
-      FROM "itemData" d
-      JOIN "itemDataValues" v ON v."valueID" = d."valueID"
-      JOIN items i ON i."itemID" = d."itemID"
-      WHERE d."fieldID" = $1
-        AND i.deleted = 0
-        AND i."parentItemID" IS NULL
-    `, [doiFieldId]);
-    for (const r of rows) {
-      const key = doiCompareKey(r.doi);
-      if (key) collectedKeys.add(key);
-    }
-  }
+  const collectedKeys = await getCollectedDoiKeys();
 
   let intersection = 0;
   for (const key of targetKeys) {
@@ -213,5 +223,170 @@ export async function getDoiCoverageStats() {
     targetOnly,
     collectedOnly,
     coveragePct,
+  };
+}
+
+/**
+ * Library DOI → { journal (Basket or UNFILED), year } for coverage joins.
+ */
+async function getLibraryDoiMetaMap() {
+  const doiFieldId = await fieldIdByName('DOI');
+  const pubFieldId = await fieldIdByName('publicationTitle');
+  const dateFieldId = await fieldIdByName('date');
+  const map = new Map();
+  if (!doiFieldId) return map;
+
+  const rows = await query(`
+    SELECT
+      v_doi.value AS doi,
+      v_pub.value AS "publicationTitle",
+      v_date.value AS date
+    FROM "itemData" d_doi
+    JOIN "itemDataValues" v_doi ON v_doi."valueID" = d_doi."valueID"
+    JOIN items i ON i."itemID" = d_doi."itemID"
+    LEFT JOIN "itemData" d_pub
+      ON d_pub."itemID" = i."itemID" AND d_pub."fieldID" = $2
+    LEFT JOIN "itemDataValues" v_pub ON v_pub."valueID" = d_pub."valueID"
+    LEFT JOIN "itemData" d_date
+      ON d_date."itemID" = i."itemID" AND d_date."fieldID" = $3
+    LEFT JOIN "itemDataValues" v_date ON v_date."valueID" = d_date."valueID"
+    WHERE d_doi."fieldID" = $1
+      AND i.deleted = 0
+      AND i."parentItemID" IS NULL
+  `, [doiFieldId, pubFieldId || -1, dateFieldId || -1]);
+
+  for (const r of rows) {
+    const key = doiCompareKey(r.doi);
+    if (!key) continue;
+    const journal = classifyJournal(r.publicationTitle);
+    const year = extractYear(r.date) ?? inferYearFromDoi(key);
+    // Prefer first occurrence; DOIs may duplicate across items
+    if (!map.has(key)) map.set(key, { journal, year, inLibrary: true });
+  }
+  return map;
+}
+
+function emptyYearBucket(year) {
+  return { year, target: 0, collected: 0, missing: 0 };
+}
+
+function emptyJournalBucket(name) {
+  return {
+    name,
+    target: 0,
+    collected: 0,
+    missing: 0,
+    coveragePct: 0,
+    years: [],
+  };
+}
+
+/**
+ * AIS Basket target coverage broken down by journal and year.
+ * Journal/year for library hits come from item metadata; missing DOIs use
+ * DOI heuristics (see targetDoiMeta.js). Unrecognised missing DOIs land in
+ * the `unattributed` bucket.
+ */
+export async function getDoiCoverageBreakdown() {
+  const targetKeys = getTargetDoiKeys();
+  const libraryMeta = await getLibraryDoiMetaMap();
+  const order = basketJournalOrder();
+  const byJournal = new Map(order.map((name) => [name, emptyJournalBucket(name)]));
+  const unattributed = emptyJournalBucket('未识别');
+  const yearMaps = new Map(order.map((name) => [name, new Map()]));
+  const unattributedYears = new Map();
+
+  function bumpYear(yearMap, year, field) {
+    if (year == null) return;
+    if (!yearMap.has(year)) yearMap.set(year, emptyYearBucket(year));
+    yearMap.get(year)[field] += 1;
+  }
+
+  for (const key of targetKeys) {
+    const lib = libraryMeta.get(key);
+    const collected = Boolean(lib);
+    let journal = lib?.journal && lib.journal !== UNFILED
+      ? lib.journal
+      : inferJournalFromDoi(key);
+    if (journal && !byJournal.has(journal)) {
+      // Library classified outside Basket — still attribute via DOI heuristic
+      journal = inferJournalFromDoi(key);
+    }
+    const year = lib?.year ?? inferYearFromDoi(key);
+
+    const bucket = journal && byJournal.has(journal) ? byJournal.get(journal) : unattributed;
+    const ymap = journal && yearMaps.has(journal) ? yearMaps.get(journal) : unattributedYears;
+
+    bucket.target += 1;
+    if (collected) {
+      bucket.collected += 1;
+      bumpYear(ymap, year, 'target');
+      bumpYear(ymap, year, 'collected');
+    } else {
+      bucket.missing += 1;
+      bumpYear(ymap, year, 'target');
+      bumpYear(ymap, year, 'missing');
+    }
+  }
+
+  function finalize(bucket, yearMap) {
+    bucket.coveragePct = bucket.target === 0
+      ? 0
+      : Math.round((bucket.collected / bucket.target) * 1000) / 10;
+    bucket.years = [...yearMap.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([, row]) => row);
+    return bucket;
+  }
+
+  const journals = order.map((name) => finalize(byJournal.get(name), yearMaps.get(name)));
+  const unattributedFinal = finalize(unattributed, unattributedYears);
+
+  return {
+    journals,
+    unattributed: unattributedFinal.target > 0 ? unattributedFinal : null,
+    targetTotal: targetKeys.size,
+    collectedTotal: [...targetKeys].filter((k) => libraryMeta.has(k)).length,
+  };
+}
+
+/**
+ * DOIs in AIS Basket target list that are not yet in the library.
+ * Optional journal/year filters use the same attribution rules as the breakdown.
+ * Sorted lexicographically for stable UI display / copy-paste.
+ *
+ * @param {{ journal?: string|null, year?: number|null }} [filters]
+ */
+export async function getMissingTargetDois({ journal = null, year = null } = {}) {
+  const targetKeys = getTargetDoiKeys();
+  const libraryMeta = await getLibraryDoiMetaMap();
+  const yearNum = year == null || year === '' ? null : Number(year);
+  const dois = [];
+
+  for (const key of targetKeys) {
+    if (libraryMeta.has(key)) continue;
+
+    const inferredJournal = inferJournalFromDoi(key);
+    const inferredYear = inferYearFromDoi(key);
+
+    if (journal) {
+      if (journal === '未识别') {
+        if (inferredJournal) continue;
+      } else if (inferredJournal !== journal) {
+        continue;
+      }
+    }
+    if (yearNum != null && !Number.isNaN(yearNum)) {
+      if (inferredYear !== yearNum) continue;
+    }
+    dois.push(key);
+  }
+
+  dois.sort();
+  return {
+    total: dois.length,
+    dois,
+    journal: journal || null,
+    year: yearNum != null && !Number.isNaN(yearNum) ? yearNum : null,
   };
 }
