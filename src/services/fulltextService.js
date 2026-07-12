@@ -39,10 +39,10 @@ function fulltextPrefixFor(key) {
  * Drop MinerU artifacts we never read: source-PDF duplicate, layout debug
  * dump, and per-page model output. Keeps full.md, content_list.json, images/.
  */
-function pruneUnusedMineruFiles(dir) {
-  for (const p of walk(dir)) {
+async function pruneUnusedMineruFiles(dir) {
+  for await (const p of walk(dir)) {
     let st;
-    try { st = fs.statSync(p); } catch { continue; }
+    try { st = await fs.promises.stat(p); } catch { continue; }
     if (!st.isFile()) continue;
     const base = path.basename(p);
     if (
@@ -50,7 +50,7 @@ function pruneUnusedMineruFiles(dir) {
       || base === 'layout.json'
       || base.endsWith('_model.json')
     ) {
-      try { fs.unlinkSync(p); } catch { /* ignore */ }
+      try { await fs.promises.unlink(p); } catch { /* ignore */ }
     }
   }
 }
@@ -119,7 +119,7 @@ export async function parseItem(key, { force = false } = {}) {
   try {
     ({ batchId } = await submitLocalPdf({ filePath, fileName, modelVersion: config.mineru.modelVersion }));
   } finally {
-    if (isTemp) try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+    if (isTemp) try { await fs.promises.unlink(filePath); } catch { /* ignore */ }
   }
 
   // Clean any prior extracted assets so a re-parse starts fresh.
@@ -172,10 +172,16 @@ function backoffDelay(attempt) {
   return Math.floor(Math.random() * exp);
 }
 
+const ENQUEUE_CONCURRENCY = 8;
+
 /**
  * Enqueue a batch of items for background submission to MinerU.
  * Creates a 'submitting' row for each valid item immediately and returns
  * a summary right away — does NOT block on network I/O.
+ *
+ * Per-key lookups (loadByKey, getFullTextRow, findPdfRelPath, cleanupAssets)
+ * are DB/storage round trips; a bounded worker pool runs them concurrently
+ * instead of one key at a time so a large batch doesn't serialize on latency.
  */
 export async function enqueueBatchParse(keys) {
   let queued = 0;
@@ -184,39 +190,44 @@ export async function enqueueBatchParse(keys) {
   let noPdf = 0;
   let notFound = 0;
 
-  for (const key of keys) {
-    const item = await Item.loadByKey(key);
-    if (!item) { notFound++; continue; }
+  const queue = keys.slice();
+  async function worker() {
+    while (queue.length) {
+      const key = queue.shift();
+      const item = await Item.loadByKey(key);
+      if (!item) { notFound++; continue; }
 
-    const existing = await getFullTextRow(item.id);
-    if (existing) {
-      if (existing.state === 'done') { skippedDone++; continue; }
-      if (['submitting', 'pending', 'running', 'converting'].includes(existing.state)) {
-        skippedRunning++; continue;
+      const existing = await getFullTextRow(item.id);
+      if (existing) {
+        if (existing.state === 'done') { skippedDone++; continue; }
+        if (['submitting', 'pending', 'running', 'converting'].includes(existing.state)) {
+          skippedRunning++; continue;
+        }
       }
+
+      const pdfRelPath = await findPdfRelPath(item);
+      if (!pdfRelPath) { noPdf++; continue; }
+
+      // Record immediately so the item is visible in the task log.
+      await cleanupAssets(key);
+      await upsertFullText(item.id, {
+        state: 'submitting',
+        mineruBatchId: null,
+        modelVersion: config.mineru.modelVersion,
+        extractedPages: null,
+        totalPages: null,
+        markdownPath: null,
+        assetDir: null,
+        errCode: null,
+        errMsg: null,
+        submittedAt: nowStr(),
+        completedAt: null,
+      });
+      submitQueue.push({ itemId: item.id, key, pdfRelPath });
+      queued++;
     }
-
-    const pdfRelPath = await findPdfRelPath(item);
-    if (!pdfRelPath) { noPdf++; continue; }
-
-    // Record immediately so the item is visible in the task log.
-    await cleanupAssets(key);
-    await upsertFullText(item.id, {
-      state: 'submitting',
-      mineruBatchId: null,
-      modelVersion: config.mineru.modelVersion,
-      extractedPages: null,
-      totalPages: null,
-      markdownPath: null,
-      assetDir: null,
-      errCode: null,
-      errMsg: null,
-      submittedAt: nowStr(),
-      completedAt: null,
-    });
-    submitQueue.push({ itemId: item.id, key, pdfRelPath });
-    queued++;
   }
+  await Promise.all(Array.from({ length: Math.min(ENQUEUE_CONCURRENCY, keys.length) }, worker));
 
   // Kick the drain loop if not already running.
   if (!submitQueueRunning && submitQueue.length > 0) {
@@ -294,7 +305,7 @@ async function submitOne({ itemId, key, pdfRelPath }) {
       console.error(`[fulltext] submit failed for ${key}: ${err.message}`);
       return;
     } finally {
-      if (isTemp) try { fs.unlinkSync(filePath); } catch { /* ignore */ }
+      if (isTemp) try { await fs.promises.unlink(filePath); } catch { /* ignore */ }
     }
   }
 }
@@ -431,8 +442,8 @@ async function finalizeDone(row, zipUrl) {
     : fulltextDirFor(row.itemKey);
 
   const { fullMdPath } = await downloadAndExtract(zipUrl, localDir);
-  rewriteAssetPaths(fullMdPath, row.itemKey);
-  pruneUnusedMineruFiles(localDir);
+  await rewriteAssetPaths(fullMdPath, row.itemKey);
+  await pruneUnusedMineruFiles(localDir);
 
   let markdownPath, assetDir;
   if (useS3()) {
@@ -442,11 +453,12 @@ async function finalizeDone(row, zipUrl) {
     const relMd = path.relative(localDir, fullMdPath).replace(/\\/g, '/');
     markdownPath = `${prefix}/${relMd}`;
     assetDir = prefix;
-    try { fs.rmSync(localDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try { await fs.promises.rm(localDir, { recursive: true, force: true }); } catch { /* ignore */ }
   } else {
     markdownPath = relToStorage(fullMdPath);
     assetDir = relToStorage(localDir);
   }
+
 
   await upsertFullText(row.itemID, {
     state: 'done',
@@ -480,9 +492,9 @@ export async function getFullText(key) {
 
 const DOI_RE = /https?:\/\/(?:dx\.)?doi\.org\/(10\.\d{4,9}\/[^\s)"']+)|\b(10\.\d{4,9}\/[^\s)"']+)/i;
 
-function findContentList(dir) {
+async function findContentList(dir) {
   try {
-    for (const f of fs.readdirSync(dir)) {
+    for (const f of await fs.promises.readdir(dir)) {
       if (f === 'content_list.json' || (f.endsWith('_content_list.json') && !f.endsWith('_v2.json'))) {
         return path.join(dir, f);
       }
@@ -491,9 +503,9 @@ function findContentList(dir) {
   return null;
 }
 
-function* walk(dir) {
+async function* walk(dir) {
   let ents;
-  try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
   for (const e of ents) {
     const p = path.join(dir, e.name);
     yield p;
@@ -501,12 +513,14 @@ function* walk(dir) {
   }
 }
 
-function findContentListRecursive(dir) {
-  const direct = findContentList(dir);
+async function findContentListRecursive(dir) {
+  const direct = await findContentList(dir);
   if (direct) return direct;
-  for (const p of walk(dir)) {
-    if (fs.statSync(p).isDirectory()) {
-      const found = findContentList(p);
+  for await (const p of walk(dir)) {
+    let st;
+    try { st = await fs.promises.stat(p); } catch { continue; }
+    if (st.isDirectory()) {
+      const found = await findContentList(p);
       if (found) return found;
     }
   }
@@ -538,10 +552,11 @@ export async function getContentListBlocks(key) {
   }
 
   const dir = fulltextDirFor(key);
-  const contentListPath = findContentListRecursive(dir);
+  const contentListPath = await findContentListRecursive(dir);
   if (!contentListPath) return null;
   try {
-    const blocks = JSON.parse(fs.readFileSync(contentListPath, 'utf8'));
+    const raw = await fs.promises.readFile(contentListPath, 'utf8');
+    const blocks = JSON.parse(raw);
     if (!Array.isArray(blocks)) return null;
     const listDirRel = path.relative(dir, path.dirname(contentListPath)).replace(/\\/g, '/');
     return { blocks, listDirRel };
@@ -661,7 +676,7 @@ async function cleanupAssets(key) {
     return;
   }
   const dir = fulltextDirFor(key);
-  try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
+  try { await fs.promises.rm(dir, { recursive: true, force: true }); } catch { /* ignore */ }
 }
 
 function nowStr() {
@@ -694,6 +709,6 @@ export async function resolveFullTextAsset(key, subPath) {
   if (abs !== rootResolved && !abs.startsWith(rootResolved + path.sep)) {
     return null;
   }
-  if (!fs.existsSync(abs)) return null;
+  try { await fs.promises.access(abs); } catch { return null; }
   return abs;
 }

@@ -179,9 +179,9 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5 } = {}) {
   }
 
   const pubFieldId = await fieldIdByName('publicationTitle');
-  const journalCores = [];
+  let journalCores = [];
   if (authorTypeId != null && pubFieldId) {
-    for (const journal of JOURNAL_WHITELIST) {
+    journalCores = await Promise.all(JOURNAL_WHITELIST.map(async (journal) => {
       const rows = await query(`
         SELECT c."creatorID" AS id, c."firstName" AS "firstName", c."lastName" AS "lastName",
                c."fieldMode" AS "fieldMode", COUNT(*)::int AS "paperCount"
@@ -199,15 +199,15 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5 } = {}) {
         LIMIT $4
       `, [pubFieldId, authorTypeId, journal, coreN]);
 
-      journalCores.push({
+      return {
         journal,
         authors: rows.map((r) => ({
           id: r.id,
           name: creatorDisplayName(r),
           paperCount: r.paperCount,
         })),
-      });
-    }
+      };
+    }));
   }
 
   return {

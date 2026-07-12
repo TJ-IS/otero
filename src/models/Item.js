@@ -180,10 +180,31 @@ async function _rowToItem(row) {
   });
 }
 
+/**
+ * Build an Item from a listItems() row that already carries fields/creators
+ * as aggregated JSON (via the query's LATERAL joins), avoiding the N+1
+ * per-item queries that _rowToItem issues.
+ */
+function _bulkRowToItem(row) {
+  return new Item({
+    id: row.itemID,
+    key: row.key,
+    itemTypeID: row.itemTypeID,
+    itemTypeName: row.itemTypeName,
+    dateAdded: row.dateAdded,
+    dateModified: row.dateModified,
+    version: row.version,
+    deleted: row.deleted,
+    parentItemID: row.parentItemID,
+    fields: row.fields,
+    creators: row.creators,
+  });
+}
+
 export const Items = {
   async list(opts) {
     const rows = await repoListItems(opts);
-    return Promise.all(rows.map(_rowToItem));
+    return rows.map(_bulkRowToItem);
   },
   loadByKey(key) { return Item.loadByKey(key); },
   loadById(id) { return Item.loadById(id); },

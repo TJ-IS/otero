@@ -54,7 +54,7 @@ export async function submitLocalPdf({ filePath, fileName, modelVersion, languag
   if (!urls || urls.length === 0) throw new Error('MinerU returned no upload url');
 
   // Upload the file to the signed OSS URL. No Content-Type header (per docs).
-  const stat = fs.statSync(filePath);
+  const stat = await fs.promises.stat(filePath);
   const src = fs.createReadStream(filePath);
   const upRes = await fetch(urls[0], {
     method: 'PUT',
@@ -116,7 +116,7 @@ export async function submitLocalPdfs(files, opts = {}) {
 }
 
 async function uploadOne(filePath, url) {
-  const stat = fs.statSync(filePath);
+  const stat = await fs.promises.stat(filePath);
   const src = fs.createReadStream(filePath);
   const upRes = await fetch(url, {
     method: 'PUT',
@@ -166,46 +166,46 @@ export async function getBatchResult(batchId) {
  * Returns { fullMdPath, contentListPath?, imagesDir? }.
  */
 export async function downloadAndExtract(zipUrl, destDir) {
-  fs.mkdirSync(destDir, { recursive: true });
+  await fs.promises.mkdir(destDir, { recursive: true });
   const tmpZip = path.join(destDir, '__tmp__.zip');
   try {
     const r = await fetch(zipUrl);
     if (!r.ok || !r.body) throw new Error(`zip download failed: HTTP ${r.status}`);
     await pipeline(Readable.fromWeb(r.body), createWriteStream(tmpZip));
     const zip = new AdmZip(tmpZip);
-    zip.extractAllTo(destDir, true);
+    await zip.extractAllToAsync(destDir, true);
 
     // MinerU zip layout: a top dir like <stem>/ containing full.md, images/, etc.
     // Find full.md anywhere under destDir.
-    const fullMdPath = findFile(destDir, 'full.md');
+    const fullMdPath = await findFile(destDir, 'full.md');
     if (!fullMdPath) throw new Error('full.md not found in MinerU zip');
-    const contentListPath = findFile(destDir, 'content_list.json') || null;
-    const imagesDir = findDir(destDir, 'images');
+    const contentListPath = (await findFile(destDir, 'content_list.json')) || null;
+    const imagesDir = await findDir(destDir, 'images');
     return { fullMdPath, contentListPath, imagesDir };
   } finally {
-    try { fs.unlinkSync(tmpZip); } catch { /* ignore */ }
+    try { await fs.promises.unlink(tmpZip); } catch { /* ignore */ }
   }
 }
 
-function findFile(root, name) {
-  for (const p of walk(root)) {
+async function findFile(root, name) {
+  for await (const p of walk(root)) {
     try {
-      if (path.basename(p) === name && fs.statSync(p).isFile()) return p;
+      if (path.basename(p) === name && (await fs.promises.stat(p)).isFile()) return p;
     } catch { /* race / broken symlink */ }
   }
   return null;
 }
-function findDir(root, name) {
-  for (const p of walk(root)) {
+async function findDir(root, name) {
+  for await (const p of walk(root)) {
     try {
-      if (path.basename(p) === name && fs.statSync(p).isDirectory()) return p;
+      if (path.basename(p) === name && (await fs.promises.stat(p)).isDirectory()) return p;
     } catch { /* race / broken symlink */ }
   }
   return null;
 }
-function* walk(dir) {
+async function* walk(dir) {
   let ents;
-  try { ents = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+  try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
   for (const e of ents) {
     const p = path.join(dir, e.name);
     yield p;
@@ -220,15 +220,15 @@ function* walk(dir) {
  *
  * Also rewrites any other asset references (e.g. videos) defensively.
  */
-export function rewriteAssetPaths(fullMdPath, itemKey) {
-  let md = fs.readFileSync(fullMdPath, 'utf8');
+export async function rewriteAssetPaths(fullMdPath, itemKey) {
+  let md = await fs.promises.readFile(fullMdPath, 'utf8');
   const base = `/api/attachments/${itemKey}/fulltext`;
   // Match ![alt](images/...) and <img src="images/...">
   md = md.replace(/!\[([^\]]*)\]\((images\/[^)]+)\)/g, (_, alt, src) =>
     `![${alt}](${base}/${normalizeSrc(src)})`);
   md = md.replace(/<img([^>]+)src=["'](images\/[^"']+)["']/g, (_, attrs, src) =>
     `<img${attrs}src="${base}/${normalizeSrc(src)}"`);
-  fs.writeFileSync(fullMdPath, md);
+  await fs.promises.writeFile(fullMdPath, md);
 }
 
 function normalizeSrc(src) {
