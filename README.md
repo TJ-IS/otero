@@ -1,13 +1,13 @@
 # Otero
 
-面向 **AIS Senior Scholars' Basket of Journals**（信息系统协会资深学者推荐期刊列表，共 11 本）的文献收录与全文管理系统。基于 Zotero 风格的 EAV 数据模型，使用纯 JavaScript + PostgreSQL 存储元数据，配合 MinerU 进行 PDF 全文解析，并提供 Web 界面进行浏览、检索与导出。
+面向 **AIS Senior Scholars' Basket of Journals**（信息系统协会资深学者推荐期刊，共 11 本）的文献收录与全文管理系统。数据模型仿 Zotero EAV；元数据存 **PostgreSQL**；PDF 与全文资产存 **本地磁盘** 或 **Cloudflare R2**（S3 兼容 API）；全文解析走 [MinerU](https://mineru.net)；Web 端支持浏览、检索、仪表盘、作者图谱与钱包编辑鉴权。
 
 ## 收录期刊
 
-系统通过内置白名单（`src/services/journalWhitelist.js`）对入库文献做**虚拟分类**：原始 `publicationTitle` 字段从不被改写，凡不在白名单内（或缺省）的条目在查询时归入"待归档"桶。
+通过 `src/services/journalWhitelist.js` 对入库文献做**虚拟分类**：原始 `publicationTitle` 永不改写；不在白名单（或缺省）的条目在查询时归入「待归档」。
 
-| # | 期刊名称 |
-|---|----------|
+| # | 期刊 |
+|---|------|
 | 1 | MIS Quarterly |
 | 2 | Information Systems Research |
 | 3 | Journal of Management Information Systems |
@@ -22,75 +22,97 @@
 
 ## 功能特性
 
-- **EAV 数据模型**：仿 Zotero 的 `items` + `itemData` + `itemDataValues` 三层结构，灵活适配不同条目类型。
-- **PDF 导入流水线**：抽取 PDF 内嵌元数据与首页文本，再向 CrossRef / arXiv / OpenLibrary 按 DOI / arXiv ID / ISBN 查询补全题录。
-- **批量导入**：`import_all.mjs` 以并发方式批量入库一个目录下的全部 PDF，并输出 CSV 进度日志。
-- **MinerU 全文解析**：调用 [MinerU](https://mineru.net) 将 PDF 转换为 Markdown + 图片资源，支持 200 文件/批的单次提交、配额感知、429 退避、失败重试。
-- **后台轮询 Worker**：服务器启动后自动轮询 MinerU 批次状态，将完成结果下载解包并改写图片链接。
-- **期刊分类侧栏**：按 11 本期刊 + "待归档"分组浏览，并显示各期刊条目计数。
-- **全文阅读视图**：在条目详情中渲染解析得到的 Markdown，图片通过 `/api/attachments/:key/fulltext` 端点提供。
-- **任务日志**：MineruTaskLog 弹窗查看解析队列状态（待提交 / 排队中 / 解析中 / 已完成 / 失败），支持批量重试失败项。
-- **题录导出**：单条或批量导出为 BibTeX / RIS。
-- **REST API**：完整支持 items / collections / tags / journals / fulltext / attachments 的增删改查。
-- **Docker 部署**：多阶段构建，前端构建产物由后端静态托管，单容器即可运行。
+- **EAV 题录**：`items` + `itemData` + `itemDataValues`，适配多种条目类型。
+- **PDF 导入**：抽取内嵌元数据与首页文本，再按 DOI / arXiv / ISBN 向 CrossRef、arXiv、OpenLibrary 补全。
+- **对象存储**：`STORAGE_TYPE=filesystem` 或 `s3`（Cloudflare R2 / 任意 S3 兼容端点）。
+- **MinerU 全文**：PDF → Markdown + 图片；批量提交、配额感知、429 退避、后台 Worker 轮询落盘。
+- **期刊侧栏 / 全文阅读 / 任务日志**：按期刊浏览；Markdown 渲染；MinerU 队列状态与失败重试。
+- **仪表盘**：概览、期刊、时间线、DOI 覆盖、入库与全文统计。
+- **作者图谱**：合作网络与作者详情页。
+- **Merkle 完整性**：文献集合 Merkle 根查询、存在性证明与重建。
+- **LLM 能力**：题录校准、字段抽取、条目对话（OpenAI 兼容 API）。
+- **导出**：BibTeX / RIS。
+- **编辑鉴权**：以太坊钱包签名登录；白名单地址可写，其余只读。
+- **Docker**：`postgres` + `otero`；前端构建产物由后端静态托管。
 
 ## 技术栈
 
-- **后端**：Node.js ≥ 20（ESM）、Express、pg（PostgreSQL）、pdfjs-dist、adm-zip、zod
-- **前端**：Vite + React + shadcn/ui + Tailwind CSS
-- **外部服务**：PostgreSQL、MinerU（全文解析）、DeepSeek/OpenAI 兼容 API（LLM）、CrossRef/arXiv/OpenLibrary（元数据识别）、可选 MinIO
+| 层 | 技术 |
+|----|------|
+| 后端 | Node.js ≥ 20（ESM）、Express、`pg`、pdfjs-dist、adm-zip、zod、`minio`（S3 SDK，对接 R2） |
+| 前端 | Vite + React + shadcn/ui + Tailwind；recharts / d3-force / KaTeX |
+| 数据 | PostgreSQL 16；对象存储 filesystem 或 Cloudflare R2 |
+| 外部 | MinerU、DeepSeek/OpenAI 兼容 LLM、CrossRef / arXiv / OpenLibrary |
 
 ## 目录结构
 
 ```
 data/                 运行时数据（gitignored）
-  storage/            文件系统模式下的 PDF / 全文（STORAGE_TYPE=filesystem）
-src/                  后端（Node.js, ESM）
-  db/                 connection（pg Pool）、schema.postgres.sql、migrate、seed
+  postgres/           Docker 卷：PostgreSQL 数据文件
+  storage/            STORAGE_TYPE=filesystem 时的 PDF / 全文
+src/
+  db/                 connection、schema.postgres.sql、migrate、seed
   models/             Item / Collection / Attachment
-  repositories/       SQL 访问层（itemRepo / fulltextRepo / collectionRepo / …）
-  services/           importService / pdfParser / recognizers / mineruService
-                       fulltextService / fulltextWorker / journalWhitelist
-                       metadataMapper / exportService / storageService
-  api/                Express 服务器 + 路由
-  cli/                commander 命令行入口
-  utils/              key / doi / isbn 工具
-  config.js           配置加载（.env + 默认值；DATABASE_URL 必填）
-  index.js            服务器启动入口
-scripts/              运维脚本（导入 PDF、对象存储迁移等）
-web/                  前端（Vite + React + shadcn/ui）
-docs/                 含 postgres-migration.md
-deps/zotero/          Zotero 参考源码（git submodule）
-Dockerfile            多阶段构建（前端 build + 后端运行）
-docker-compose.yml    postgres + otero（可选）
+  repositories/       SQL 访问层
+  services/           导入、识别、存储、MinerU、全文、校准、抽取、聊天、Merkle…
+  api/                Express + 路由 + 钱包鉴权中间件
+  cli/                commander CLI
+  config.js           .env + 默认值（DATABASE_URL 必填）
+scripts/
+  import-downloads-to-db.mjs   按 DOI 文件名批量入库（Crossref + 当前存储后端）
+web/                  Vite 前端
+docs/                 设计参考（Zotero 数据格式与 PDF 识别分析）
+deps/zotero/          Zotero 参考源码（submodule）
+Dockerfile / docker-compose.yml / docker-entrypoint.sh
 ```
+
+根目录另有若干一次性运维脚本（`import_all.mjs`、`enrich_all.mjs`、`extract_all.mjs` 等），路径与并发写死在脚本内，按需改后使用。
 
 ## 环境变量
 
-在项目根目录创建 `.env` 文件（参见 `src/config.js`）：
+复制 `.env.example` 为 `.env`。完整键名以 `src/config.js` 为准，常用项：
 
 ```env
-# MinerU 全文解析
-OTERO_MINERU_TOKEN="<your-mineru-bearer-token>"
+# PostgreSQL（必填）
+DATABASE_URL=postgresql://otero:otero-secret-change-me@127.0.0.1:5432/otero
+POSTGRES_USER=otero
+POSTGRES_PASSWORD=otero-secret-change-me
+POSTGRES_DB=otero
+POSTGRES_PORT=5432
+
+# 对象存储：filesystem | s3（R2 等）
+STORAGE_TYPE=s3
+S3_ENDPOINT=<ACCOUNT_ID>.r2.cloudflarestorage.com
+S3_PORT=443
+S3_USE_SSL=true
+S3_ACCESS_KEY=
+S3_SECRET_KEY=
+S3_BUCKET=otero-pdfs
+S3_REGION=auto
+S3_CREATE_BUCKET=false
+
+# MinerU
+OTERO_MINERU_TOKEN=
 OTERO_MINERU_MODEL=vlm
 OTERO_MINERU_POLL_MS=15000
 OTERO_MINERU_MAX_CONCURRENT=3
 OTERO_MINERU_BATCH_SIZE=200
 
-# LLM（可选，用于元数据补全等）
-OPENAI_API_KEY="<your-api-key>"
+# LLM（校准 / 抽取 / 对话）
+OPENAI_API_KEY=
 OPENAI_BASE_URL=https://api.deepseek.com/v1
 OPENAI_MODEL=deepseek-v4-flash
 
-# 服务器
+# 钱包编辑白名单（逗号分隔）与 JWT
+OTERO_EDITOR_WHITELIST=0x...
+OTERO_AUTH_SECRET=change-me-in-production
+
+# 服务监听（本地开发）
 OTERO_PORT=3000
 OTERO_HOST=127.0.0.1
-
-# PostgreSQL（必填）
-DATABASE_URL=postgresql://otero:otero-secret-change-me@127.0.0.1:5432/otero
 ```
 
-> ⚠️ `.env` 已在 `.gitignore` 中，切勿提交真实密钥。SQLite → PG 步骤见 [`docs/postgres-migration.md`](docs/postgres-migration.md)。
+> `.env` 已在 `.gitignore` 中，勿提交真实密钥。R2 请使用 **S3 API 端点**（`*.r2.cloudflarestorage.com`），不要用公共自定义域名。
 
 ## 安装与运行
 
@@ -98,87 +120,105 @@ DATABASE_URL=postgresql://otero:otero-secret-change-me@127.0.0.1:5432/otero
 
 ```bash
 docker compose up -d postgres   # 或自备 PostgreSQL
+cp .env.example .env            # 填 DATABASE_URL、存储与 Token
 npm install
-npm run migrate   # 应用 schema.postgres.sql
-npm run seed      # 写入 itemTypes / fields / creatorTypes（幂等，不清空业务数据）
-npm run serve     # 启动 API + Web（默认 127.0.0.1:3000）
+npm run migrate                 # 应用 schema.postgres.sql
+npm run seed                    # itemTypes / fields / creatorTypes（幂等）
+npm run serve                   # API +（若已 build）Web，默认 127.0.0.1:3000
 ```
 
-前端（开发模式，热更新）：
+前端热更新：
 
 ```bash
-cd web
-npm install
-npm run dev       # http://127.0.0.1:5173，/api 反向代理到 :3000
-npm run build     # 生产构建到 web/dist，由后端静态托管
+cd web && npm install && npm run dev
+# http://127.0.0.1:5173 ，/api 与 /health 代理到 :3000
 ```
 
-开发时同时运行后端 `npm run serve` 与前端 `npm run dev`；Vite 会把 `/api`、`/health` 代理到 `http://127.0.0.1:3000`。
+生产前端：`cd web && npm run build`，后端以 SPA fallback 托管 `web/dist/`。
 
-生产部署时先 `cd web && npm run build`，再启动后端即可，后端会以 SPA fallback 方式提供 `web/dist/`。
+测试：`DATABASE_URL=... npm test`（不会 TRUNCATE 业务表）。
 
-### Docker
+### Docker（一键）
 
 ```bash
+# 根目录准备好 .env（含 S3/R2、MinerU、AUTH 等；compose 会覆盖 DATABASE_URL 指向服务名 postgres）
 docker compose up -d --build
-# 访问 http://localhost:3001
+# 宿主访问 http://localhost:4321 （映射容器 3000）
 ```
 
-容器内 `/app/data` 为持久卷，挂载到宿主 `./data`。
+`./data` 挂载到容器 `/app/data`（含 `postgres/` 与可选 `storage/`）。入口脚本会先 `migrate` + `seed` 再启动。
 
 ## 使用方式
 
-### 命令行
+### CLI
 
 ```bash
-# 导入 PDF（自动识别元数据）
-node src/cli/index.js import path/to/paper1.pdf path/to/paper2.pdf
-
-# 列出条目
-node src/cli/index.js list
-node src/cli/index.js list --type journalArticle --tag "machine learning"
-
-# 启动服务
-node src/cli/index.js serve --port 3000
+npm run cli -- import path/to/a.pdf path/to/b.pdf
+npm run cli -- list
+npm run cli -- list --type journalArticle
+npm run cli -- parse <ITEM_KEY> --wait
+npm run cli -- parse-all
+npm run cli -- parse-status
+npm run cli -- serve --port 3000
 ```
 
-### 批量导入脚本
-
-`import_all.mjs` 扫描一个目录下的全部 PDF 并并发入库，输出 CSV 进度日志：
+### 批量入库（DOI 文件名）
 
 ```bash
-# 修改脚本顶部的 PDF_DIR / CONCURRENCY / BATCH_LOG 后执行
-node import_all.mjs
+# 默认扫描 data/downloads/{unpaywall,scihub}；文件名 = DOI 且 '/' → '_'
+node scripts/import-downloads-to-db.mjs
+node scripts/import-downloads-to-db.mjs --dir /path/to/pdfs --concurrency 4
+node scripts/import-downloads-to-db.mjs --dry-run
 ```
 
-### 触发全文解析
+### 全文解析
 
-- 在 Web 界面条目详情中点击"解析全文"，或在 MineruTaskLog 中批量提交。
-- 调用 API：`POST /api/fulltext/parse-batch { "keys": ["KEY1", ...] }`。
-- 后台 Worker 会按 `OTERO_MINERU_POLL_MS` 间隔轮询 MinerU 并下载结果。
+- Web：条目详情「解析全文」，或 MineruTaskLog 批量提交 / 重试失败项。
+- API：`POST /api/fulltext/parse-batch`、`POST /api/items/:key/fulltext/parse`。
+- Worker 按 `OTERO_MINERU_POLL_MS` 轮询并下载结果到当前存储后端。
 
-## REST API
+### Web 路由
+
+| 路径 | 说明 |
+|------|------|
+| `/` | 文献库 |
+| `/search` | 检索 |
+| `/items/:key` | 条目详情 |
+| `/dashboard` | 概览 / 期刊 / 时间线 |
+| `/dashboard/authors`、`/authors/:id` | 作者图谱与详情 |
+| `/dashboard/merkle` | Merkle 视图 |
+
+## REST API（摘要）
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/items` | 列出条目（`?type=&journal=&collection=&search=`） |
-| GET | `/api/items/export` | 批量导出（`?format=bibtex\|ris`） |
-| GET | `/api/items/:key` | 条目详情 |
-| GET | `/api/items/:key/export` | 单条导出（`?format=bibtex\|ris`） |
-| PATCH | `/api/items/:key` | 更新字段 |
-| DELETE | `/api/items/:key` | 软删除（`?permanent=true` 永久删除） |
-| POST | `/api/import/pdf` | multipart 上传 PDF 并走识别流水线 |
-| GET | `/api/journals` | 11 本期刊 + 待归档的条目计数 |
-| GET | `/api/fulltext/pending` | 分页任务日志（`?filter=&page=&pageSize=`） |
-| POST | `/api/fulltext/parse-batch` | 批量入队解析 |
-| POST | `/api/fulltext/retry-failed` | 重试所有失败项 |
-| POST | `/api/items/:key/fulltext/parse` | 单条触发解析（`?force=true`） |
-| GET | `/api/items/:key/fulltext` | 读取全文（含 Markdown） |
-| DELETE | `/api/items/:key/fulltext` | 删除全文结果 |
-| GET | `/api/attachments/:key/fulltext/*` | 全文图片等静态资源 |
-| — | `/api/collections` `/api/tags` | 集合与标签 CRUD |
+| GET | `/health` | 健康检查 |
+| GET/POST | `/api/auth/nonce`、`/verify`、`/me` | 钱包登录 |
+| GET/POST/PATCH/DELETE | `/api/items…` | 条目 CRUD、导出、附件列表 |
+| POST | `/api/import/pdf` | multipart 上传 PDF |
+| GET | `/api/journals` | 期刊 + 待归档计数 |
+| GET | `/api/authors/graph`、`/api/authors/:id` | 作者 |
+| GET | `/api/stats/*` | overview、doi-coverage、years、journals、fulltext、ingestion… |
+| GET/POST/DELETE | `/api/fulltext…`、`/api/items/:key/fulltext…` | 全文队列与内容 |
+| GET | `/api/attachments/:key/file` | PDF 流 |
+| GET | `/api/attachments/:key/fulltext/*` | 全文静态资源 |
+| POST | `/api/items/:key/calibrate`、`/extract`、`/chat`、`/crossref` | LLM / Crossref |
+| GET/POST | `/api/merkle/*` | root / exists / verify / rebuild |
+| — | `/api/collections` | 集合 CRUD |
+
+写操作需编辑者 JWT（`Authorization: Bearer …`）；未登录可读。
 
 ## 设计文档
 
-- `docs/zotero-data-format-analysis.md`：Zotero 数据格式分析。
-- `docs/zotero-pdf-metadata-extraction.md`：PDF 元数据抽取设计。
+- [`docs/zotero-data-format-analysis.md`](docs/zotero-data-format-analysis.md) — Zotero EAV / 存储模型分析（Otero schema 的设计依据）
+- [`docs/zotero-pdf-metadata-extraction.md`](docs/zotero-pdf-metadata-extraction.md) — Zotero PDF 识别流水线；文末对照 Otero 实现
+- [`transfer/RESTORE.md`](transfer/RESTORE.md) — 当前栈下的备份与恢复说明（`transfer/` 目录本身 gitignore）
+
+## 备份与数据
+
+| 组件 | 位置 | 备份建议 |
+|------|------|----------|
+| 元数据 | PostgreSQL（Docker 下为 `data/postgres/`） | `pg_dump` / `pg_restore` |
+| PDF + 全文 | R2 bucket，或 `data/storage/`（filesystem） | R2 侧版本/复制；本地则打包 `data/storage` |
+
+历史「SQLite + 本地 MinIO」迁移脚本与文档已移除；勿再按旧流程操作。

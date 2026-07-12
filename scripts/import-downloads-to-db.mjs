@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Import PDFs into PostgreSQL. Filename is a DOI with '/' replaced by '_';
- * metadata comes from Crossref; PDFs go to configured storage (MinIO/fs).
+ * metadata comes from Crossref; PDFs go to configured storage (S3/R2 or filesystem).
  *
  * Usage:
  *   node scripts/import-downloads-to-db.mjs

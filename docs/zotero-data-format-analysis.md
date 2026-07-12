@@ -1,6 +1,21 @@
 # Zotero 文献存储数据格式分析
 
-> 基于 `deps/zotero` 源码分析（核心定义：`chrome/content/zotero/xpcom/data/` + `resource/schema/`）
+> **文档角色**：设计参考。分析 `deps/zotero` 的数据模型，说明 Otero 为何采用 EAV。  
+> **Otero 现状**：元数据在 **PostgreSQL**（`src/db/schema.postgres.sql`），对象文件在 **filesystem 或 Cloudflare R2**（`STORAGE_TYPE` / `src/services/storageService.js`）。不再使用 SQLite 或本地 MinIO。
+
+**源码依据**：`deps/zotero` → `chrome/content/zotero/xpcom/data/`、`resource/schema/`。
+
+### Otero 对应位置
+
+| Zotero 概念 | Otero |
+|-------------|--------|
+| EAV 字段 | `itemData` / `itemDataValues`（PG） |
+| Item / Attachment 模型 | `src/models/Item.js`、`Attachment.js` |
+| 仓储 / SQL | `src/repositories/*` |
+| Schema 版本 | `schemaVersion` 表 + `src/db/migrate.js`（目标版本见 `config.schemaVersion`） |
+| 文件路径 | 附件 `path` 为相对 storage key 或 S3 object name，经 `storageService` 读写 |
+
+下文描述的是 **Zotero 自身** 的结构与行为，便于对照实现；运行时以 Otero 代码与 `schema.postgres.sql` 为准。
 
 ---
 

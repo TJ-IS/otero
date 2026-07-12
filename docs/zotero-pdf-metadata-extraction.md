@@ -1,5 +1,8 @@
 # Zotero PDF 元信息提取流程分析
 
+> **文档角色**：设计参考。梳理 Zotero 导入 PDF 后的识别流水线。  
+> **Otero 现状**：不调用 Zotero Recognizer / Translator；用自研流水线（见文末对照表）。元数据在 PostgreSQL，PDF/全文在 filesystem 或 R2。
+
 ## 概述
 
 上传 PDF 后，Zotero 通过以下流水线提取文献元信息：
@@ -206,3 +209,33 @@ search.translate({ libraryID: false }); // 先不保存，仅获取数据
 |----------|--------|------|
 | `extensions.zotero.autoRecognizeFiles` | `true` | 导入 PDF 时是否自动识别元数据 |
 | `extensions.zotero.autoRenameFiles` | — | 识别后是否自动重命名文件 |
+
+---
+
+## Otero 对应实现（当前）
+
+Otero 借鉴「本地抽文本 → 标识符 → 外部元数据源」的思路，但实现完全独立：
+
+```
+导入入口（CLI / POST /api/import/pdf / scripts/import-downloads-to-db.mjs）
+  │
+  ├─ storageService.storeFile → filesystem 或 R2（S3）
+  ├─ pdfParser（pdfjs-dist）抽取内嵌元数据与首页文本
+  ├─ recognizers：CrossRef / arXiv / OpenLibrary（按 DOI、arXiv ID、ISBN）
+  ├─ metadataMapper → Item + Attachment 写入 PostgreSQL
+  │
+  └─ 全文（可选，异步）
+       └─ MinerU 批次 + fulltextWorker → Markdown / 图片写入同一存储后端
+```
+
+| 步骤 | Otero 代码 |
+|------|------------|
+| 导入编排 | `src/services/importService.js` |
+| PDF 解析 | `src/services/pdfParser.js` |
+| 外部识别 | `src/services/recognizers/*` |
+| 字段映射 | `src/services/metadataMapper.js` |
+| 对象读写 | `src/services/storageService.js`、`s3Client.js` |
+| 全文 | `src/services/fulltextService.js`、`mineruService.js`、`fulltextWorker.js` |
+| 批量 DOI 入库 | `scripts/import-downloads-to-db.mjs` |
+
+可选增强（非 Zotero 路径）：`calibrateService` / `extractService` / `crossrefEnrichService` / `chatService` 用 LLM 或 Crossref 再补全。
