@@ -1,5 +1,6 @@
 import { query, queryOne, execute, withTransaction, nowUtc } from '../db/connection.js';
 import { JOURNAL_WHITELIST, UNFILED } from '../services/journalWhitelist.js';
+import { normalizeDoi } from '../utils/doi.js';
 
 // ---------------------------------------------------------------------------
 // Lookup helpers for schema names <-> IDs
@@ -162,11 +163,100 @@ const ITEM_SORT_FIELDS = {
 };
 
 /**
+ * Append journal / year / basket-scope constraints. Mutates where + params.
+ * Returns the next placeholder index, or null if the filter can never match.
+ *
+ * @param {object} opts
+ * @param {string} [opts.journal] single journal or UNFILED
+ * @param {string[]} [opts.journals] multi-journal allow-list (Basket names)
+ * @param {number} [opts.yearFrom] inclusive start year
+ * @param {number} [opts.yearTo] inclusive end year
+ * @param {boolean} [opts.basketOnly] when true and no journal(s), restrict to whitelist
+ */
+export async function appendItemScopeFilters(where, params, p, {
+  journal, journals, yearFrom, yearTo, basketOnly = false,
+} = {}) {
+  const jfid = await fieldIdByName('publicationTitle');
+  const journalList = Array.isArray(journals) ? journals.filter(Boolean) : [];
+
+  if (journal) {
+    if (!jfid) return null;
+    if (journal === UNFILED) {
+      const jParam = p++;
+      const wlParams = JOURNAL_WHITELIST.map(() => `$${p++}`).join(',');
+      where.push(`NOT EXISTS (
+        SELECT 1 FROM "itemData" d
+        JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+        WHERE d."itemID"=i."itemID" AND d."fieldID"=$${jParam} AND v.value IN (${wlParams})
+      )`);
+      params.push(jfid, ...JOURNAL_WHITELIST);
+    } else {
+      where.push(`EXISTS (
+        SELECT 1 FROM "itemData" d
+        JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+        WHERE d."itemID"=i."itemID" AND d."fieldID"=$${p++} AND v.value=$${p++}
+      )`);
+      params.push(jfid, journal);
+    }
+  } else if (journalList.length > 0) {
+    if (!jfid) return null;
+    const jParam = p++;
+    const jlParams = journalList.map(() => `$${p++}`).join(',');
+    where.push(`EXISTS (
+      SELECT 1 FROM "itemData" d
+      JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+      WHERE d."itemID"=i."itemID" AND d."fieldID"=$${jParam} AND v.value IN (${jlParams})
+    )`);
+    params.push(jfid, ...journalList);
+  } else if (basketOnly) {
+    if (!jfid) return null;
+    const jParam = p++;
+    const wlParams = JOURNAL_WHITELIST.map(() => `$${p++}`).join(',');
+    where.push(`EXISTS (
+      SELECT 1 FROM "itemData" d
+      JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+      WHERE d."itemID"=i."itemID" AND d."fieldID"=$${jParam} AND v.value IN (${wlParams})
+    )`);
+    params.push(jfid, ...JOURNAL_WHITELIST);
+  }
+
+  const hasYearFrom = Number.isInteger(yearFrom);
+  const hasYearTo = Number.isInteger(yearTo);
+  if (hasYearFrom || hasYearTo) {
+    const dfid = await fieldIdByName('date');
+    if (!dfid) return null;
+    const dParam = p++;
+    params.push(dfid);
+    const yearExpr = `SUBSTRING(v.value FROM 1 FOR 4)`;
+    const yearConds = [`${yearExpr} ~ '^[0-9]{4}$'`];
+    if (hasYearFrom) {
+      yearConds.push(`${yearExpr}::int >= $${p++}`);
+      params.push(yearFrom);
+    }
+    if (hasYearTo) {
+      yearConds.push(`${yearExpr}::int <= $${p++}`);
+      params.push(yearTo);
+    }
+    where.push(`EXISTS (
+      SELECT 1 FROM "itemData" d
+      JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+      WHERE d."itemID"=i."itemID" AND d."fieldID"=$${dParam}
+        AND ${yearConds.join(' AND ')}
+    )`);
+  }
+
+  return p;
+}
+
+/**
  * Build the shared WHERE clause + params for item list/count/keys queries.
  * Returns { where, params, p } or null when a filter can never match
  * (e.g. an unknown type name), letting callers short-circuit to an empty result.
  */
-async function _buildItemFilter({ type, journal, collection, search, includeDeleted = false }) {
+async function _buildItemFilter({
+  type, journal, journals, collection, search, includeDeleted = false,
+  yearFrom, yearTo, basketOnly = false,
+} = {}) {
   const where = ['i."parentItemID" IS NULL'];
   const params = [];
   let p = 1;
@@ -180,28 +270,10 @@ async function _buildItemFilter({ type, journal, collection, search, includeDele
     params.push(typeId);
   }
 
-  if (journal) {
-    const jfid = await fieldIdByName('publicationTitle');
-    if (jfid) {
-      if (journal === UNFILED) {
-        const jParam = p++;
-        const wlParams = JOURNAL_WHITELIST.map(() => `$${p++}`).join(',');
-        where.push(`NOT EXISTS (
-          SELECT 1 FROM "itemData" d
-          JOIN "itemDataValues" v ON v."valueID"=d."valueID"
-          WHERE d."itemID"=i."itemID" AND d."fieldID"=$${jParam} AND v.value IN (${wlParams})
-        )`);
-        params.push(jfid, ...JOURNAL_WHITELIST);
-      } else {
-        where.push(`EXISTS (
-          SELECT 1 FROM "itemData" d
-          JOIN "itemDataValues" v ON v."valueID"=d."valueID"
-          WHERE d."itemID"=i."itemID" AND d."fieldID"=$${p++} AND v.value=$${p++}
-        )`);
-        params.push(jfid, journal);
-      }
-    }
-  }
+  p = await appendItemScopeFilters(where, params, p, {
+    journal, journals, yearFrom, yearTo, basketOnly,
+  });
+  if (p == null) return null;
 
   if (collection) {
     where.push(`EXISTS (
@@ -253,7 +325,8 @@ async function _buildItemFilter({ type, journal, collection, search, includeDele
 }
 
 export async function listItems({
-  type, journal, collection, search, includeDeleted = false,
+  type, journal, journals, collection, search, includeDeleted = false,
+  yearFrom, yearTo, basketOnly = false,
   page = 1, pageSize = 100, sortField = 'dateModified', sortDir = 'desc',
 } = {}) {
   const validPage = Math.max(1, parseInt(page, 10) || 1);
@@ -265,7 +338,10 @@ export async function listItems({
   const orderByExpr = `${sortCols.map(c => `${c} ${validSortDir}`).join(', ')}, i."itemID" ${validSortDir}`;
 
   const empty = { items: [], total: 0, page: validPage, pageSize: validPageSize, totalPages: 0 };
-  const filter = await _buildItemFilter({ type, journal, collection, search, includeDeleted });
+  const filter = await _buildItemFilter({
+    type, journal, journals, collection, search, includeDeleted,
+    yearFrom, yearTo, basketOnly,
+  });
   if (!filter) return empty;
   const { where, params, searchQuery } = filter;
   let { p } = filter;
@@ -359,8 +435,14 @@ export async function listItems({
  * filtered set even though the paginated table only holds the loaded pages.
  * Payload is tiny (8-char keys) so this stays cheap even for large libraries.
  */
-export async function listItemKeys({ type, journal, collection, search, includeDeleted = false } = {}) {
-  const filter = await _buildItemFilter({ type, journal, collection, search, includeDeleted });
+export async function listItemKeys({
+  type, journal, journals, collection, search, includeDeleted = false,
+  yearFrom, yearTo, basketOnly = false,
+} = {}) {
+  const filter = await _buildItemFilter({
+    type, journal, journals, collection, search, includeDeleted,
+    yearFrom, yearTo, basketOnly,
+  });
   if (!filter) return [];
   const { where, params } = filter;
   const rows = await query(
@@ -368,6 +450,66 @@ export async function listItemKeys({ type, journal, collection, search, includeD
     params
   );
   return rows.map(r => r.key);
+}
+
+/**
+ * Exact DOI lookup (case-insensitive, normalized). Basket-scoped, top-level only.
+ * When multiple items share a DOI, return the most recently modified.
+ */
+export async function findItemByDoi(doi) {
+  const normalized = normalizeDoi(doi);
+  if (!normalized) return null;
+
+  const doiFieldId = await fieldIdByName('DOI');
+  const jfid = await fieldIdByName('publicationTitle');
+  if (!doiFieldId || !jfid) return null;
+
+  // Also match DOI values that still carry a doi.org URL prefix in storage.
+  const key = normalized.toLowerCase();
+  const wlPlaceholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 4}`).join(',');
+  return queryOne(`
+    SELECT i.*
+    FROM items i
+    JOIN "itemData" d ON d."itemID" = i."itemID" AND d."fieldID" = $1
+    JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+    WHERE i.deleted = 0
+      AND i."parentItemID" IS NULL
+      AND lower(regexp_replace(
+            trim(both FROM v.value),
+            '^https?://(dx\\.)?doi\\.org/',
+            '',
+            'i'
+          )) = $2
+      AND EXISTS (
+        SELECT 1 FROM "itemData" dj
+        JOIN "itemDataValues" vj ON vj."valueID" = dj."valueID"
+        WHERE dj."itemID" = i."itemID" AND dj."fieldID" = $3
+          AND vj.value IN (${wlPlaceholders})
+      )
+    ORDER BY i."dateModified" DESC
+    LIMIT 1
+  `, [doiFieldId, key, jfid, ...JOURNAL_WHITELIST]);
+}
+
+/**
+ * First PDF attachment key for a parent item, or null.
+ */
+export async function findPdfAttachmentByItemId(parentItemId) {
+  const row = await queryOne(`
+    SELECT i.key
+    FROM "itemAttachments" a
+    JOIN items i ON i."itemID" = a."itemID"
+    WHERE a."parentItemID" = $1
+      AND i.deleted = 0
+      AND a.path IS NOT NULL
+      AND (
+        lower(COALESCE(a."contentType", '')) LIKE '%pdf%'
+        OR lower(COALESCE(a.path, '')) LIKE '%.pdf'
+      )
+    ORDER BY i."dateAdded" ASC
+    LIMIT 1
+  `, [parentItemId]);
+  return row?.key ?? null;
 }
 
 export async function listJournals() {

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks, LayoutDashboard, MoreHorizontal } from 'lucide-react';
+import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks, LayoutDashboard, MoreHorizontal, BookOpen } from 'lucide-react';
 import { api } from '@/api/client';
 import { toast } from 'sonner';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
@@ -160,6 +160,18 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               <span>仪表盘</span>
             </Link>
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            title="开放 API 文档"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <Link to="/docs">
+              <BookOpen className="size-4" />
+              <span>开放 API</span>
+            </Link>
+          </Button>
           {canEdit && (
             <Button
               variant="ghost"
@@ -206,6 +218,11 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               <DropdownMenuItem asChild>
                 <Link to="/dashboard" className="flex items-center gap-2">
                   <LayoutDashboard className="size-4" /> 数据仪表盘
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/docs" className="flex items-center gap-2">
+                  <BookOpen className="size-4" /> 开放 API
                 </Link>
               </DropdownMenuItem>
               {canEdit && (

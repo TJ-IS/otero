@@ -11,6 +11,7 @@ import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
 import { DashboardJournals } from '@/components/dashboard/DashboardJournals';
 import { DashboardTimeline } from '@/components/dashboard/DashboardTimeline';
 import { DashboardAuthorStats } from '@/components/dashboard/DashboardAuthorStats';
+import { OpenApiDocsPage } from '@/components/OpenApiDocsPage';
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LibraryView />} />
         <Route path="/search" element={<SearchPage />} />
+        <Route path="/docs" element={<OpenApiDocsPage />} />
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<DashboardOverview />} />
           <Route path="journals" element={<DashboardJournals />} />
