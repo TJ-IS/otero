@@ -188,12 +188,20 @@ export async function downloadAndExtract(zipUrl, destDir) {
 }
 
 function findFile(root, name) {
-  const entries = walk(root);
-  return entries.find(p => path.basename(p) === name && fs.statSync(p).isFile()) || null;
+  for (const p of walk(root)) {
+    try {
+      if (path.basename(p) === name && fs.statSync(p).isFile()) return p;
+    } catch { /* race / broken symlink */ }
+  }
+  return null;
 }
 function findDir(root, name) {
-  const entries = walk(root);
-  return entries.find(p => path.basename(p) === name && fs.statSync(p).isDirectory()) || null;
+  for (const p of walk(root)) {
+    try {
+      if (path.basename(p) === name && fs.statSync(p).isDirectory()) return p;
+    } catch { /* race / broken symlink */ }
+  }
+  return null;
 }
 function* walk(dir) {
   let ents;
