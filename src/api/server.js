@@ -18,7 +18,8 @@ import { authorsRouter } from './routes/authors.js';
 import { statsRouter } from './routes/stats.js';
 import { authRouter } from './routes/auth.js';
 import { openRouter } from './routes/open.js';
-import { optionalAuth, editorWriteGate } from './middleware/auth.js';
+import { adminRouter } from './routes/admin.js';
+import { optionalAuth, editorWriteGate, requireEditor } from './middleware/auth.js';
 import { startFullTextWorker } from '../services/fulltextWorker.js';
 import { recoverSubmittingOnStartup } from '../services/fulltextService.js';
 import { config } from '../config.js';
@@ -37,6 +38,11 @@ export function buildApp() {
 
   app.use('/api/auth', authRouter);
   app.use('/api', optionalAuth(), editorWriteGate);
+
+  // Admin routes: whitelist-only. editorWriteGate lets GETs through to anyone,
+  // so gate the whole admin surface (including reads) behind requireEditor —
+  // these endpoints expose connection strings, storage endpoints and creds.
+  app.use('/api/admin', requireEditor, adminRouter);
 
   app.use('/api/items', itemsRouter);
   app.use('/api/collections', collectionsRouter);

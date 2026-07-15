@@ -4,6 +4,7 @@ import {
   parseItem, getFullText, getFullTextStructure, deleteFullText, enqueueBatchParse, retryFailed,
 } from '../../services/fulltextService.js';
 import { listFullTextPaged, getFullTextCounts } from '../../repositories/fulltextRepo.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const fulltextRouter = Router();
 
@@ -12,7 +13,7 @@ const ALLOWED_FILTERS = new Set(['all', 'active', 'done', 'failed']);
 // GET /api/fulltext/pending?filter=&page=&pageSize=
 // Paged task-log view. Returns current page plus per-state counts so the
 // UI can render summary + pagination without a second round-trip.
-fulltextRouter.get('/fulltext/pending', async (req, res) => {
+fulltextRouter.get('/fulltext/pending', asyncHandler(async (req, res) => {
   const filter = ALLOWED_FILTERS.has(req.query.filter) ? req.query.filter : 'all';
   const page = Math.max(1, Number(req.query.page) || 1);
   const pageSize = Math.min(200, Math.max(1, Number(req.query.pageSize) || 50));
@@ -28,30 +29,30 @@ fulltextRouter.get('/fulltext/pending', async (req, res) => {
     totalPages: Math.max(1, Math.ceil(total / pageSize)),
     counts,
   });
-});
+}));
 
 // POST /api/fulltext/parse-batch  { keys: [key, ...] }
 // Enqueues all items for background submission and returns immediately.
 // Each valid item gets a 'submitting' DB row at once so it shows up in the
 // task log; actual MinerU submission is drained by a bounded-concurrency
 // queue in fulltextService.
-fulltextRouter.post('/fulltext/parse-batch', async (req, res) => {
+fulltextRouter.post('/fulltext/parse-batch', asyncHandler(async (req, res) => {
   const keys = Array.isArray(req.body?.keys) ? req.body.keys : [];
   if (keys.length === 0) return res.status(400).json({ error: 'keys required' });
   const summary = await enqueueBatchParse(keys);
   res.json({ results: [], summary });
-});
+}));
 
 // POST /api/fulltext/retry-failed
 // Re-enqueues every row currently in 'failed' state. Useful after a burst
 // of HTTP 429 rate-limit failures.
-fulltextRouter.post('/fulltext/retry-failed', async (_req, res) => {
+fulltextRouter.post('/fulltext/retry-failed', asyncHandler(async (_req, res) => {
   const summary = await retryFailed();
   res.json({ summary });
-});
+}));
 
 // POST /api/items/:key/fulltext/parse  ?force=true
-fulltextRouter.post('/items/:key/fulltext/parse', async (req, res) => {
+fulltextRouter.post('/items/:key/fulltext/parse', asyncHandler(async (req, res) => {
   const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   const force = req.query.force === 'true' || req.query.force === '1';
@@ -61,27 +62,27 @@ fulltextRouter.post('/items/:key/fulltext/parse', async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
-});
+}));
 
 // GET /api/items/:key/fulltext
-fulltextRouter.get('/items/:key/fulltext', async (req, res) => {
+fulltextRouter.get('/items/:key/fulltext', asyncHandler(async (req, res) => {
   const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   res.json(await getFullText(req.params.key));
-});
+}));
 
 // GET /api/items/:key/fulltext/structure
 // Structured MinerU output (outline, figures, tables, equations, charts,
 // references, footnotes, publisher stamp) derived from content_list.json.
-fulltextRouter.get('/items/:key/fulltext/structure', async (req, res) => {
+fulltextRouter.get('/items/:key/fulltext/structure', asyncHandler(async (req, res) => {
   const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   res.json(await getFullTextStructure(req.params.key));
-});
+}));
 
 // DELETE /api/items/:key/fulltext
-fulltextRouter.delete('/items/:key/fulltext', async (req, res) => {
+fulltextRouter.delete('/items/:key/fulltext', asyncHandler(async (req, res) => {
   const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   res.json(await deleteFullText(req.params.key));
-});
+}));

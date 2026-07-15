@@ -11,22 +11,23 @@ import {
   getMissingTargetDois,
 } from '../../repositories/statsRepo.js';
 import { UNFILED } from '../../services/journalWhitelist.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const statsRouter = Router();
 
-statsRouter.get('/overview', async (req, res) => {
+statsRouter.get('/overview', asyncHandler(async (req, res) => {
   res.json(await getOverviewStats());
-});
+}));
 
-statsRouter.get('/doi-coverage', async (req, res) => {
+statsRouter.get('/doi-coverage', asyncHandler(async (req, res) => {
   res.json(await getDoiCoverageStats());
-});
+}));
 
-statsRouter.get('/doi-coverage/breakdown', async (req, res) => {
+statsRouter.get('/doi-coverage/breakdown', asyncHandler(async (req, res) => {
   res.json(await getDoiCoverageBreakdown());
-});
+}));
 
-statsRouter.get('/doi-coverage/missing', async (req, res) => {
+statsRouter.get('/doi-coverage/missing', asyncHandler(async (req, res) => {
   const journal = typeof req.query.journal === 'string' && req.query.journal
     ? req.query.journal
     : null;
@@ -36,17 +37,17 @@ statsRouter.get('/doi-coverage/missing', async (req, res) => {
     journal,
     year: Number.isFinite(year) ? year : null,
   }));
-});
+}));
 
-statsRouter.get('/item-types', async (req, res) => {
+statsRouter.get('/item-types', asyncHandler(async (req, res) => {
   res.json({ itemTypes: await getItemTypeDistribution() });
-});
+}));
 
-statsRouter.get('/years', async (req, res) => {
+statsRouter.get('/years', asyncHandler(async (req, res) => {
   res.json({ years: await getPublicationYearHistogram() });
-});
+}));
 
-statsRouter.get('/journals', async (req, res) => {
+statsRouter.get('/journals', asyncHandler(async (req, res) => {
   let journals = await getJournalBreakdown();
   // Same visibility rule as GET /api/journals: the "待归档" bucket is only
   // shown to whitelisted editors.
@@ -54,12 +55,12 @@ statsRouter.get('/journals', async (req, res) => {
     journals = journals.filter(j => j.name !== UNFILED);
   }
   res.json({ journals });
-});
+}));
 
-statsRouter.get('/fulltext', async (req, res) => {
+statsRouter.get('/fulltext', asyncHandler(async (req, res) => {
   res.json({ counts: await getFullTextStatusCounts() });
-});
+}));
 
-statsRouter.get('/ingestion', async (req, res) => {
+statsRouter.get('/ingestion', asyncHandler(async (req, res) => {
   res.json({ activity: await getIngestionActivity() });
-});
+}));

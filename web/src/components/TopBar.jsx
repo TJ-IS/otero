@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks, LayoutDashboard, MoreHorizontal, BookOpen } from 'lucide-react';
+import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks, LayoutDashboard, MoreHorizontal, BookOpen, ShieldCheck } from 'lucide-react';
 import { api } from '@/api/client';
 import { toast } from 'sonner';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
@@ -183,6 +183,19 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               <ListChecks className="size-4" />
             </Button>
           )}
+          {canEdit && (
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              title="后台管理"
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <Link to="/admin">
+                <ShieldCheck className="size-4" />
+              </Link>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -228,6 +241,13 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               {canEdit && (
                 <DropdownMenuItem onClick={() => setLogOpen(true)} className="gap-2">
                   <ListChecks className="size-4" /> MinerU 解析任务日志
+                </DropdownMenuItem>
+              )}
+              {canEdit && (
+                <DropdownMenuItem asChild>
+                  <Link to="/admin" className="flex items-center gap-2">
+                    <ShieldCheck className="size-4" /> 后台管理
+                  </Link>
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />

@@ -3,6 +3,7 @@ import { streamText, convertToModelMessages, pipeTextStreamToResponse } from 'ai
 import { Item } from '../../models/Item.js';
 import { buildPaperContext, getChatModel } from '../../services/chatService.js';
 import { config } from '../../config.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const chatRouter = Router();
 
@@ -10,7 +11,7 @@ export const chatRouter = Router();
 // Plain-text streaming response (consumed by the frontend's
 // TextStreamChatTransport / useChat). Open to all visitors (see
 // editorWriteGate's publicWrites exemption) — no wallet/editor auth.
-chatRouter.post('/items/:key/chat', async (req, res) => {
+chatRouter.post('/items/:key/chat', asyncHandler(async (req, res) => {
   const it = await Item.loadByKey(req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
 
@@ -38,4 +39,4 @@ chatRouter.post('/items/:key/chat', async (req, res) => {
   });
 
   pipeTextStreamToResponse({ response: res, stream: result.textStream });
-});
+}));

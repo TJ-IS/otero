@@ -178,6 +178,27 @@ export const api = {
     });
   },
 
+  // Admin
+  getAdminStatus() { return req('/api/admin/status'); },
+  getAdminPostgresStatus() { return req('/api/admin/status/postgres'); },
+  getAdminR2Status() { return req('/api/admin/status/r2'); },
+  getAdminDuplicates() { return req('/api/admin/duplicates'); },
+  checkAdminDuplicates({ doi, title, author, limit } = {}) {
+    const qs = new URLSearchParams();
+    if (doi) qs.set('doi', doi);
+    if (title) qs.set('title', title);
+    if (author) qs.set('author', author);
+    if (limit) qs.set('limit', String(limit));
+    return req(`/api/admin/duplicates?${qs.toString()}`);
+  },
+  preCheckDuplicate(body) {
+    return req('/api/admin/duplicates/check', { method: 'POST', body: JSON.stringify(body) });
+  },
+  getAdminReconcile() { return req('/api/admin/reconcile'); },
+  deleteAdminOrphanObjects(names) {
+    return req('/api/admin/reconcile/delete', { method: 'POST', body: JSON.stringify({ names }) });
+  },
+
   // Merkle DOI proofs
   getMerkleRoot() { return req('/api/merkle/root'); },
   checkMerkleExists(doi) {

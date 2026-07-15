@@ -4,6 +4,7 @@ import { queryOne } from '../../db/connection.js';
 import { config } from '../../config.js';
 import { resolveStoredPath, getStoredFileStream, storedFileExists } from '../../services/storageService.js';
 import { resolveFullTextAsset } from '../../services/fulltextService.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const attachmentsRouter = Router();
 
@@ -11,7 +12,7 @@ export const attachmentsRouter = Router();
  * Stream a stored attachment file by its item key.
  * GET /api/attachments/:key/file
  */
-attachmentsRouter.get('/:key/file', async (req, res) => {
+attachmentsRouter.get('/:key/file', asyncHandler(async (req, res) => {
   const row = await queryOne(`
     SELECT a.path, a."contentType" AS "contentType"
     FROM items i
@@ -46,7 +47,7 @@ attachmentsRouter.get('/:key/file', async (req, res) => {
   } catch (err) {
     if (!res.headersSent) res.status(500).json({ error: err.message });
   }
-});
+}));
 
 /**
  * Serve a file from an item's extracted full-text directory (MinerU assets).
@@ -54,7 +55,7 @@ attachmentsRouter.get('/:key/file', async (req, res) => {
  * Resolved via resolveFullTextAsset, which is storage-mode-aware (filesystem
  * or MinIO).
  */
-attachmentsRouter.get('/:key/fulltext/*', async (req, res) => {
+attachmentsRouter.get('/:key/fulltext/*', asyncHandler(async (req, res) => {
   const subPath = req.params[0];
   if (!subPath) return res.status(400).json({ error: 'path required' });
   const resolved = await resolveFullTextAsset(req.params.key, subPath);
@@ -70,7 +71,7 @@ attachmentsRouter.get('/:key/fulltext/*', async (req, res) => {
   } catch (err) {
     if (!res.headersSent) res.status(500).json({ error: err.message });
   }
-});
+}));
 
 const MIME_BY_EXT = {
   '.png': 'image/png',

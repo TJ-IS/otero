@@ -2,13 +2,14 @@ import { Router } from 'express';
 import { extractItem, applyExtraction } from '../../services/extractService.js';
 import { listUnfiledWithFulltextDone } from '../../repositories/itemRepo.js';
 import { config } from '../../config.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const extractRouter = Router();
 
 // POST /api/items/:key/extract
 // Run LLM-based metadata extraction against the parsed full text.
 // Returns per-field suggestions with confidence; does NOT modify the database.
-extractRouter.post('/items/:key/extract', async (req, res) => {
+extractRouter.post('/items/:key/extract', asyncHandler(async (req, res) => {
   try {
     const result = await extractItem(req.params.key);
     res.json(result);
@@ -16,12 +17,12 @@ extractRouter.post('/items/:key/extract', async (req, res) => {
     const status = /未找到|not found/i.test(err.message) ? 404 : 400;
     res.status(status).json({ error: err.message });
   }
-});
+}));
 
 // POST /api/items/:key/extract/apply
 // Run extraction AND apply the result to the database (gated by confidence
 // thresholds supplied in the body). Returns what was applied vs skipped.
-extractRouter.post('/items/:key/extract/apply', async (req, res) => {
+extractRouter.post('/items/:key/extract/apply', asyncHandler(async (req, res) => {
   try {
     const result = await extractItem(req.params.key);
     const opts = {
@@ -36,7 +37,7 @@ extractRouter.post('/items/:key/extract/apply', async (req, res) => {
     const status = /未找到|not found/i.test(err.message) ? 404 : 400;
     res.status(status).json({ error: err.message });
   }
-});
+}));
 
 // POST /api/extract/batch
 // Synchronously process a batch of unfiled+fulltext-done items. Each item is
@@ -44,7 +45,7 @@ extractRouter.post('/items/:key/extract/apply', async (req, res) => {
 // Returns a summary; per-item detail goes to the response array.
 //
 // Body: { threshold, typeThreshold, limit, dryRun, overwrite }
-extractRouter.post('/extract/batch', async (req, res) => {
+extractRouter.post('/extract/batch', asyncHandler(async (req, res) => {
   if (!config.llm.apiKey) {
     return res.status(400).json({ error: '未配置 OPENAI_API_KEY' });
   }
@@ -101,4 +102,4 @@ extractRouter.post('/extract/batch', async (req, res) => {
     dryRun,
     results,
   });
-});
+}));

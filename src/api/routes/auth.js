@@ -8,6 +8,7 @@ import {
   isEditor,
   buildSignMessage,
 } from '../middleware/auth.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get('/nonce', (req, res) => {
   }
 });
 
-router.post('/verify', async (req, res) => {
+router.post('/verify', asyncHandler(async (req, res) => {
   const { address, nonce, signature } = req.body || {};
   if (!address || !isAddress(address)) {
     return res.status(400).json({ error: 'invalid address' });
@@ -39,9 +40,9 @@ router.post('/verify', async (req, res) => {
   const token = await signToken(normalized);
   const canEdit = isEditor(normalized);
   res.json({ address: normalized, token, canEdit });
-});
+}));
 
-router.get('/me', async (req, res) => {
+router.get('/me', asyncHandler(async (req, res) => {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) {
@@ -52,6 +53,6 @@ router.get('/me', async (req, res) => {
     return res.status(401).json({ error: 'invalid token' });
   }
   res.json({ address: auth.address, canEdit: auth.canEdit });
-});
+}));
 
 export { router as authRouter };
