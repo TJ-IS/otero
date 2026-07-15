@@ -1,7 +1,4 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useTheme } from 'next-themes';
-import { ArrowLeft, Check, Copy, ExternalLink, Moon, Sun } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -97,46 +94,7 @@ function CodeBlock({ children, className }) {
 }
 
 export function OpenApiDocsPage() {
-  const { theme, setTheme } = useTheme();
-  const [skillMd, setSkillMd] = useState('');
-  const [skillLoading, setSkillLoading] = useState(true);
-  const [copiedSkill, setCopiedSkill] = useState(false);
   const base = typeof window !== 'undefined' ? window.location.origin : '';
-
-  useEffect(() => {
-    let cancelled = false;
-    setSkillLoading(true);
-    fetch('/api/open/v1/SKILL.md')
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.text();
-      })
-      .then((text) => {
-        if (!cancelled) setSkillMd(text);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setSkillMd('');
-          toast.error(`加载 SKILL.md 失败: ${err.message}`);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setSkillLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
-
-  const handleCopySkill = async () => {
-    if (!skillMd) return;
-    try {
-      await copyText(skillMd);
-      setCopiedSkill(true);
-      toast.success('已复制 SKILL.md');
-      setTimeout(() => setCopiedSkill(false), 2000);
-    } catch {
-      toast.error('复制失败');
-    }
-  };
 
   const handleCopyCurl = async (curl) => {
     const text = curl.replaceAll('$BASE', base);
@@ -149,151 +107,101 @@ export function OpenApiDocsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-12 max-w-3xl items-center gap-2 px-4">
-          <Button variant="ghost" size="sm" asChild className="shrink-0 text-muted-foreground">
-            <Link to="/">
-              <ArrowLeft className="size-4" />
-            </Link>
-          </Button>
-          <h1 className="text-sm font-medium tracking-tight">开放 API 文档</h1>
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              title="切换主题"
-            >
-              {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-            </Button>
-          </div>
+    <main className="mx-auto max-w-3xl px-4 py-8 space-y-10">
+      <section className="space-y-3">
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Otero 开放只读 API，面向 AIS Senior Scholars&apos; Basket 文献库。
+          所有接口均为 <code className="text-xs">GET</code>，不会修改数据库。
+          Base URL：
+        </p>
+        <CodeBlock>{`${base}/api/open/v1`}</CodeBlock>
+        <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+          <li>仅暴露白名单 11 刊内、未删除的顶层条目</li>
+          <li>
+            分页：<code className="text-xs">page</code>（默认 1）、
+            <code className="text-xs">pageSize</code>（默认 20，最大 100）
+          </li>
+          <li>
+            列表响应：
+            <code className="text-xs">{'{ items, total, page, pageSize, totalPages }'}</code>
+          </li>
+        </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold tracking-tight">Filter 参数</h2>
+        <p className="text-sm text-muted-foreground">
+          适用于 <code className="text-xs">/articles</code>、<code className="text-xs">/authors</code>、
+          <code className="text-xs">/authors/:id/items</code>、<code className="text-xs">/search</code>。
+        </p>
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-left">
+              <tr>
+                <th className="px-3 py-2 font-medium">参数</th>
+                <th className="px-3 py-2 font-medium">说明</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              <tr>
+                <td className="px-3 py-2 font-mono text-xs">journal</td>
+                <td className="px-3 py-2 text-muted-foreground">单刊精确名（须为 Basket 白名单）</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-mono text-xs">journals</td>
+                <td className="px-3 py-2 text-muted-foreground">多刊，逗号分隔；与 journal 互斥</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-mono text-xs">year</td>
+                <td className="px-3 py-2 text-muted-foreground">精确年份</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-mono text-xs">yearFrom / yearTo</td>
+                <td className="px-3 py-2 text-muted-foreground">年份区间（含端点）</td>
+              </tr>
+              <tr>
+                <td className="px-3 py-2 font-mono text-xs">type</td>
+                <td className="px-3 py-2 text-muted-foreground">条目类型，如 journalArticle</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </header>
+        <CodeBlock>
+          {`${base}/api/open/v1/articles?yearFrom=2018&yearTo=2022&journals=${encodeURIComponent('MIS Quarterly,Information Systems Research')}`}
+        </CodeBlock>
+      </section>
 
-      <main className="mx-auto max-w-3xl px-4 py-8 space-y-10">
-        <section className="space-y-3">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Otero 开放只读 API，面向 AIS Senior Scholars&apos; Basket 文献库。
-            所有接口均为 <code className="text-xs">GET</code>，不会修改数据库。
-            Base URL：
-          </p>
-          <CodeBlock>{`${base}/api/open/v1`}</CodeBlock>
-          <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
-            <li>仅暴露白名单 11 刊内、未删除的顶层条目</li>
-            <li>分页：<code className="text-xs">page</code>（默认 1）、<code className="text-xs">pageSize</code>（默认 20，最大 100）</li>
-            <li>列表响应：<code className="text-xs">{'{ items, total, page, pageSize, totalPages }'}</code></li>
-          </ul>
-        </section>
-
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold tracking-tight">Filter 参数</h2>
-          <p className="text-sm text-muted-foreground">
-            适用于 <code className="text-xs">/articles</code>、<code className="text-xs">/authors</code>、
-            <code className="text-xs">/authors/:id/items</code>、<code className="text-xs">/search</code>。
-          </p>
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-left">
-                <tr>
-                  <th className="px-3 py-2 font-medium">参数</th>
-                  <th className="px-3 py-2 font-medium">说明</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                <tr>
-                  <td className="px-3 py-2 font-mono text-xs">journal</td>
-                  <td className="px-3 py-2 text-muted-foreground">单刊精确名（须为 Basket 白名单）</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 font-mono text-xs">journals</td>
-                  <td className="px-3 py-2 text-muted-foreground">多刊，逗号分隔；与 journal 互斥</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 font-mono text-xs">year</td>
-                  <td className="px-3 py-2 text-muted-foreground">精确年份</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 font-mono text-xs">yearFrom / yearTo</td>
-                  <td className="px-3 py-2 text-muted-foreground">年份区间（含端点）</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2 font-mono text-xs">type</td>
-                  <td className="px-3 py-2 text-muted-foreground">条目类型，如 journalArticle</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <CodeBlock>
-            {`${base}/api/open/v1/articles?yearFrom=2018&yearTo=2022&journals=${encodeURIComponent('MIS Quarterly,Information Systems Research')}`}
-          </CodeBlock>
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-base font-semibold tracking-tight">Agent Skills.md</h2>
-            <div className="flex items-center gap-1.5">
+      <section className="space-y-5">
+        <h2 className="text-base font-semibold tracking-tight">接口一览</h2>
+        {ENDPOINTS.map((ep) => (
+          <article key={ep.id} className="rounded-md border px-4 py-3 space-y-2">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold">
+                {ep.method}
+              </span>
+              <code className="text-sm font-mono break-all">{ep.path}</code>
+            </div>
+            <p className="text-sm text-muted-foreground">{ep.summary}</p>
+            {ep.query && (
+              <p className="text-xs text-muted-foreground">
+                Query：<code className="font-mono">{ep.query}</code>
+              </p>
+            )}
+            <div className="flex items-start gap-2">
+              <CodeBlock className="flex-1">{ep.curl.replaceAll('$BASE', base)}</CodeBlock>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                onClick={handleCopySkill}
-                disabled={!skillMd || skillLoading}
+                className="shrink-0"
+                onClick={() => handleCopyCurl(ep.curl)}
+                title="复制 curl"
               >
-                {copiedSkill ? <Check className="size-4" /> : <Copy className="size-4" />}
-                {copiedSkill ? '已复制' : '复制 Skills.md'}
-              </Button>
-              <Button variant="ghost" size="sm" asChild>
-                <a href="/api/open/v1/SKILL.md" target="_blank" rel="noreferrer">
-                  <ExternalLink className="size-4" />
-                  原始文件
-                </a>
+                <Copy className="size-4" />
               </Button>
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            复制下方内容保存为 <code className="text-xs">SKILL.md</code>，供其他 Agent 访问本站开放数据。
-          </p>
-          {skillLoading ? (
-            <div className="rounded-md border px-3 py-8 text-center text-sm text-muted-foreground">
-              加载中…
-            </div>
-          ) : (
-            <CodeBlock className="max-h-[28rem] overflow-y-auto">{skillMd || '（空）'}</CodeBlock>
-          )}
-        </section>
-
-        <section className="space-y-5">
-          <h2 className="text-base font-semibold tracking-tight">接口一览</h2>
-          {ENDPOINTS.map((ep) => (
-            <article key={ep.id} className="rounded-md border px-4 py-3 space-y-2">
-              <div className="flex flex-wrap items-baseline gap-2">
-                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold">
-                  {ep.method}
-                </span>
-                <code className="text-sm font-mono break-all">{ep.path}</code>
-              </div>
-              <p className="text-sm text-muted-foreground">{ep.summary}</p>
-              {ep.query && (
-                <p className="text-xs text-muted-foreground">
-                  Query：<code className="font-mono">{ep.query}</code>
-                </p>
-              )}
-              <div className="flex items-start gap-2">
-                <CodeBlock className="flex-1">{ep.curl.replaceAll('$BASE', base)}</CodeBlock>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => handleCopyCurl(ep.curl)}
-                  title="复制 curl"
-                >
-                  <Copy className="size-4" />
-                </Button>
-              </div>
-            </article>
-          ))}
-        </section>
-      </main>
-    </div>
+          </article>
+        ))}
+      </section>
+    </main>
   );
 }

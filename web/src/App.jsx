@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Navigate, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { LibraryView } from '@/components/LibraryView';
 import { SearchPage } from '@/components/SearchPage';
@@ -11,7 +11,9 @@ import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
 import { DashboardJournals } from '@/components/dashboard/DashboardJournals';
 import { DashboardTimeline } from '@/components/dashboard/DashboardTimeline';
 import { DashboardAuthorStats } from '@/components/dashboard/DashboardAuthorStats';
+import { DocsLayout } from '@/components/DocsLayout';
 import { OpenApiDocsPage } from '@/components/OpenApiDocsPage';
+import { AgentsMdPage } from '@/components/AgentsMdPage';
 
 export default function App() {
   return (
@@ -19,7 +21,11 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LibraryView />} />
         <Route path="/search" element={<SearchPage />} />
-        <Route path="/docs" element={<OpenApiDocsPage />} />
+        <Route path="/docs" element={<DocsLayout />}>
+          <Route index element={<Navigate to="api" replace />} />
+          <Route path="api" element={<OpenApiDocsPage />} />
+          <Route path="agents" element={<AgentsMdPage />} />
+        </Route>
         <Route path="/dashboard" element={<DashboardLayout />}>
           <Route index element={<DashboardOverview />} />
           <Route path="journals" element={<DashboardJournals />} />
