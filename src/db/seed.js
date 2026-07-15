@@ -141,66 +141,103 @@ FIELDS.push({ id: 39, name: 'repository' });
 const FIELD_BY_NAME = new Map(FIELDS.map(f => [f.name, f]));
 const CREATOR_BY_NAME = new Map(CREATOR_TYPES.map(c => [c.name, c]));
 
+/** Build and validate the rows used by the bulk seed statements. */
+export function buildSeedRows() {
+  const itemTypeFields = [];
+  const itemTypeCreatorTypes = [];
+
+  for (const itemType of ITEM_TYPES) {
+    for (let orderIndex = 0; orderIndex < itemType.fields.length; orderIndex++) {
+      const name = itemType.fields[orderIndex];
+      const field = FIELD_BY_NAME.get(name);
+      if (!field) throw new Error(`Unknown field "${name}" for itemType "${itemType.name}"`);
+      itemTypeFields.push({ itemTypeId: itemType.id, fieldId: field.id, orderIndex });
+    }
+
+    for (const name of itemType.creators) {
+      const creatorType = CREATOR_BY_NAME.get(name);
+      if (!creatorType) {
+        throw new Error(`Unknown creator type "${name}" for itemType "${itemType.name}"`);
+      }
+      itemTypeCreatorTypes.push({
+        itemTypeId: itemType.id,
+        creatorTypeId: creatorType.id,
+        primaryCreator: name === itemType.primary ? 1 : 0,
+      });
+    }
+  }
+
+  return { itemTypeFields, itemTypeCreatorTypes };
+}
+
 /**
  * Insert schema definitions. Idempotent via ON CONFLICT.
  */
 export async function seed() {
   await initDb();
+  const { itemTypeFields, itemTypeCreatorTypes } = buildSeedRows();
+
   await withTransaction(async (client) => {
-    for (const f of FIELDS) {
-      await execute(
-        `INSERT INTO "fields"("fieldID", "fieldName", "fieldFormatID") VALUES ($1, $2, NULL)
-         ON CONFLICT ("fieldID") DO UPDATE SET "fieldName" = EXCLUDED."fieldName"`,
-        [f.id, f.name],
-        client
-      );
-    }
-    for (const c of CREATOR_TYPES) {
-      await execute(
-        `INSERT INTO "creatorTypes"("creatorTypeID", "creatorType") VALUES ($1, $2)
-         ON CONFLICT ("creatorTypeID") DO UPDATE SET "creatorType" = EXCLUDED."creatorType"`,
-        [c.id, c.name],
-        client
-      );
-    }
+    await execute(
+      `INSERT INTO "fields"("fieldID", "fieldName", "fieldFormatID")
+       SELECT * FROM UNNEST($1::integer[], $2::text[], $3::integer[])
+       ON CONFLICT ("fieldID") DO UPDATE SET "fieldName" = EXCLUDED."fieldName"`,
+      [FIELDS.map(f => f.id), FIELDS.map(f => f.name), FIELDS.map(() => null)],
+      client
+    );
 
-    for (const t of ITEM_TYPES) {
-      await execute(
-        `INSERT INTO "itemTypes"("itemTypeID", "typeName", custom) VALUES ($1, $2, 0)
-         ON CONFLICT ("itemTypeID") DO UPDATE SET "typeName" = EXCLUDED."typeName"`,
-        [t.id, t.name],
-        client
-      );
-      for (let idx = 0; idx < t.fields.length; idx++) {
-        const name = t.fields[idx];
-        const f = FIELD_BY_NAME.get(name);
-        if (!f) throw new Error(`Unknown field "${name}" for itemType "${t.name}"`);
-        await execute(
-          `INSERT INTO "itemTypeFields"("itemTypeID", "fieldID", "orderIndex") VALUES ($1, $2, $3)
-           ON CONFLICT ("itemTypeID", "fieldID") DO UPDATE SET "orderIndex" = EXCLUDED."orderIndex"`,
-          [t.id, f.id, idx],
-          client
-        );
-      }
-      for (const name of t.creators) {
-        const c = CREATOR_BY_NAME.get(name);
-        if (!c) throw new Error(`Unknown creator type "${name}" for itemType "${t.name}"`);
-        await execute(
-          `INSERT INTO "itemTypeCreatorTypes"("itemTypeID", "creatorTypeID", "primaryCreator")
-           VALUES ($1, $2, $3)
-           ON CONFLICT ("itemTypeID", "creatorTypeID")
-           DO UPDATE SET "primaryCreator" = EXCLUDED."primaryCreator"`,
-          [t.id, c.id, name === t.primary ? 1 : 0],
-          client
-        );
-      }
-    }
+    await execute(
+      `INSERT INTO "creatorTypes"("creatorTypeID", "creatorType")
+       SELECT * FROM UNNEST($1::integer[], $2::text[])
+       ON CONFLICT ("creatorTypeID") DO UPDATE SET "creatorType" = EXCLUDED."creatorType"`,
+      [CREATOR_TYPES.map(c => c.id), CREATOR_TYPES.map(c => c.name)],
+      client
+    );
 
-    for (const m of BASE_FIELD_MAPPINGS) {
+    await execute(
+      `INSERT INTO "itemTypes"("itemTypeID", "typeName", custom)
+       SELECT * FROM UNNEST($1::integer[], $2::text[], $3::integer[])
+       ON CONFLICT ("itemTypeID") DO UPDATE SET "typeName" = EXCLUDED."typeName"`,
+      [ITEM_TYPES.map(t => t.id), ITEM_TYPES.map(t => t.name), ITEM_TYPES.map(() => 0)],
+      client
+    );
+
+    await execute(
+      `INSERT INTO "itemTypeFields"("itemTypeID", "fieldID", "orderIndex")
+       SELECT * FROM UNNEST($1::integer[], $2::integer[], $3::integer[])
+       ON CONFLICT ("itemTypeID", "fieldID")
+       DO UPDATE SET "orderIndex" = EXCLUDED."orderIndex"`,
+      [
+        itemTypeFields.map(row => row.itemTypeId),
+        itemTypeFields.map(row => row.fieldId),
+        itemTypeFields.map(row => row.orderIndex),
+      ],
+      client
+    );
+
+    await execute(
+      `INSERT INTO "itemTypeCreatorTypes"("itemTypeID", "creatorTypeID", "primaryCreator")
+       SELECT * FROM UNNEST($1::integer[], $2::integer[], $3::integer[])
+       ON CONFLICT ("itemTypeID", "creatorTypeID")
+       DO UPDATE SET "primaryCreator" = EXCLUDED."primaryCreator"`,
+      [
+        itemTypeCreatorTypes.map(row => row.itemTypeId),
+        itemTypeCreatorTypes.map(row => row.creatorTypeId),
+        itemTypeCreatorTypes.map(row => row.primaryCreator),
+      ],
+      client
+    );
+
+    if (BASE_FIELD_MAPPINGS.length > 0) {
       await execute(
-        `INSERT INTO "baseFieldMappings"("baseFieldID", "itemTypeID", "fieldID") VALUES ($1, $2, $3)
+        `INSERT INTO "baseFieldMappings"("baseFieldID", "itemTypeID", "fieldID")
+         SELECT * FROM UNNEST($1::integer[], $2::integer[], $3::integer[])
          ON CONFLICT DO NOTHING`,
-        [m.baseId, m.itemTypeId, m.fieldId],
+        [
+          BASE_FIELD_MAPPINGS.map(row => row.baseId),
+          BASE_FIELD_MAPPINGS.map(row => row.itemTypeId),
+          BASE_FIELD_MAPPINGS.map(row => row.fieldId),
+        ],
         client
       );
     }

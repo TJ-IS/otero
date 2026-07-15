@@ -5,6 +5,30 @@ const { Pool } = pg;
 
 let pool = null;
 
+/**
+ * Build the pg connection options used by every application connection.
+ *
+ * pg currently treats sslmode=require as verify-full and warns that this will
+ * change in its next major version. Preserve today's secure behavior explicitly.
+ */
+export function databaseConnectionOptions(databaseUrl) {
+  const url = new URL(databaseUrl);
+  const sslMode = url.searchParams.get('sslmode');
+  const useLibpqCompat = url.searchParams.get('uselibpqcompat') === 'true';
+  if (!useLibpqCompat && ['prefer', 'require', 'verify-ca'].includes(sslMode)) {
+    url.searchParams.set('sslmode', 'verify-full');
+  }
+
+  return { connectionString: url.toString() };
+}
+
+/** Set session defaults for each new physical PostgreSQL connection. */
+export function initializeClient(client) {
+  // Do not pass this through pg's startup `options`: Neon pooled endpoints do
+  // not support that startup parameter. pg queues this before later queries.
+  return client.query('SET search_path TO public');
+}
+
 /** UTC timestamp string matching historical SQLite datetime('now') format. */
 export function nowUtc() {
   return new Date().toISOString().replace('T', ' ').slice(0, 19);
@@ -20,7 +44,10 @@ export async function initDb() {
     throw new Error('DATABASE_URL is required (PostgreSQL connection string)');
   }
   pool = new Pool({
-    connectionString: config.databaseUrl,
+    ...databaseConnectionOptions(config.databaseUrl),
+    // pg-pool awaits this hook before handing a new client to callers. This is
+    // compatible with Neon pooler and avoids overlapping client.query() calls.
+    onConnect: initializeClient,
     // Remote links drop often; keep idle clients from holding dead sockets forever.
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 20_000,

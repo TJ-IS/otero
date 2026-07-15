@@ -9,6 +9,8 @@ import {
   getPostgresStatus,
   getR2Status,
   getSystemStatus,
+  getTrash,
+  emptyTrash,
   reconcileStorage,
   deleteOrphanObjects,
 } from '../../services/adminService.js';
@@ -123,6 +125,25 @@ adminRouter.get('/status', async (req, res, next) => {
   }
 });
 
+/** GET /api/admin/trash — paginated soft-deleted item trees. */
+adminRouter.get('/trash', async (req, res, next) => {
+  try {
+    const result = await getTrash({ page: req.query.page, pageSize: req.query.pageSize });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** DELETE /api/admin/trash — permanently purge every soft-deleted item tree. */
+adminRouter.delete('/trash', async (_req, res, next) => {
+  try {
+    res.json(await emptyTrash());
+  } catch (error) {
+    next(error);
+  }
+});
+
 /**
  * GET /api/admin/reconcile
  * Compare PostgreSQL attachment/full-text references against R2 objects.
@@ -173,6 +194,7 @@ adminRouter.get('/health', async (req, res) => {
       'postgres-status',
       'r2-status',
       'system-monitoring',
+      'trash-management',
       'storage-reconciliation',
     ],
     timestamp: new Date().toISOString(),

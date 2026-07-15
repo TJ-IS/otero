@@ -1,7 +1,7 @@
 /**
  * Admin service for whitelist management and system monitoring.
  */
-import { getPool, query, queryOne } from '../db/connection.js';
+import { execute, getPool, query, queryOne, withTransaction } from '../db/connection.js';
 import { config } from '../config.js';
 import { useS3 } from './storageService.js';
 import { getS3Client } from './s3Client.js';
@@ -217,10 +217,8 @@ export async function getAllDuplicates() {
   return result;
 }
 
-/**
- * Get detailed database connection status for PostgreSQL.
- */
-export async function getPostgresStatus() {
+/** Fetch the complete admin PostgreSQL snapshot in a single network round trip. */
+async function getPostgresSnapshot() {
   const pool = getPool();
 
   try {
@@ -231,44 +229,52 @@ export async function getPostgresStatus() {
       waitingCount: pool.waitingCount,
     };
 
-    // Test connection and get server info
-    const versionResult = await queryOne('SELECT version()');
-    const currentTimeResult = await queryOne('SELECT NOW() AT TIME ZONE \'UTC\' as server_time');
-
-    // Get database size
-    const dbSizeResult = await queryOne(`
-      SELECT pg_size_pretty(pg_database_size(current_database())) as db_size,
-             pg_database_size(current_database()) as db_size_bytes
+    // Keep all independent observations inside one statement. On a remote Neon
+    // database this avoids eight sequential client/server round trips.
+    const snapshot = await queryOne(`
+      WITH table_sizes AS (
+        SELECT n.nspname AS schemaname, c.relname AS tablename,
+               pg_size_pretty(pg_total_relation_size(c.oid)) AS size,
+               pg_total_relation_size(c.oid) AS size_bytes
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'r'
+        ORDER BY pg_total_relation_size(c.oid) DESC
+        LIMIT 10
+      )
+      SELECT
+        version() AS version,
+        NOW() AT TIME ZONE 'UTC' AS server_time,
+        pg_size_pretty(pg_database_size(current_database())) AS db_size,
+        pg_database_size(current_database()) AS db_size_bytes,
+        (
+          SELECT json_build_object(
+            'total_connections', count(*),
+            'active_connections', count(*) FILTER (WHERE state = 'active'),
+            'idle_connections', count(*) FILTER (WHERE state = 'idle')
+          )
+          FROM pg_stat_activity
+          WHERE datname = current_database()
+        ) AS connections,
+        COALESCE(
+          (SELECT json_agg(row_to_json(t) ORDER BY t.size_bytes DESC) FROM table_sizes t),
+          '[]'::json
+        ) AS tables,
+        (SELECT version FROM "schemaVersion" ORDER BY version DESC LIMIT 1) AS schema_version,
+        (SELECT "appliedAt" FROM "schemaVersion" ORDER BY version DESC LIMIT 1) AS schema_applied_at,
+        (
+          SELECT json_build_object(
+            'total_items', count(*),
+            'active_items', count(*) FILTER (WHERE deleted = 0),
+            'deleted_items', count(*) FILTER (WHERE deleted = 1)
+          )
+          FROM items
+        ) AS item_stats,
+        (
+          SELECT json_build_object('total_attachments', count(*))
+          FROM "itemAttachments"
+        ) AS attachment_stats
     `);
-
-    // Get table sizes. Use the pg_class OID directly instead of building a
-    // "schema.table" string and casting to regclass: unquoted identifiers get
-    // folded to lowercase, so mixed-case tables like "itemFullText" would raise
-    // relation "public.itemfulltext" does not exist and fail the whole status.
-    const tableSizes = await query(`
-      SELECT n.nspname AS schemaname, c.relname AS tablename,
-             pg_size_pretty(pg_total_relation_size(c.oid)) AS size,
-             pg_total_relation_size(c.oid) AS size_bytes
-      FROM pg_class c
-      JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'public' AND c.relkind = 'r'
-      ORDER BY pg_total_relation_size(c.oid) DESC
-      LIMIT 10
-    `);
-
-    // Get connection count
-    const connectionStats = await queryOne(`
-      SELECT count(*) as total_connections,
-             count(*) FILTER (WHERE state = 'active') as active_connections,
-             count(*) FILTER (WHERE state = 'idle') as idle_connections
-      FROM pg_stat_activity
-      WHERE datname = current_database()
-    `);
-
-    // Get schema version
-    const schemaVersionResult = await queryOne(
-      'SELECT version, "appliedAt" FROM "schemaVersion" ORDER BY version DESC LIMIT 1'
-    );
 
     return {
       status: 'connected',
@@ -277,18 +283,22 @@ export async function getPostgresStatus() {
         poolStats,
       },
       server: {
-        version: versionResult?.version || 'unknown',
-        serverTime: currentTimeResult?.server_time || null,
+        version: snapshot?.version || 'unknown',
+        serverTime: snapshot?.server_time || null,
       },
       database: {
         name: config.databaseUrl.split('/').pop()?.split('?')[0] || 'unknown',
-        size: dbSizeResult?.db_size || 'unknown',
-        sizeBytes: dbSizeResult?.db_size_bytes || 0,
-        schemaVersion: schemaVersionResult?.version || null,
-        schemaAppliedAt: schemaVersionResult?.appliedAt || null,
+        size: snapshot?.db_size || 'unknown',
+        sizeBytes: snapshot?.db_size_bytes || 0,
+        schemaVersion: snapshot?.schema_version || null,
+        schemaAppliedAt: snapshot?.schema_applied_at || null,
       },
-      connections: connectionStats,
-      tables: tableSizes,
+      connections: snapshot?.connections || null,
+      tables: snapshot?.tables || [],
+      statistics: {
+        items: snapshot?.item_stats || { total_items: 0, active_items: 0, deleted_items: 0 },
+        attachments: snapshot?.attachment_stats || { total_attachments: 0 },
+      },
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
@@ -298,9 +308,19 @@ export async function getPostgresStatus() {
       connection: {
         url: maskConnectionString(config.databaseUrl),
       },
+      statistics: {
+        items: { total_items: 0, active_items: 0, deleted_items: 0 },
+        attachments: { total_attachments: 0 },
+      },
       timestamp: new Date().toISOString(),
     };
   }
+}
+
+/** Get detailed database connection status for PostgreSQL. */
+export async function getPostgresStatus() {
+  const { statistics: _statistics, ...status } = await getPostgresSnapshot();
+  return status;
 }
 
 /**
@@ -320,52 +340,10 @@ export async function getR2Status() {
     const s3Client = getS3Client();
     const s3Config = config.storage.s3;
 
-    // Try to list objects to verify connection
     const bucketName = s3Config.bucket;
-
-    // Get bucket info (this will throw if connection fails)
-    let bucketExists = false;
-    let objectCount = 0;
-    let totalSize = 0;
-
-    try {
-      // Try to stat the bucket and list objects
-      const stream = s3Client.listObjectsV2(bucketName, '', false);
-
-      const objects = [];
-      await new Promise((resolve, reject) => {
-        stream.on('data', obj => objects.push(obj));
-        stream.on('error', reject);
-        stream.on('end', resolve);
-      });
-
-      bucketExists = true;
-      objectCount = objects.length;
-      totalSize = objects.reduce((sum, obj) => sum + (obj.size || 0), 0);
-    } catch (err) {
-      if (err.code === 'NoSuchBucket') {
-        bucketExists = false;
-      } else {
-        throw err;
-      }
-    }
-
-    // Get some sample object paths
-    const sampleObjects = [];
-    try {
-      const stream = s3Client.listObjectsV2(bucketName, '', false, '', 5);
-      await new Promise((resolve, reject) => {
-        stream.on('data', obj => sampleObjects.push({
-          name: obj.name,
-          size: obj.size,
-          lastModified: obj.lastModified,
-        }));
-        stream.on('error', reject);
-        stream.on('end', resolve);
-      });
-    } catch {
-      // Ignore errors in sample listing
-    }
+    // A status page only needs a cheap health probe. Listing the bucket made
+    // latency grow with object count and the old sample request listed it twice.
+    const bucketExists = await s3Client.bucketExists(bucketName);
 
     return {
       status: bucketExists ? 'connected' : 'bucket_not_found',
@@ -379,15 +357,11 @@ export async function getR2Status() {
       bucket: {
         name: bucketName,
         exists: bucketExists,
-        objectCount,
-        totalSize,
-        totalSizeFormatted: formatBytes(totalSize),
       },
       credentials: {
         accessKey: maskCredential(s3Config.accessKey),
         secretKeySet: !!s3Config.secretKey,
       },
-      sampleObjects,
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
@@ -409,38 +383,188 @@ export async function getR2Status() {
  * Get combined system status (both PostgreSQL and R2).
  */
 export async function getSystemStatus() {
-  const [postgresStatus, r2Status] = await Promise.all([
-    getPostgresStatus(),
+  const [postgresSnapshot, r2Status] = await Promise.all([
+    getPostgresSnapshot(),
     getR2Status(),
   ]);
-
-  // Get item statistics
-  const itemStats = await query(`
-    SELECT
-      COUNT(*) as total_items,
-      COUNT(*) FILTER (WHERE deleted = 0) as active_items,
-      COUNT(*) FILTER (WHERE deleted = 1) as deleted_items
-    FROM items
-  `).then(rows => rows[0]).catch(() => ({ total_items: 0, active_items: 0, deleted_items: 0 }));
-
-  const attachmentStats = await query(`
-    SELECT COUNT(*) as total_attachments
-    FROM "itemAttachments"
-  `).then(rows => rows[0]).catch(() => ({ total_attachments: 0 }));
+  const { statistics, ...postgresStatus } = postgresSnapshot;
 
   return {
     postgres: postgresStatus,
     r2: r2Status,
-    statistics: {
-      items: itemStats,
-      attachments: attachmentStats,
-    },
+    statistics,
     config: {
       nodeVersion: process.version,
       platform: process.platform,
       uptime: process.uptime(),
       memory: process.memoryUsage(),
     },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Trash: inspect and permanently remove soft-deleted item trees.
+// ---------------------------------------------------------------------------
+
+/**
+ * List the roots of soft-deleted item trees in one paginated query.
+ * A deleted child whose parent is still active is also treated as a root so
+ * every soft-deleted row remains reachable from the admin trash page.
+ */
+export async function getTrash({ page = 1, pageSize = 50 } = {}) {
+  const validPage = Math.max(1, Number.parseInt(page, 10) || 1);
+  const validPageSize = Math.min(100, Math.max(1, Number.parseInt(pageSize, 10) || 50));
+  const offset = (validPage - 1) * validPageSize;
+
+  const snapshot = await queryOne(`
+    WITH RECURSIVE item_edges AS (
+      SELECT "itemID" AS child, "parentItemID" AS parent
+      FROM items WHERE "parentItemID" IS NOT NULL
+      UNION
+      SELECT "itemID", "parentItemID" FROM "itemAttachments" WHERE "parentItemID" IS NOT NULL
+      UNION
+      SELECT "itemID", "parentItemID" FROM "itemNotes" WHERE "parentItemID" IS NOT NULL
+      UNION
+      SELECT "itemID", "parentItemID" FROM "itemAnnotations" WHERE "parentItemID" IS NOT NULL
+    ), roots AS (
+      SELECT i."itemID", i.key, i."itemTypeID", i."dateAdded", i."dateModified"
+      FROM items i
+      WHERE i.deleted = 1
+        AND NOT EXISTS (
+          SELECT 1
+          FROM item_edges edge
+          JOIN items parent ON parent."itemID" = edge.parent
+          WHERE edge.child = i."itemID" AND parent.deleted = 1
+        )
+    ), trash_tree AS (
+      SELECT r."itemID", r."itemID" AS "rootItemID" FROM roots r
+      UNION
+      SELECT edge.child, tree."rootItemID"
+      FROM item_edges edge
+      JOIN trash_tree tree ON edge.parent = tree."itemID"
+    ), page_rows AS (
+      SELECT r."itemID" AS id, r.key, it."typeName" AS "itemType",
+             r."dateAdded", r."dateModified" AS "deletedAt",
+             COALESCE((
+               SELECT v.value
+               FROM "itemData" d
+               JOIN fields f ON f."fieldID" = d."fieldID" AND f."fieldName" = 'title'
+               JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+               WHERE d."itemID" = r."itemID"
+               LIMIT 1
+             ), '(无标题)') AS title,
+             (SELECT COUNT(*)::int - 1 FROM trash_tree t WHERE t."rootItemID" = r."itemID") AS "childCount"
+      FROM roots r
+      JOIN "itemTypes" it ON it."itemTypeID" = r."itemTypeID"
+      ORDER BY r."dateModified" DESC, r."itemID" DESC
+      LIMIT $1 OFFSET $2
+    )
+    SELECT
+      (SELECT COUNT(*)::int FROM roots) AS total,
+      (SELECT GREATEST(COUNT(*)::int - (SELECT COUNT(*)::int FROM roots), 0) FROM trash_tree) AS "childItems",
+      COALESCE(
+        (SELECT json_agg(row_to_json(p) ORDER BY p."deletedAt" DESC, p.id DESC) FROM page_rows p),
+        '[]'::json
+      ) AS items
+  `, [validPageSize, offset]);
+
+  const total = snapshot?.total || 0;
+  return {
+    items: snapshot?.items || [],
+    total,
+    childItems: snapshot?.childItems || 0,
+    page: validPage,
+    pageSize: validPageSize,
+    totalPages: Math.max(1, Math.ceil(total / validPageSize)),
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/**
+ * Permanently delete every soft-deleted item tree in a single transaction.
+ * PostgreSQL can reuse the freed pages after normal vacuuming; physical file
+ * size is not expected to shrink immediately.
+ */
+export async function emptyTrash() {
+  return withTransaction(emptyTrashWithClient);
+}
+
+/** Transaction body exported for focused, non-destructive unit testing. */
+export async function emptyTrashWithClient(client) {
+  const selection = await queryOne(`
+      WITH RECURSIVE item_edges AS (
+        SELECT "itemID" AS child, "parentItemID" AS parent
+        FROM items WHERE "parentItemID" IS NOT NULL
+        UNION
+        SELECT "itemID", "parentItemID" FROM "itemAttachments" WHERE "parentItemID" IS NOT NULL
+        UNION
+        SELECT "itemID", "parentItemID" FROM "itemNotes" WHERE "parentItemID" IS NOT NULL
+        UNION
+        SELECT "itemID", "parentItemID" FROM "itemAnnotations" WHERE "parentItemID" IS NOT NULL
+      ), roots AS (
+        SELECT i."itemID"
+        FROM items i
+        WHERE i.deleted = 1
+          AND NOT EXISTS (
+            SELECT 1
+            FROM item_edges edge
+            JOIN items parent ON parent."itemID" = edge.parent
+            WHERE edge.child = i."itemID" AND parent.deleted = 1
+          )
+      ), trash_tree AS (
+        SELECT r."itemID" FROM roots r
+        UNION
+        SELECT edge.child
+        FROM item_edges edge
+        JOIN trash_tree tree ON edge.parent = tree."itemID"
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM roots) AS "rootItems",
+        COALESCE(array_agg("itemID"), ARRAY[]::integer[]) AS ids
+      FROM trash_tree
+    `, [], client);
+
+  const ids = selection?.ids || [];
+  if (ids.length === 0) {
+    return {
+      rootItems: 0,
+      deletedItems: 0,
+      orphanCreators: 0,
+      orphanValues: 0,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // Some migrated attachment/note rows carry their parent relationship only
+  // in the subtype table, not items.parentItemID. Remove those referencing rows
+  // explicitly before deleting items so immediate parent FKs cannot block the
+  // bulk purge. The outer transaction keeps this atomic.
+  await execute('DELETE FROM "itemAttachments" WHERE "itemID" = ANY($1::integer[])', [ids], client);
+  await execute('DELETE FROM "itemNotes" WHERE "itemID" = ANY($1::integer[])', [ids], client);
+  await execute('DELETE FROM "itemAnnotations" WHERE "itemID" = ANY($1::integer[])', [ids], client);
+  const deleted = await execute('DELETE FROM items WHERE "itemID" = ANY($1::integer[])', [ids], client);
+
+  // Item rows cascade into itemCreators/itemData. Remove dictionary values
+  // that no remaining item references so the purge also reclaims their space.
+  const creators = await execute(`
+      DELETE FROM creators c
+      WHERE NOT EXISTS (
+        SELECT 1 FROM "itemCreators" ic WHERE ic."creatorID" = c."creatorID"
+      )
+    `, [], client);
+  const values = await execute(`
+      DELETE FROM "itemDataValues" v
+      WHERE NOT EXISTS (
+        SELECT 1 FROM "itemData" d WHERE d."valueID" = v."valueID"
+      )
+    `, [], client);
+
+  return {
+    rootItems: selection?.rootItems || 0,
+    deletedItems: deleted.rowCount,
+    orphanCreators: creators.rowCount,
+    orphanValues: values.rowCount,
     timestamp: new Date().toISOString(),
   };
 }

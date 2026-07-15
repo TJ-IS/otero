@@ -9,6 +9,7 @@ const TABS = [
   { to: '/admin', label: '系统状态', end: true },
   { to: '/admin/duplicates', label: '条目查重' },
   { to: '/admin/reconcile', label: '存储对账' },
+  { to: '/admin/trash', label: '回收站' },
 ];
 
 export function AdminLayout() {

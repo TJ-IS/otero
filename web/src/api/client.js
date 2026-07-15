@@ -182,6 +182,11 @@ export const api = {
   getAdminStatus() { return req('/api/admin/status'); },
   getAdminPostgresStatus() { return req('/api/admin/status/postgres'); },
   getAdminR2Status() { return req('/api/admin/status/r2'); },
+  getAdminTrash({ page = 1, pageSize = 50 } = {}) {
+    const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    return req(`/api/admin/trash?${qs.toString()}`);
+  },
+  emptyAdminTrash() { return req('/api/admin/trash', { method: 'DELETE' }); },
   getAdminDuplicates() { return req('/api/admin/duplicates'); },
   checkAdminDuplicates({ doi, title, author, limit } = {}) {
     const qs = new URLSearchParams();

@@ -1,8 +1,9 @@
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Database, HardDrive, Server, RefreshCw, Loader2, AlertCircle,
+  Database, HardDrive, Server, RefreshCw, AlertCircle,
   CheckCircle2, XCircle, Cpu, FileText, Paperclip,
 } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
@@ -52,11 +53,7 @@ export function SystemStatusPanel() {
   const { data, error, loading, refresh } = useAsync(() => api.getAdminStatus(), []);
 
   if (loading && !data) {
-    return (
-      <div className="flex h-64 items-center justify-center text-muted-foreground">
-        <Loader2 className="mr-2 size-5 animate-spin" /> 正在检测连接...
-      </div>
-    );
+    return <StatusSkeleton />;
   }
 
   if (error) {
@@ -150,7 +147,7 @@ export function SystemStatusPanel() {
                   <Row label="Region" value={r2.endpoint?.region} />
                   <Row label="存储桶" value={r2.bucket?.name} mono />
                   <Row label="桶状态" value={r2.bucket?.exists ? '存在' : '不存在'} />
-                  <Row label="对象数（顶层）" value={r2.bucket?.objectCount} />
+                  <Row label="存储桶访问" value={r2.bucket?.exists ? '正常' : '不可用'} />
                   <Row label="Access Key" value={r2.credentials?.accessKey} mono />
                   <Row label="Secret Key" value={r2.credentials?.secretKeySet ? '已配置' : '未配置'} />
                 </>
@@ -195,6 +192,60 @@ export function SystemStatusPanel() {
       <p className="text-center text-xs text-muted-foreground">
         采集于 {data?.timestamp && new Date(data.timestamp).toLocaleString()}
       </p>
+    </div>
+  );
+}
+
+function StatusSkeleton() {
+  return (
+    <div
+      className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6"
+      aria-busy="true"
+      aria-label="正在加载系统状态"
+    >
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-3 w-56" />
+        </div>
+        <Skeleton className="h-8 w-20" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[0, 1].map((column) => (
+          <Card key={column}>
+            <CardHeader className="space-y-3 pb-3">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-28" />
+                <Skeleton className="h-5 w-16" />
+              </div>
+              <Skeleton className="h-3 w-32" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {[0, 1, 2, 3, 4, 5].map((row) => (
+                <div key={row} className="flex items-center justify-between gap-6">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className={`h-3 ${row % 2 ? 'w-28' : 'w-40'}`} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((tile) => (
+          <Card key={tile}>
+            <CardContent className="flex items-center gap-3 p-4">
+              <Skeleton className="size-9 shrink-0 rounded-lg" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-5 w-24" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,51 +1,76 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
-import { LibraryView } from '@/components/LibraryView';
-import { SearchPage } from '@/components/SearchPage';
-import { MerkleTreeView } from '@/components/MerkleTreeView';
-import { AuthorGraph } from '@/components/AuthorGraph';
-import { AuthorPage } from '@/components/AuthorPage';
-import { ItemPage } from '@/components/ItemPage';
-import { DashboardLayout } from '@/components/DashboardLayout';
-import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
-import { DashboardJournals } from '@/components/dashboard/DashboardJournals';
-import { DashboardTimeline } from '@/components/dashboard/DashboardTimeline';
-import { DashboardAuthorStats } from '@/components/dashboard/DashboardAuthorStats';
-import { DocsLayout } from '@/components/DocsLayout';
-import { OpenApiDocsPage } from '@/components/OpenApiDocsPage';
-import { AgentsMdPage } from '@/components/AgentsMdPage';
-import { AdminLayout } from '@/components/AdminLayout';
-import { SystemStatusPanel } from '@/components/admin/SystemStatusPanel';
-import { DuplicatesPanel } from '@/components/admin/DuplicatesPanel';
-import { StorageReconciliationPanel } from '@/components/admin/StorageReconciliationPanel';
+
+function lazyNamed(loader, name) {
+  return lazy(() => loader().then(module => ({ default: module[name] })));
+}
+
+const LibraryView = lazyNamed(() => import('@/components/LibraryView'), 'LibraryView');
+const SearchPage = lazyNamed(() => import('@/components/SearchPage'), 'SearchPage');
+const MerkleTreeView = lazyNamed(() => import('@/components/MerkleTreeView'), 'MerkleTreeView');
+const AuthorGraph = lazyNamed(() => import('@/components/AuthorGraph'), 'AuthorGraph');
+const AuthorPage = lazyNamed(() => import('@/components/AuthorPage'), 'AuthorPage');
+const ItemPage = lazyNamed(() => import('@/components/ItemPage'), 'ItemPage');
+const DashboardLayout = lazyNamed(() => import('@/components/DashboardLayout'), 'DashboardLayout');
+const DashboardOverview = lazyNamed(() => import('@/components/dashboard/DashboardOverview'), 'DashboardOverview');
+const DashboardJournals = lazyNamed(() => import('@/components/dashboard/DashboardJournals'), 'DashboardJournals');
+const DashboardTimeline = lazyNamed(() => import('@/components/dashboard/DashboardTimeline'), 'DashboardTimeline');
+const DashboardAuthorStats = lazyNamed(() => import('@/components/dashboard/DashboardAuthorStats'), 'DashboardAuthorStats');
+const DocsLayout = lazyNamed(() => import('@/components/DocsLayout'), 'DocsLayout');
+const OpenApiDocsPage = lazyNamed(() => import('@/components/OpenApiDocsPage'), 'OpenApiDocsPage');
+const AgentsMdPage = lazyNamed(() => import('@/components/AgentsMdPage'), 'AgentsMdPage');
+const AdminLayout = lazyNamed(() => import('@/components/AdminLayout'), 'AdminLayout');
+const SystemStatusPanel = lazyNamed(() => import('@/components/admin/SystemStatusPanel'), 'SystemStatusPanel');
+const DuplicatesPanel = lazyNamed(() => import('@/components/admin/DuplicatesPanel'), 'DuplicatesPanel');
+const StorageReconciliationPanel = lazyNamed(
+  () => import('@/components/admin/StorageReconciliationPanel'),
+  'StorageReconciliationPanel'
+);
+const TrashPanel = lazyNamed(() => import('@/components/admin/TrashPanel'), 'TrashPanel');
+
+function RouteFallback() {
+  return (
+    <div className="min-h-[100dvh] bg-background p-6" aria-busy="true" aria-label="正在加载页面">
+      <div className="mx-auto max-w-5xl animate-pulse space-y-5">
+        <div className="h-8 w-48 rounded-md bg-muted" />
+        <div className="h-4 w-72 max-w-full rounded-md bg-muted" />
+        <div className="h-56 rounded-xl bg-muted/70" />
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <>
-      <Routes>
-        <Route path="/" element={<LibraryView />} />
-        <Route path="/search" element={<SearchPage />} />
-        <Route path="/docs" element={<DocsLayout />}>
-          <Route index element={<Navigate to="api" replace />} />
-          <Route path="api" element={<OpenApiDocsPage />} />
-          <Route path="agents" element={<AgentsMdPage />} />
-        </Route>
-        <Route path="/dashboard" element={<DashboardLayout />}>
-          <Route index element={<DashboardOverview />} />
-          <Route path="journals" element={<DashboardJournals />} />
-          <Route path="timeline" element={<DashboardTimeline />} />
-          <Route path="authors" element={<AuthorGraph />} />
-          <Route path="authors/stats" element={<DashboardAuthorStats />} />
-          <Route path="merkle" element={<MerkleTreeView />} />
-        </Route>
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<SystemStatusPanel />} />
-          <Route path="duplicates" element={<DuplicatesPanel />} />
-          <Route path="reconcile" element={<StorageReconciliationPanel />} />
-        </Route>
-        <Route path="/authors/:id" element={<AuthorPage />} />
-        <Route path="/items/:key" element={<ItemPage />} />
-      </Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<LibraryView />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/docs" element={<DocsLayout />}>
+            <Route index element={<Navigate to="api" replace />} />
+            <Route path="api" element={<OpenApiDocsPage />} />
+            <Route path="agents" element={<AgentsMdPage />} />
+          </Route>
+          <Route path="/dashboard" element={<DashboardLayout />}>
+            <Route index element={<DashboardOverview />} />
+            <Route path="journals" element={<DashboardJournals />} />
+            <Route path="timeline" element={<DashboardTimeline />} />
+            <Route path="authors" element={<AuthorGraph />} />
+            <Route path="authors/stats" element={<DashboardAuthorStats />} />
+            <Route path="merkle" element={<MerkleTreeView />} />
+          </Route>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<SystemStatusPanel />} />
+            <Route path="duplicates" element={<DuplicatesPanel />} />
+            <Route path="reconcile" element={<StorageReconciliationPanel />} />
+            <Route path="trash" element={<TrashPanel />} />
+          </Route>
+          <Route path="/authors/:id" element={<AuthorPage />} />
+          <Route path="/items/:key" element={<ItemPage />} />
+        </Routes>
+      </Suspense>
       <Toaster richColors position="bottom-right" />
     </>
   );
