@@ -61,7 +61,16 @@ function collectPdfDirs() {
 }
 
 function logPathFor(dirs) {
-  if (DIR_ARG) return path.join(DIR_ARG, 'import-to-db-log.jsonl');
+  if (DIR_ARG) {
+    const inDir = path.join(DIR_ARG, 'import-to-db-log.jsonl');
+    try {
+      fs.accessSync(DIR_ARG, fs.constants.W_OK);
+      return inDir;
+    } catch {
+      // Source dirs may be root-owned (e.g. copied as root); fall back.
+      return path.join(DEFAULT_ROOT, `import-to-db-${path.basename(DIR_ARG)}.jsonl`);
+    }
+  }
   return path.join(DEFAULT_ROOT, 'import-to-db-log.jsonl');
 }
 

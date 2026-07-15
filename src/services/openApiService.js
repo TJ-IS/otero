@@ -6,6 +6,9 @@ import {
 } from '../repositories/itemRepo.js';
 import { searchAuthors, listAuthorItems } from '../repositories/authorRepo.js';
 import { getFullText } from './fulltextService.js';
+import { getFullTextStructure } from './fulltextService.js';
+import { toBibtex, toRis, toBibtexBatch, toRisBatch } from './exportService.js';
+import { getOpenFacets, getOpenOverviewStats, getOpenTimeline } from '../repositories/openApiRepo.js';
 import { JOURNAL_WHITELIST, UNFILED } from './journalWhitelist.js';
 import { normalizeDoi } from '../utils/doi.js';
 
@@ -194,6 +197,16 @@ async function loadItemByDoiOrThrow(doiRaw) {
   return { doi, item };
 }
 
+async function loadItemByKeyOrThrow(keyRaw) {
+  const key = keyRaw == null ? '' : String(keyRaw).trim();
+  if (!key) throw new OpenApiError(400, 'item key is required');
+  const item = await Item.loadByKey(key);
+  if (!item || item.deleted || item.parentItemID != null || !WHITELIST_SET.has(item.getField('publicationTitle'))) {
+    throw new OpenApiError(404, 'item not found');
+  }
+  return item;
+}
+
 export async function getItemByDoi(doiRaw) {
   const { doi, item } = await loadItemByDoiOrThrow(doiRaw);
   return { doi, item: item.toJSON() };
@@ -234,11 +247,94 @@ export async function getPdfUrlByDoi(doiRaw) {
   };
 }
 
+export async function getOpenItemByKey(key) {
+  const item = await loadItemByKeyOrThrow(key);
+  return { item: item.toJSON() };
+}
+
+export async function getMarkdownByKey(key) {
+  const item = await loadItemByKeyOrThrow(key);
+  const ft = await getFullText(item.key);
+  if (!ft || ft.state !== 'done' || !ft.markdown) {
+    throw new OpenApiError(404, 'markdown not available for item', {
+      itemKey: item.key,
+      state: ft?.state ?? null,
+    });
+  }
+  return { itemKey: item.key, state: ft.state, markdown: ft.markdown };
+}
+
+export async function getPdfUrlByKey(key) {
+  const item = await loadItemByKeyOrThrow(key);
+  const attachmentKey = await findPdfAttachmentByItemId(item.id);
+  if (!attachmentKey) {
+    throw new OpenApiError(404, 'pdf not available for item', { itemKey: item.key });
+  }
+  return { itemKey: item.key, attachmentKey, url: `/api/attachments/${attachmentKey}/file` };
+}
+
+export async function getStructureByKey(key) {
+  const item = await loadItemByKeyOrThrow(key);
+  return getFullTextStructure(item.key);
+}
+
+export async function exportItemByKey(key, format = 'bibtex') {
+  const item = await loadItemByKeyOrThrow(key);
+  const normalized = String(format || 'bibtex').toLowerCase();
+  if (!['bibtex', 'ris'].includes(normalized)) {
+    throw new OpenApiError(400, 'format must be bibtex or ris');
+  }
+  return {
+    format: normalized,
+    content: normalized === 'ris' ? toRis(item.toJSON()) : toBibtex(item.toJSON()),
+  };
+}
+
+export async function exportOpenArticles({ format = 'bibtex', q, ...filters }) {
+  const normalized = String(format || 'bibtex').toLowerCase();
+  if (!['bibtex', 'ris'].includes(normalized)) {
+    throw new OpenApiError(400, 'format must be bibtex or ris');
+  }
+  const common = {
+    search: q != null && String(q).trim() ? String(q).trim() : undefined,
+    type: filters.type,
+    journal: filters.journal,
+    journals: filters.journals,
+    yearFrom: filters.yearFrom,
+    yearTo: filters.yearTo,
+    basketOnly: true,
+    includeDeleted: false,
+    pageSize: 200,
+    sortField: 'date',
+    sortDir: 'desc',
+  };
+  const first = await Items.list({ ...common, page: 1 });
+  const pages = [];
+  const pageNumbers = Array.from(
+    { length: Math.max(0, first.totalPages - 1) },
+    (_, index) => index + 2,
+  );
+  // Keep bulk exports responsive without opening dozens of concurrent queries
+  // for a large corpus.
+  for (let index = 0; index < pageNumbers.length; index += 4) {
+    const batch = pageNumbers.slice(index, index + 4);
+    pages.push(...await Promise.all(batch.map((page) => Items.list({ ...common, page }))));
+  }
+  const json = [first, ...pages].flatMap((page) => page.items.map((item) => item.toJSON()));
+  return {
+    format: normalized,
+    content: normalized === 'ris' ? toRisBatch(json) : toBibtexBatch(json),
+    count: json.length,
+  };
+}
+
+export { getOpenFacets, getOpenOverviewStats, getOpenTimeline };
+
 export function buildSkillMarkdown({ baseUrl }) {
   const base = String(baseUrl || '').replace(/\/$/, '');
   return `---
 name: otero-open-api
-description: Read-only access to the Otero AIS Senior Scholars' Basket literature library via HTTP APIs. Use when searching papers or authors, listing Basket journals, filtering by year/journal, resolving DOIs, or fetching markdown/PDF download URLs.
+description: Read-only access to the Otero AIS Senior Scholars' Basket literature library via HTTP APIs. Use when searching papers or authors, resolving DOI or item keys, fetching structured full text, exporting citations, or querying corpus statistics.
 ---
 
 # Otero Open API
@@ -252,6 +348,8 @@ Read-only HTTP API for the Otero literature corpus (AIS Senior Scholars' Basket 
 - List an author's papers
 - List Basket journals and filter by journal / year range
 - Resolve a DOI to metadata, MinerU markdown, or a PDF download URL
+- Follow an item key to metadata, structured full text, BibTeX, or RIS
+- Query facets, corpus coverage, and the publication timeline
 
 ## Base URL
 
@@ -272,7 +370,7 @@ All endpoints are **GET** and **read-only**. Do not attempt POST/PATCH/DELETE ag
 
 ## Shared filters
 
-Use on \`/articles\`, \`/authors\`, \`/authors/:id/items\`, and \`/search\`:
+Use on \`/articles\`, \`/authors\`, \`/authors/:id/items\`, \`/search\`, \`/facets\`, and \`/stats/timeline\`:
 
 | Param | Description |
 |-------|-------------|
@@ -293,6 +391,18 @@ Use on \`/articles\`, \`/authors\`, \`/authors/:id/items\`, and \`/search\`:
 \`GET ${base}/api/open/v1/articles?q=blockchain&yearFrom=2018&yearTo=2022&journal=MIS%20Quarterly&page=1&pageSize=20\`
 
 \`q\` is optional (filter-only browsing is allowed).
+
+### Export filtered articles
+
+\`GET ${base}/api/open/v1/articles/export?q=platform&format=bibtex\`
+
+\`format\` is \`bibtex\` (default) or \`ris\`.
+
+### Facets
+
+\`GET ${base}/api/open/v1/facets?q=platform&yearFrom=2020\`
+
+Returns journal, year, item-type, DOI, PDF, and markdown availability counts for the filtered result set.
 
 ### Search authors
 
@@ -320,6 +430,28 @@ Returns \`{ q, articles, authors }\` (each bucket paginated).
 
 DOI may include an \`https://doi.org/\` prefix. PDF URL is relative (\`/api/attachments/{key}/file\`); prepend the site origin to download.
 
+### By item key
+
+Use the \`key\` returned by article and search results:
+
+\`GET ${base}/api/open/v1/items/{key}\`
+
+\`GET ${base}/api/open/v1/items/{key}/markdown\`
+
+\`GET ${base}/api/open/v1/items/{key}/pdf-url\`
+
+\`GET ${base}/api/open/v1/items/{key}/structure\`
+
+\`GET ${base}/api/open/v1/items/{key}/export?format=bibtex\`
+
+The structure response can include outline, figures, tables, equations, charts, references, footnotes, and publisher stamp.
+
+### Statistics
+
+\`GET ${base}/api/open/v1/stats/overview\`
+
+\`GET ${base}/api/open/v1/stats/timeline?journal=MIS%20Quarterly\`
+
 ## Errors
 
 - \`400\` invalid parameters
@@ -329,6 +461,7 @@ DOI may include an \`https://doi.org/\` prefix. PDF URL is relative (\`/api/atta
 
 1. Call \`/journals\` first if you need exact journal names for filters.
 2. Prefer \`/search\` when the user query could match either papers or people.
-3. For full text, use \`/items/by-doi/markdown\` after confirming the DOI via \`/items/by-doi\`.
+3. When a search result already provides \`key\`, prefer key-based endpoints and avoid resolving the DOI again.
+4. Fetch \`/items/{key}/structure\` when only references, tables, figures, or the outline are needed.
 `;
 }

@@ -20,6 +20,22 @@ const ENDPOINTS = [
     curl: 'curl "$BASE/api/open/v1/articles?q=blockchain&yearFrom=2018&yearTo=2022&page=1&pageSize=20"',
   },
   {
+    id: 'articles-export',
+    method: 'GET',
+    path: '/api/open/v1/articles/export',
+    summary: '按文章检索条件批量导出 BibTeX 或 RIS',
+    query: 'format=bibtex|ris, q, journal|journals, year, yearFrom, yearTo, type',
+    curl: 'curl -OJ "$BASE/api/open/v1/articles/export?q=platform&format=bibtex"',
+  },
+  {
+    id: 'facets',
+    method: 'GET',
+    path: '/api/open/v1/facets',
+    summary: '返回当前查询的期刊、年份、类型和资源可用性聚合',
+    query: 'q, journal|journals, year, yearFrom, yearTo, type',
+    curl: 'curl "$BASE/api/open/v1/facets?q=platform&yearFrom=2020"',
+  },
+  {
     id: 'authors',
     method: 'GET',
     path: '/api/open/v1/authors',
@@ -68,6 +84,57 @@ const ENDPOINTS = [
     curl: 'curl --get "$BASE/api/open/v1/items/by-doi/pdf-url" --data-urlencode "doi=10.1234/example"',
   },
   {
+    id: 'by-key',
+    method: 'GET',
+    path: '/api/open/v1/items/:key',
+    summary: '按搜索结果中的 item key 获取完整元数据',
+    curl: 'curl "$BASE/api/open/v1/items/ABCD1234"',
+  },
+  {
+    id: 'by-key-md',
+    method: 'GET',
+    path: '/api/open/v1/items/:key/markdown',
+    summary: '按 item key 获取已解析的全文 Markdown',
+    curl: 'curl "$BASE/api/open/v1/items/ABCD1234/markdown"',
+  },
+  {
+    id: 'by-key-pdf',
+    method: 'GET',
+    path: '/api/open/v1/items/:key/pdf-url',
+    summary: '按 item key 获取 PDF 相对地址与绝对地址',
+    curl: 'curl "$BASE/api/open/v1/items/ABCD1234/pdf-url"',
+  },
+  {
+    id: 'by-key-structure',
+    method: 'GET',
+    path: '/api/open/v1/items/:key/structure',
+    summary: '获取目录、图表、公式、参考文献和脚注等结构化全文',
+    curl: 'curl "$BASE/api/open/v1/items/ABCD1234/structure"',
+  },
+  {
+    id: 'by-key-export',
+    method: 'GET',
+    path: '/api/open/v1/items/:key/export',
+    summary: '导出单篇 BibTeX 或 RIS',
+    query: 'format=bibtex|ris',
+    curl: 'curl "$BASE/api/open/v1/items/ABCD1234/export?format=ris"',
+  },
+  {
+    id: 'stats-overview',
+    method: 'GET',
+    path: '/api/open/v1/stats/overview',
+    summary: 'Basket 范围内的文章、作者、DOI、PDF 和全文覆盖概览',
+    curl: 'curl "$BASE/api/open/v1/stats/overview"',
+  },
+  {
+    id: 'stats-timeline',
+    method: 'GET',
+    path: '/api/open/v1/stats/timeline',
+    summary: '按出版年份统计文章数，可附带查询和共享筛选条件',
+    query: 'q, journal|journals, year, yearFrom, yearTo, type',
+    curl: 'curl "$BASE/api/open/v1/stats/timeline?journal=MIS%20Quarterly"',
+  },
+  {
     id: 'skill',
     method: 'GET',
     path: '/api/open/v1/SKILL.md',
@@ -111,12 +178,14 @@ export function OpenApiDocsPage() {
       <section className="space-y-3">
         <p className="text-sm text-muted-foreground leading-relaxed">
           Otero 开放只读 API，面向 AIS Senior Scholars&apos; Basket 文献库。
+          支持从检索结果继续读取条目、结构化全文和引用导出，也提供聚合与时间线统计。
           所有接口均为 <code className="text-xs">GET</code>，不会修改数据库。
           Base URL：
         </p>
         <CodeBlock>{`${base}/api/open/v1`}</CodeBlock>
         <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
           <li>仅暴露白名单 11 刊内、未删除的顶层条目</li>
+          <li>搜索结果中的 <code className="text-xs">key</code> 可直接用于条目、全文和导出接口</li>
           <li>
             分页：<code className="text-xs">page</code>（默认 1）、
             <code className="text-xs">pageSize</code>（默认 20，最大 100）
@@ -132,7 +201,8 @@ export function OpenApiDocsPage() {
         <h2 className="text-base font-semibold tracking-tight">Filter 参数</h2>
         <p className="text-sm text-muted-foreground">
           适用于 <code className="text-xs">/articles</code>、<code className="text-xs">/authors</code>、
-          <code className="text-xs">/authors/:id/items</code>、<code className="text-xs">/search</code>。
+          <code className="text-xs">/authors/:id/items</code>、<code className="text-xs">/search</code>、
+          <code className="text-xs">/facets</code> 和 <code className="text-xs">/stats/timeline</code>。
         </p>
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-sm">
