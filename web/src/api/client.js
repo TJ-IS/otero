@@ -199,7 +199,9 @@ export const api = {
   preCheckDuplicate(body) {
     return req('/api/admin/duplicates/check', { method: 'POST', body: JSON.stringify(body) });
   },
-  getAdminReconcile() { return req('/api/admin/reconcile'); },
+  getAdminReconcile({ force = false } = {}) {
+    return req(`/api/admin/reconcile${force ? '?force=1' : ''}`);
+  },
   deleteAdminOrphanObjects(names) {
     return req('/api/admin/reconcile/delete', { method: 'POST', body: JSON.stringify({ names }) });
   },

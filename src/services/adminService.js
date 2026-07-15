@@ -573,23 +573,66 @@ export async function emptyTrashWithClient(client) {
 // Storage reconciliation: compare PostgreSQL references against R2 objects.
 // ---------------------------------------------------------------------------
 
-/**
- * Recursively list every object in the R2 bucket as { name, size }.
- * Only used for reconciliation (a full listing is unavoidable there).
- */
-function listAllR2Objects() {
+const R2_LIST_CONCURRENCY = 8;
+const R2_LIST_RETRIES = 3;
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** Collect one S3 listing stream, retrying transient R2/network failures. */
+async function listR2Entries(prefix, recursive, attempts = R2_LIST_RETRIES) {
   const client = getS3Client();
   const bucket = config.storage.s3.bucket;
-  return new Promise((resolve, reject) => {
-    const objects = [];
-    const stream = client.listObjectsV2(bucket, '', true); // recursive
-    stream.on('data', (obj) => {
-      // Directory markers have no name/size; skip them.
-      if (obj.name) objects.push({ name: obj.name, size: obj.size || 0 });
+  try {
+    return await new Promise((resolve, reject) => {
+      const entries = [];
+      const stream = client.listObjectsV2(bucket, prefix, recursive);
+      stream.on('data', entry => entries.push(entry));
+      stream.on('error', reject);
+      stream.on('end', () => resolve(entries));
     });
-    stream.on('error', reject);
-    stream.on('end', () => resolve(objects));
-  });
+  } catch (error) {
+    if (attempts <= 1) throw error;
+    await delay((R2_LIST_RETRIES - attempts + 1) * 500);
+    return listR2Entries(prefix, recursive, attempts - 1);
+  }
+}
+
+/**
+ * List every R2 object using bounded parallel prefix scans.
+ *
+ * A single recursive ListObjectsV2 stream paginates the entire bucket
+ * serially. Otero object names are sharded by their first two key characters,
+ * so discover the top-level prefixes and merge them into first-character
+ * partitions. This keeps coverage exact (including unexpected prefixes) while
+ * allowing independent R2 pages to be fetched concurrently.
+ */
+async function listAllR2Objects() {
+  const topLevel = await listR2Entries('', false);
+  const partitions = new Set();
+  const rootObjects = [];
+  for (const entry of topLevel) {
+    if (entry.prefix) partitions.add(entry.prefix[0]);
+    else if (entry.name) rootObjects.push({ name: entry.name, size: entry.size || 0 });
+  }
+
+  const prefixes = [...partitions];
+  const objects = rootObjects.filter(obj => !partitions.has(obj.name[0]));
+  let cursor = 0;
+  async function worker() {
+    while (cursor < prefixes.length) {
+      const prefix = prefixes[cursor++];
+      const entries = await listR2Entries(prefix, true);
+      for (const entry of entries) {
+        if (entry.name) objects.push({ name: entry.name, size: entry.size || 0 });
+      }
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(R2_LIST_CONCURRENCY, prefixes.length) }, worker)
+  );
+  return objects;
 }
 
 /**
@@ -598,27 +641,28 @@ function listAllR2Objects() {
  * prefix containing all extracted full-text assets.
  */
 async function buildDbReferenceSets() {
-  const attachmentRows = await query(`
-    SELECT i.key AS key, a.path AS path, i.deleted AS deleted
-    FROM "itemAttachments" a
-    JOIN items i ON i."itemID" = a."itemID"
-    WHERE a.path IS NOT NULL AND a.path <> ''
-  `);
+  const [attachmentRows, ftRows] = await Promise.all([
+    query(`
+      SELECT i.key AS key, a.path AS path, i.deleted AS deleted
+      FROM "itemAttachments" a
+      JOIN items i ON i."itemID" = a."itemID"
+      WHERE a.path IS NOT NULL AND a.path <> ''
+    `),
+    query(`
+      SELECT i.key AS key, i.deleted AS deleted,
+             f."markdownPath" AS "markdownPath", f."assetDir" AS "assetDir"
+      FROM "itemFullText" f
+      JOIN items i ON i."itemID" = f."itemID"
+      WHERE (f."markdownPath" IS NOT NULL AND f."markdownPath" <> '')
+         OR (f."assetDir" IS NOT NULL AND f."assetDir" <> '')
+    `).catch(() => []),
+  ]);
 
   const exactPaths = new Map();
   for (const r of attachmentRows) {
     const norm = normalizeObjectName(r.path);
     exactPaths.set(norm, { key: r.key, deleted: Boolean(r.deleted), type: 'attachment' });
   }
-
-  const ftRows = await query(`
-    SELECT i.key AS key, i.deleted AS deleted,
-           f."markdownPath" AS "markdownPath", f."assetDir" AS "assetDir"
-    FROM "itemFullText" f
-    JOIN items i ON i."itemID" = f."itemID"
-    WHERE (f."markdownPath" IS NOT NULL AND f."markdownPath" <> '')
-       OR (f."assetDir" IS NOT NULL AND f."assetDir" <> '')
-  `).catch(() => []);
 
   const prefixes = new Map();
   for (const r of ftRows) {
@@ -684,6 +728,12 @@ function classifyObject(name, { exactPaths, prefixes }) {
 }
 
 const RECON_LIST_CAP = 1000;
+const RECON_CACHE_TTL_MS = Math.max(
+  0,
+  Number(process.env.OTERO_RECON_CACHE_TTL_MS ?? 5 * 60 * 1000)
+);
+let reconciliationCache = null;
+let reconciliationInFlight = null;
 
 /**
  * Reconcile PostgreSQL references against R2 objects.
@@ -692,7 +742,7 @@ const RECON_LIST_CAP = 1000;
  *
  * Lists are capped at RECON_LIST_CAP entries each; full counts are always exact.
  */
-export async function reconcileStorage() {
+export async function reconcileStorage({ force = false } = {}) {
   if (!useS3()) {
     return {
       status: 'not_applicable',
@@ -701,10 +751,27 @@ export async function reconcileStorage() {
     };
   }
 
-  const [refs, objects] = await Promise.all([
-    buildDbReferenceSets(),
-    listAllR2Objects(),
-  ]);
+  const now = Date.now();
+  if (!force && reconciliationCache && now - reconciliationCache.savedAt < RECON_CACHE_TTL_MS) {
+    return { ...reconciliationCache.result, cached: true };
+  }
+  // A forced refresh should not start a duplicate full-bucket scan when one is
+  // already running. Every caller awaits the same in-flight promise.
+  if (reconciliationInFlight) return reconciliationInFlight;
+
+  reconciliationInFlight = performStorageReconciliation();
+  try {
+    const result = await reconciliationInFlight;
+    reconciliationCache = { result, savedAt: Date.now() };
+    return result;
+  } finally {
+    reconciliationInFlight = null;
+  }
+}
+
+async function performStorageReconciliation() {
+  const startedAt = Date.now();
+  const [refs, objects] = await Promise.all([buildDbReferenceSets(), listAllR2Objects()]);
   const objectNames = new Set(objects.map(o => o.name));
 
   // Exact paths (attachments and markdown files) must exist by name.
@@ -775,6 +842,8 @@ export async function reconcileStorage() {
       missingInR2: missingTotal > missingInR2.length,
       orphanInR2: orphanTotal > orphanInR2.length,
     },
+    cached: false,
+    durationMs: Date.now() - startedAt,
     timestamp: new Date().toISOString(),
   };
 }
@@ -805,6 +874,7 @@ export async function deleteOrphanObjects(names) {
   const bucket = config.storage.s3.bucket;
   const deleted = [];
   const skipped = [];
+  const safeNames = [];
 
   for (const name of uniqueNames) {
     if (typeof name !== 'string' || !name) {
@@ -817,14 +887,41 @@ export async function deleteOrphanObjects(names) {
       skipped.push({ name, reason: `referenced by ${cls.type} (${cls.key})` });
       continue;
     }
+    safeNames.push(name);
+  }
+
+  if (safeNames.length > 0) {
     try {
-      // statObject prevents a missing key from being reported as deleted;
-      // removeObject errors are intentionally allowed to reach this result.
-      await client.statObject(bucket, name);
-      await client.removeObject(bucket, name);
-      deleted.push(name);
+      // MinIO/R2 batches this list into the S3 multi-delete API. The previous
+      // statObject + removeObject loop cost two serial requests per object.
+      await client.removeObjects(bucket, safeNames.map(name => ({ name })));
+      deleted.push(...safeNames);
+      if (reconciliationCache) {
+        const deletedSet = new Set(safeNames);
+        const cachedResult = reconciliationCache.result;
+        let removedBytes = 0;
+        for (const obj of cachedResult.orphanInR2 || []) {
+          if (deletedSet.has(obj.name)) removedBytes += obj.size || 0;
+        }
+        const summary = cachedResult.summary || {};
+        const orphanBytes = Math.max(0, (summary.orphanBytes || 0) - removedBytes);
+        reconciliationCache = {
+          savedAt: Date.now(),
+          result: {
+            ...cachedResult,
+            summary: {
+              ...summary,
+              r2Objects: Math.max(0, (summary.r2Objects || 0) - safeNames.length),
+              orphanInR2: Math.max(0, (summary.orphanInR2 || 0) - safeNames.length),
+              orphanBytes,
+              orphanBytesFormatted: formatBytes(orphanBytes),
+            },
+            orphanInR2: (cachedResult.orphanInR2 || []).filter(obj => !deletedSet.has(obj.name)),
+          },
+        };
+      }
     } catch (err) {
-      skipped.push({ name, reason: err.message });
+      for (const name of safeNames) skipped.push({ name, reason: err.message });
     }
   }
 

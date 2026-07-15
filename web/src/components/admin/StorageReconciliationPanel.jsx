@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -53,8 +54,95 @@ function TruncatedNote({ truncated, listCap, total }) {
   );
 }
 
+function VirtualMissingList({ items }) {
+  const parentRef = useRef(null);
+  const rows = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 56,
+    overscan: 8,
+  });
+
+  return (
+    <div ref={parentRef} className="max-h-[32rem] overflow-y-auto">
+      <div className="relative w-full" style={{ height: `${rows.getTotalSize()}px` }}>
+        {rows.getVirtualItems().map((row) => {
+          const item = items[row.index];
+          return (
+            <div
+              key={`${item.key}-${item.path}-${row.index}`}
+              ref={rows.measureElement}
+              data-index={row.index}
+              className="absolute left-0 top-0 flex w-full items-center justify-between gap-3 border-b py-2"
+              style={{ transform: `translateY(${row.start}px)` }}
+            >
+              <div className="min-w-0">
+                <Link
+                  to={`/items/${item.key}`}
+                  className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+                >
+                  {item.key} <ExternalLink className="size-3" />
+                </Link>
+                <p className="truncate font-mono text-xs text-muted-foreground">{item.path}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Badge variant="outline" className="text-xs">{item.type || 'attachment'}</Badge>
+                {item.deleted ? <Badge variant="secondary">已删除条目</Badge> : null}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function VirtualOrphanList({ items, selected, onToggle }) {
+  const parentRef = useRef(null);
+  const rows = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 52,
+    overscan: 8,
+  });
+
+  return (
+    <div ref={parentRef} className="max-h-[32rem] overflow-y-auto">
+      <div className="relative w-full" style={{ height: `${rows.getTotalSize()}px` }}>
+        {rows.getVirtualItems().map((row) => {
+          const item = items[row.index];
+          return (
+            <div
+              key={item.name}
+              ref={rows.measureElement}
+              data-index={row.index}
+              className="absolute left-0 top-0 flex w-full items-center gap-3 border-b py-2"
+              style={{ transform: `translateY(${row.start}px)` }}
+            >
+              <Checkbox checked={selected.has(item.name)} onCheckedChange={() => onToggle(item.name)} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-mono text-xs">{item.name}</p>
+                {item.key ? <p className="truncate text-xs text-muted-foreground">关联条目：{item.key}</p> : null}
+              </div>
+              <Badge variant="outline" className="shrink-0 text-xs">{item.type || 'unknown'}</Badge>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{item.sizeFormatted}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function StorageReconciliationPanel() {
-  const { data, error, loading, refresh } = useAsync(() => api.getAdminReconcile(), []);
+  const forceNextRefresh = useRef(false);
+  const {
+    data, error, loading, refresh: runRefresh,
+  } = useAsync(() => {
+    const force = forceNextRefresh.current;
+    forceNextRefresh.current = false;
+    return api.getAdminReconcile({ force });
+  }, []);
   const [selected, setSelected] = useState(() => new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -71,14 +159,19 @@ export function StorageReconciliationPanel() {
   );
   const allSelected = orphanInR2.length > 0 && selectedCount === orphanInR2.length;
 
-  const toggle = (name) => {
+  const refresh = useCallback(() => {
+    forceNextRefresh.current = true;
+    runRefresh();
+  }, [runRefresh]);
+
+  const toggle = useCallback((name) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name);
       else next.add(name);
       return next;
     });
-  };
+  }, []);
 
   const toggleAll = () => {
     setSelected(allSelected ? new Set() : new Set(orphanInR2.map((o) => o.name)));
@@ -96,7 +189,9 @@ export function StorageReconciliationPanel() {
       const result = await api.deleteAdminOrphanObjects(names);
       setDeleteResult(result);
       setSelected(new Set());
-      refresh();
+      // The backend updates its reconciliation cache after a successful bulk
+      // delete, so reload that result without forcing another full R2 scan.
+      runRefresh();
     } catch (e) {
       setDeleteResult({ error: e.message });
     } finally {
@@ -107,8 +202,11 @@ export function StorageReconciliationPanel() {
 
   if (loading && !data) {
     return (
-      <div className="flex h-64 items-center justify-center text-muted-foreground">
-        <Loader2 className="mr-2 size-5 animate-spin" /> 正在对账存储...
+      <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
+        <div className="flex items-center text-sm">
+          <Loader2 className="mr-2 size-5 animate-spin" /> 正在分区扫描 R2...
+        </div>
+        <p className="text-xs">大型存储桶需要读取全部对象索引，首次扫描可能持续几十秒。</p>
       </div>
     );
   }
@@ -209,25 +307,7 @@ export function StorageReconciliationPanel() {
             <p className="py-6 text-center text-sm text-muted-foreground">未发现缺失对象 🎉</p>
           ) : (
             <>
-              <ul className="divide-y text-sm">
-                {missingInR2.map((m, i) => (
-                  <li key={`${m.key}-${m.path}-${i}`} className="flex items-center justify-between gap-3 py-2">
-                    <div className="min-w-0">
-                      <Link
-                        to={`/items/${m.key}`}
-                        className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
-                      >
-                        {m.key} <ExternalLink className="size-3" />
-                      </Link>
-                      <p className="truncate font-mono text-xs text-muted-foreground">{m.path}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <Badge variant="outline" className="text-xs">{m.type || 'attachment'}</Badge>
-                      {m.deleted && <Badge variant="secondary">已删除条目</Badge>}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <VirtualMissingList items={missingInR2} />
               <TruncatedNote truncated={data?.truncated?.missingInR2} listCap={data?.listCap} total={summary?.missingInR2} />
             </>
           )}
@@ -263,19 +343,7 @@ export function StorageReconciliationPanel() {
                 <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
                 <span>全选本页</span>
               </div>
-              <ul className="divide-y text-sm">
-                {orphanInR2.map((o) => (
-                  <li key={o.name} className="flex items-center gap-3 py-2">
-                    <Checkbox checked={selected.has(o.name)} onCheckedChange={() => toggle(o.name)} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-mono text-xs">{o.name}</p>
-                      {o.key && <p className="truncate text-xs text-muted-foreground">关联条目：{o.key}</p>}
-                    </div>
-                    <Badge variant="outline" className="shrink-0 text-xs">{o.type || 'unknown'}</Badge>
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{o.sizeFormatted}</span>
-                  </li>
-                ))}
-              </ul>
+              <VirtualOrphanList items={orphanInR2} selected={selected} onToggle={toggle} />
               <TruncatedNote truncated={data?.truncated?.orphanInR2} listCap={data?.listCap} total={summary?.orphanInR2} />
             </>
           )}
@@ -284,7 +352,8 @@ export function StorageReconciliationPanel() {
 
       {data?.timestamp && (
         <p className="text-center text-xs text-muted-foreground">
-          采集于 {new Date(data.timestamp).toLocaleString()}
+          {data.cached ? '缓存结果' : '实时扫描'} · 采集于 {new Date(data.timestamp).toLocaleString()}
+          {Number.isFinite(data.durationMs) ? ` · 扫描耗时 ${(data.durationMs / 1000).toFixed(1)} 秒` : ''}
         </p>
       )}
 

@@ -151,7 +151,8 @@ adminRouter.delete('/trash', async (_req, res, next) => {
  */
 adminRouter.get('/reconcile', async (req, res, next) => {
   try {
-    const result = await reconcileStorage();
+    const force = req.query.force === 'true' || req.query.force === '1';
+    const result = await reconcileStorage({ force });
     res.json(result);
   } catch (error) {
     next(error);
