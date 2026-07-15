@@ -23,38 +23,34 @@ function extractYear(dateStr) {
 }
 
 export async function getOverviewStats() {
-  const totalItems = (await queryOne(`
-    SELECT COUNT(*)::int AS n FROM items WHERE deleted = 0 AND "parentItemID" IS NULL
-  `)).n;
-
-  const totalCreators = (await queryOne(`
-    SELECT COUNT(DISTINCT ic."creatorID")::int AS n
-    FROM "itemCreators" ic
-    JOIN items i ON i."itemID" = ic."itemID"
-    WHERE i.deleted = 0 AND i."parentItemID" IS NULL
-  `)).n;
-
-  const doiFieldId = await fieldIdByName('DOI');
-  const withDoi = doiFieldId ? (await queryOne(`
-    SELECT COUNT(*)::int AS n
-    FROM "itemData" d
-    JOIN items i ON i."itemID" = d."itemID"
-    WHERE d."fieldID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL
-  `, [doiFieldId])).n : 0;
-
-  const withAttachment = (await queryOne(`
-    SELECT COUNT(DISTINCT ia."parentItemID")::int AS n
-    FROM "itemAttachments" ia
-    JOIN items i ON i."itemID" = ia."parentItemID"
-    WHERE i.deleted = 0 AND i."parentItemID" IS NULL
-  `)).n;
+  // Return all overview counters in one database round trip. This matters for
+  // hosted PostgreSQL where four serial COUNT queries are dominated by latency.
+  const row = await queryOne(`
+    SELECT
+      (SELECT COUNT(*)::int
+       FROM items i
+       WHERE i.deleted = 0 AND i."parentItemID" IS NULL) AS "totalItems",
+      (SELECT COUNT(DISTINCT ic."creatorID")::int
+       FROM "itemCreators" ic
+       JOIN items i ON i."itemID" = ic."itemID"
+       WHERE i.deleted = 0 AND i."parentItemID" IS NULL) AS "totalCreators",
+      (SELECT COUNT(*)::int
+       FROM "itemData" d
+       JOIN fields f ON f."fieldID" = d."fieldID" AND f."fieldName" = 'DOI'
+       JOIN items i ON i."itemID" = d."itemID"
+       WHERE i.deleted = 0 AND i."parentItemID" IS NULL) AS "withDoi",
+      (SELECT COUNT(DISTINCT ia."parentItemID")::int
+       FROM "itemAttachments" ia
+       JOIN items i ON i."itemID" = ia."parentItemID"
+       WHERE i.deleted = 0 AND i."parentItemID" IS NULL) AS "withAttachment"
+  `);
 
   return {
-    totalItems,
-    totalCreators,
+    totalItems: row?.totalItems ?? 0,
+    totalCreators: row?.totalCreators ?? 0,
     journalCount: JOURNAL_WHITELIST.length,
-    withDoi,
-    withAttachment,
+    withDoi: row?.withDoi ?? 0,
+    withAttachment: row?.withAttachment ?? 0,
   };
 }
 

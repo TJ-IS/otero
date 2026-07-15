@@ -73,8 +73,12 @@ Dockerfile / docker-compose.yml / docker-entrypoint.sh
 复制 `.env.example` 为 `.env`。完整键名以 `src/config.js` 为准，常用项：
 
 ```env
-# PostgreSQL（必填，以下为 Neon pooled 连接串格式）
-DATABASE_URL=postgresql://USER:PASSWORD@HOST-pooler.REGION.aws.neon.tech/DATABASE?sslmode=verify-full&channel_binding=require
+# PostgreSQL（必填）
+DATABASE_URL=postgresql://otero:otero-secret-change-me@127.0.0.1:5432/otero
+POSTGRES_USER=otero
+POSTGRES_PASSWORD=otero-secret-change-me
+POSTGRES_DB=otero
+POSTGRES_PORT=5432
 
 # 对象存储：filesystem | s3（R2 等）
 STORAGE_TYPE=s3
@@ -115,6 +119,7 @@ OTERO_HOST=127.0.0.1
 ### 本地开发
 
 ```bash
+docker compose up -d postgres   # 或自备 PostgreSQL
 cp .env.example .env            # 填 DATABASE_URL、存储与 Token
 npm install
 npm run migrate                 # 应用 schema.postgres.sql
@@ -136,12 +141,12 @@ cd web && npm install && npm run dev
 ### Docker（一键）
 
 ```bash
-# 根目录准备好 .env（含 Neon DATABASE_URL、S3/R2、MinerU、AUTH 等）
+# 根目录准备好 .env（含 S3/R2、MinerU、AUTH 等；compose 会覆盖 DATABASE_URL 指向服务名 postgres）
 docker compose up -d --build
 # 宿主访问 http://localhost:4321 （映射容器 3000）
 ```
 
-`./data` 挂载到容器 `/app/data`（用于可选的本地文件存储）。入口脚本会先连接 Neon 执行 `migrate` + `seed`，再启动服务。
+`./data` 挂载到容器 `/app/data`（含 `postgres/` 与可选 `storage/`）。入口脚本会先 `migrate` + `seed` 再启动。
 
 ## 使用方式
 

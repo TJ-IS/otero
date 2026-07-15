@@ -12,19 +12,39 @@ const creatorCache = new Map();
 // Item.save() can check allowance from memory instead of a query per field.
 const allowedFieldsCache = new Map();
 let cachesLoaded = false;
+let cachesLoading = null;
 
 async function loadCaches() {
   if (cachesLoaded) return;
-  for (const r of await query('SELECT "itemTypeID", "typeName" FROM "itemTypes"')) {
+  if (cachesLoading) return cachesLoading;
+  cachesLoading = populateCaches();
+  try {
+    await cachesLoading;
+  } finally {
+    cachesLoading = null;
+  }
+}
+
+async function populateCaches() {
+  // These lookup tables are independent. Fetch them concurrently so a remote
+  // database costs one network round trip instead of four serial round trips.
+  const [types, fields, creatorTypes, allowedFields] = await Promise.all([
+    query('SELECT "itemTypeID", "typeName" FROM "itemTypes"'),
+    query('SELECT "fieldID", "fieldName" FROM fields'),
+    query('SELECT "creatorTypeID", "creatorType" FROM "creatorTypes"'),
+    query('SELECT "itemTypeID", "fieldID" FROM "itemTypeFields"'),
+  ]);
+
+  for (const r of types) {
     typeCache.set(r.typeName, r.itemTypeID);
   }
-  for (const r of await query('SELECT "fieldID", "fieldName" FROM "fields"')) {
+  for (const r of fields) {
     fieldCache.set(r.fieldName, r.fieldID);
   }
-  for (const r of await query('SELECT "creatorTypeID", "creatorType" FROM "creatorTypes"')) {
+  for (const r of creatorTypes) {
     creatorCache.set(r.creatorType, r.creatorTypeID);
   }
-  for (const r of await query('SELECT "itemTypeID", "fieldID" FROM "itemTypeFields"')) {
+  for (const r of allowedFields) {
     if (!allowedFieldsCache.has(r.itemTypeID)) allowedFieldsCache.set(r.itemTypeID, new Set());
     allowedFieldsCache.get(r.itemTypeID).add(r.fieldID);
   }
@@ -38,6 +58,7 @@ export function clearSchemaCaches() {
   creatorCache.clear();
   allowedFieldsCache.clear();
   cachesLoaded = false;
+  cachesLoading = null;
 }
 
 export async function itemTypeIdByName(name) {
@@ -346,12 +367,6 @@ export async function listItems({
   const { where, params, searchQuery } = filter;
   let { p } = filter;
 
-  const countRow = await queryOne(
-    `SELECT COUNT(*)::int AS cnt FROM items i WHERE ${where.join(' AND ')}`,
-    params
-  );
-  const total = countRow?.cnt || 0;
-
   const offset = (validPage - 1) * validPageSize;
   const listParams = [...params];
   let ftsSelect = `NULL::text AS "fulltextSnippet", false AS "fulltextHit", 0::float4 AS "fulltextRank"`;
@@ -389,36 +404,72 @@ export async function listItems({
     orderBy = `COALESCE(ft_hit."fulltextRank", 0) DESC, ${orderByExpr}`;
   }
 
-  const rows = await query(
-    `SELECT i.*, it."typeName" AS "itemTypeName",
+  // For the common timestamp sorts, choose the requested page before running
+  // the per-item field/creator aggregates. Without this CTE PostgreSQL has to
+  // build JSON for every matching item, sort all of them, and only then keep
+  // the first page. Field-based sorts and ranked search still use the general
+  // path because their sort values are produced by the later joins.
+  const canPrepaginate = !searchQuery && (
+    sortCols === ITEM_SORT_FIELDS.dateModified ||
+    sortCols === ITEM_SORT_FIELDS.dateAdded
+  );
+  const limitParam = p++;
+  const offsetParam = p++;
+  const pageCte = canPrepaginate
+    ? `WITH page_items AS MATERIALIZED (
+         SELECT i.*
+         FROM items i
+         WHERE ${where.join(' AND ')}
+         ORDER BY ${orderByExpr}
+         LIMIT $${limitParam} OFFSET $${offsetParam}
+       )`
+    : '';
+  const itemSource = canPrepaginate ? 'page_items i' : 'items i';
+  const outerWhere = canPrepaginate ? '' : `WHERE ${where.join(' AND ')}`;
+  const outerPagination = canPrepaginate
+    ? ''
+    : `LIMIT $${limitParam} OFFSET $${offsetParam}`;
+
+  // Count and page data do not depend on each other. Run both concurrently to
+  // avoid paying two serial network round trips to hosted PostgreSQL.
+  const [countRow, rows] = await Promise.all([
+    queryOne(
+      `SELECT COUNT(*)::int AS cnt FROM items i WHERE ${where.join(' AND ')}`,
+      params
+    ),
+    query(
+      `${pageCte}
+       SELECT i.*, it."typeName" AS "itemTypeName",
        COALESCE(fields_agg.fields, '{}'::json) AS fields,
        COALESCE(creators_agg.creators, '[]'::json) AS creators,
        ${ftsSelect}
-     FROM items i
-     JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
-     LEFT JOIN LATERAL (
-       SELECT json_object_agg(f."fieldName", v.value) AS fields
-       FROM "itemData" d
-       JOIN fields f ON f."fieldID" = d."fieldID"
-       JOIN "itemDataValues" v ON v."valueID" = d."valueID"
-       WHERE d."itemID" = i."itemID"
-     ) fields_agg ON true
-     LEFT JOIN LATERAL (
-       SELECT json_agg(json_build_object(
-         'id', c."creatorID", 'firstName', c."firstName", 'lastName', c."lastName",
-         'fieldMode', c."fieldMode", 'creatorType', ct."creatorType", 'orderIndex', ic."orderIndex"
-       ) ORDER BY ic."orderIndex") AS creators
-       FROM "itemCreators" ic
-       JOIN creators c ON c."creatorID" = ic."creatorID"
-       JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
-       WHERE ic."itemID" = i."itemID"
-     ) creators_agg ON true
-     ${ftsJoin}
-     WHERE ${where.join(' AND ')}
-     ORDER BY ${orderBy}
-     LIMIT $${p++} OFFSET $${p++}`,
-    [...listParams, validPageSize, offset]
-  );
+       FROM ${itemSource}
+       JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
+       LEFT JOIN LATERAL (
+         SELECT json_object_agg(f."fieldName", v.value) AS fields
+         FROM "itemData" d
+         JOIN fields f ON f."fieldID" = d."fieldID"
+         JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+         WHERE d."itemID" = i."itemID"
+       ) fields_agg ON true
+       LEFT JOIN LATERAL (
+         SELECT json_agg(json_build_object(
+           'id', c."creatorID", 'firstName', c."firstName", 'lastName', c."lastName",
+           'fieldMode', c."fieldMode", 'creatorType', ct."creatorType", 'orderIndex', ic."orderIndex"
+         ) ORDER BY ic."orderIndex") AS creators
+         FROM "itemCreators" ic
+         JOIN creators c ON c."creatorID" = ic."creatorID"
+         JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
+         WHERE ic."itemID" = i."itemID"
+       ) creators_agg ON true
+       ${ftsJoin}
+       ${outerWhere}
+       ORDER BY ${orderBy}
+       ${outerPagination}`,
+      [...listParams, validPageSize, offset]
+    ),
+  ]);
+  const total = countRow?.cnt || 0;
 
   return {
     items: rows,
@@ -516,33 +567,46 @@ export async function listJournals() {
   const jfid = await fieldIdByName('publicationTitle');
   if (!jfid) return [];
 
-  const journals = [];
-  for (const name of JOURNAL_WHITELIST) {
-    const row = await queryOne(`
-      SELECT COUNT(*)::int AS cnt
-      FROM "itemData" d
-      JOIN "itemDataValues" v ON v."valueID" = d."valueID"
-      JOIN items i ON i."itemID" = d."itemID"
-      WHERE d."fieldID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL
-        AND v.value = $2
-    `, [jfid, name]);
-    journals.push({ name, itemCount: row.cnt });
-  }
-
-  const placeholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 2}`).join(',');
-  const unfiledRow = await queryOne(`
-    SELECT COUNT(*)::int AS cnt
-    FROM items i
-    WHERE i.deleted = 0 AND i."parentItemID" IS NULL
-      AND NOT EXISTS (
-        SELECT 1 FROM "itemData" d
-        JOIN "itemDataValues" v ON v."valueID" = d."valueID"
-        WHERE d."itemID" = i."itemID" AND d."fieldID" = $1 AND v.value IN (${placeholders})
-      )
-  `, [jfid, ...JOURNAL_WHITELIST]);
-  journals.push({ name: UNFILED, itemCount: unfiledRow.cnt });
-
-  return journals;
+  // Preserve whitelist order while calculating all journal buckets and the
+  // virtual UNFILED bucket in one statement. The previous implementation ran
+  // one COUNT per journal, which multiplied remote-database latency by 12.
+  return query(`
+    WITH targets AS (
+      SELECT name, ord
+      FROM unnest($2::text[]) WITH ORDINALITY AS target(name, ord)
+    ), counts AS (
+      SELECT t.name, t.ord, COUNT(i."itemID")::int AS "itemCount"
+      FROM targets t
+      LEFT JOIN "itemDataValues" v ON v.value = t.name
+      LEFT JOIN "itemData" d
+        ON d."valueID" = v."valueID" AND d."fieldID" = $1
+      LEFT JOIN items i
+        ON i."itemID" = d."itemID"
+       AND i.deleted = 0
+       AND i."parentItemID" IS NULL
+      GROUP BY t.name, t.ord
+    ), unfiled AS (
+      SELECT COUNT(*)::int AS "itemCount"
+      FROM items i
+      WHERE i.deleted = 0
+        AND i."parentItemID" IS NULL
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "itemData" d
+          JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+          WHERE d."itemID" = i."itemID"
+            AND d."fieldID" = $1
+            AND v.value = ANY($2::text[])
+        )
+    )
+    SELECT name, "itemCount"
+    FROM (
+      SELECT name, "itemCount", ord FROM counts
+      UNION ALL
+      SELECT $3::text, "itemCount", 2147483647::bigint FROM unfiled
+    ) buckets
+    ORDER BY ord
+  `, [jfid, JOURNAL_WHITELIST, UNFILED]);
 }
 
 export async function listUnfiledWithFulltextDone({ page = 1, pageSize = 100 } = {}) {
