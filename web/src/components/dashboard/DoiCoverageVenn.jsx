@@ -292,8 +292,8 @@ export function DoiCoverageVenn({ data }) {
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-[hsl(var(--chart-good))] transition-[width] duration-500 ease-out"
-              style={{ width: `${Math.min(100, data.coveragePct)}%` }}
+              className="motion-progress h-full origin-left rounded-full bg-[hsl(var(--chart-good))]"
+              style={{ transform: `scaleX(${Math.min(100, data.coveragePct) / 100})` }}
             />
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">

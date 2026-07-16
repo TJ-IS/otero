@@ -1,38 +1,41 @@
+import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 
-export function FloatingDetailPanel({ open, onClose, width, resizeHandle, transitioning, children }) {
+export function FloatingDetailPanel({ open, onClose, width, resizeHandle, children }) {
   const isMobile = useIsMobile();
-  if (!open) return null;
+  const previouslyFocused = useRef(null);
+
+  useEffect(() => {
+    if (open) previouslyFocused.current = document.activeElement;
+  }, [open]);
 
   return (
-    <>
-      <button
-        type="button"
-        aria-label="关闭详情"
-        tabIndex={-1}
-        onClick={onClose}
-        className="absolute inset-0 z-20 cursor-default bg-black/15 animate-in fade-in duration-150"
-      />
-      <div
+    <DialogPrimitive.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="motion-panel fixed inset-0 z-20 bg-black/20 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
+        <DialogPrimitive.Content
+          aria-describedby={undefined}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            previouslyFocused.current?.focus?.();
+          }}
         className={cn(
-          'z-30 flex',
+          'motion-panel fixed z-30 flex outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 [animation-timing-function:var(--motion-ease-drawer)]',
           isMobile
-            ? 'fixed inset-0'
-            : cn('absolute right-3 top-3 bottom-3', transitioning ? '' : 'transition-[width] duration-200 ease-out'),
+            ? 'inset-0'
+            : 'right-3 top-3 bottom-3 data-[state=open]:slide-in-from-right-full data-[state=closed]:slide-out-to-right-full',
         )}
         style={isMobile ? undefined : { width }}
-      >
-        {!isMobile && resizeHandle}
-        <div
-          className={cn(
-            'relative flex h-full flex-1 flex-col bg-background overflow-hidden animate-in slide-in-from-right-full duration-200',
-            isMobile ? '' : 'border shadow-2xl',
-          )}
         >
-          {children}
-        </div>
-      </div>
-    </>
+          <DialogPrimitive.Title className="sr-only">条目详情</DialogPrimitive.Title>
+          {!isMobile && resizeHandle}
+          <div className={cn('relative flex h-full flex-1 flex-col overflow-hidden bg-background', isMobile ? '' : 'border shadow-2xl')}>
+            {children}
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

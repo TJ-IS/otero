@@ -1,24 +1,26 @@
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Library } from 'lucide-react';
+import { BookOpen, Library, List } from 'lucide-react';
 import { memo } from 'react';
 import { cn } from '@/lib/utils';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-export const Sidebar = memo(function Sidebar({ filter, onFilterChange, version, onCollapse }) {
+export const Sidebar = memo(function Sidebar({ filter, onFilterChange, version, onCollapse, onSelected, showCollapse = true }) {
   // Re-fetch when auth changes: the "待归档" bucket is only returned by the
   // API for whitelisted editors, so login/logout must refresh the list.
   const { canEdit } = useAuth();
-  const { data: journals } = useAsync(() => api.listJournals(), [version, canEdit]);
+  const { data: journals } = useAsync((signal) => api.listJournals({ signal }), [version, canEdit]);
 
   const isActive = (value) => filter?.journal === value;
 
   const select = (value) => {
-    // No toggle-off: there is no "all items" view, clicking the active
-    // journal just keeps it selected.
-    if (isActive(value)) return;
+    if (isActive(value)) {
+      onSelected?.();
+      return;
+    }
     onFilterChange({ type: null, journal: value, collection: null });
+    onSelected?.();
   };
 
   return (
@@ -26,9 +28,11 @@ export const Sidebar = memo(function Sidebar({ filter, onFilterChange, version, 
       <div className="flex h-12 items-center gap-2 border-b px-4 font-semibold">
         <Library className="size-5" />
         <span className="flex-1">Otero</span>
-        <button onClick={onCollapse} className="text-muted-foreground hover:text-foreground transition-colors" title="折叠侧栏">
-          <span className="text-base leading-none">&lsaquo;</span>
-        </button>
+        {showCollapse && (
+          <button onClick={onCollapse} className="text-muted-foreground hover:text-foreground transition-colors" title="折叠侧栏">
+            <span className="text-base leading-none">&lsaquo;</span>
+          </button>
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
         <div className="px-2 py-3">
@@ -39,6 +43,12 @@ export const Sidebar = memo(function Sidebar({ filter, onFilterChange, version, 
             )}
           </div>
           <div className="space-y-0.5">
+            <SidebarItem
+              icon={<List className="size-4" />}
+              label="全部期刊"
+              active={isActive(null)}
+              onClick={() => select(null)}
+            />
             {(journals || []).length === 0 && (
               <div className="px-2 py-1 text-xs text-muted-foreground">暂无期刊</div>
             )}

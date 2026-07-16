@@ -15,7 +15,7 @@ const TABS = [
 
 export function DashboardLayout() {
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   return (
     <div className="flex h-[100dvh] flex-col bg-background">
@@ -41,7 +41,7 @@ export function DashboardLayout() {
               end={t.end}
               className={({ isActive }) =>
                 cn(
-                  'inline-flex items-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all',
+                  'inline-flex items-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors',
                   isActive
                     ? 'bg-background text-foreground shadow'
                     : 'text-muted-foreground hover:text-foreground'
@@ -57,11 +57,11 @@ export function DashboardLayout() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            title={resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
-            {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
         </div>
       </header>
@@ -75,7 +75,7 @@ export function DashboardLayout() {
             end={t.end}
             className={({ isActive }) =>
               cn(
-                'inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all',
+                'inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors',
                 isActive
                   ? 'bg-background text-foreground shadow'
                   : 'text-muted-foreground hover:text-foreground'

@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState, Suspense, lazy } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import {
   Image as ImageIcon, Table2, Sigma, BarChart3, Quote, List, PanelLeftClose, PanelLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import DOMPurify from 'dompurify';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
 import { ITEM_TYPE_LABELS, itemTitle } from '@/lib/items';
@@ -106,6 +107,16 @@ function AssetCard({ imgUrl, caption, pageIdx, onPreview, children }) {
   );
 }
 
+function SafeExtractedTable({ html }) {
+  const safeHtml = useMemo(() => DOMPurify.sanitize(html, {
+    USE_PROFILES: { html: true },
+    ALLOWED_TAGS: ['table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col', 'br', 'span', 'strong', 'em', 'sup', 'sub'],
+    ALLOWED_ATTR: ['colspan', 'rowspan', 'scope'],
+  }), [html]);
+
+  return <div className="text-xs overflow-x-auto p-3 border-b fulltext-prose" dangerouslySetInnerHTML={{ __html: safeHtml }} />;
+}
+
 function MetaRow({ label, children }) {
   if (children == null || children === '') return null;
   return (
@@ -123,11 +134,12 @@ export const ItemPage = memo(function ItemPage() {
   const [tocOpen, setTocOpen] = useState(true);
   const [assetTab, setAssetTab] = useState('figures');
   const [lightbox, setLightbox] = useState({ open: false, src: '', alt: '' });
+  const readerScrollRef = useRef(null);
 
-  const { data: item, error: itemError, loading: itemLoading } = useAsync(() => api.getItem(key), [key]);
-  const { data: attachments } = useAsync(() => api.getItemAttachments(key), [key]);
-  const { data: fulltext, loading: fulltextLoading, refresh: refreshFulltext } = useAsync(() => api.getFulltext(key), [key]);
-  const { data: structure, loading: structureLoading } = useAsync(() => api.getFulltextStructure(key), [key]);
+  const { data: item, error: itemError, loading: itemLoading } = useAsync((signal) => api.getItem(key, { signal }), [key]);
+  const { data: attachments } = useAsync((signal) => api.getItemAttachments(key, { signal }), [key]);
+  const { data: fulltext, loading: fulltextLoading, refresh: refreshFulltext } = useAsync((signal) => api.getFulltext(key, { signal }), [key]);
+  const { data: structure, loading: structureLoading } = useAsync((signal) => api.getFulltextStructure(key, { signal }), [key]);
 
   const state = fulltext?.state || (fulltextLoading ? 'loading' : 'idle');
   const isActive = ACTIVE_STATES.has(state);
@@ -149,7 +161,14 @@ export const ItemPage = memo(function ItemPage() {
   const scrollToHeading = useCallback((text) => {
     const id = headingId(text);
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const container = readerScrollRef.current;
+    if (!el || !container) return;
+
+    const top = el.getBoundingClientRect().top
+      - container.getBoundingClientRect().top
+      + container.scrollTop;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    container.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' });
   }, []);
 
   const openPreview = useCallback((src, alt) => {
@@ -232,7 +251,7 @@ export const ItemPage = memo(function ItemPage() {
   const f = item.fields || {};
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background overflow-x-hidden">
+    <div className="fixed inset-0 flex flex-col overflow-hidden bg-background">
       {/* Compact toolbar — no truncated title */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center gap-2 px-3 sm:px-4 h-12">
@@ -284,7 +303,7 @@ export const ItemPage = memo(function ItemPage() {
         {/* Collapsible TOC */}
         <aside
           className={cn(
-            'hidden md:flex flex-col border-r bg-muted/15 shrink-0 transition-[width] duration-200',
+            'hidden md:flex md:h-full flex-col border-r bg-muted/15 shrink-0',
             tocOpen ? 'w-56 xl:w-64' : 'w-0 border-r-0 overflow-hidden',
           )}
         >
@@ -314,7 +333,11 @@ export const ItemPage = memo(function ItemPage() {
         </aside>
 
         {/* Reading column */}
-        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden">
+        <main
+          ref={readerScrollRef}
+          data-reader-scroll
+          className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain"
+        >
           <div className="mx-auto w-full max-w-3xl min-w-0 px-4 sm:px-6 py-6 sm:py-8 space-y-8">
             {/* Title block — full, no truncation */}
             <header className="space-y-3">
@@ -453,12 +476,7 @@ export const ItemPage = memo(function ItemPage() {
                         pageIdx={t.pageIdx}
                         onPreview={openPreview}
                       >
-                        {t.html && (
-                          <div
-                            className="text-xs overflow-x-auto p-3 border-b fulltext-prose"
-                            dangerouslySetInnerHTML={{ __html: t.html }}
-                          />
-                        )}
+                        {t.html && <SafeExtractedTable html={t.html} />}
                       </AssetCard>
                     ))}
                   </TabsContent>

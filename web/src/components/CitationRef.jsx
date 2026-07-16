@@ -1,5 +1,6 @@
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 // An in-text author-year citation (e.g. "Samuelson 2001") that resolves to one
 // or more entries in the reference list. Hovering / focusing shows a floating
@@ -11,13 +12,22 @@ import { createPortal } from 'react-dom';
 
 const CARD_WIDTH = 380;
 
-function scrollToReference(refId) {
+function scrollToReference(refId, reduceMotion) {
   const el = document.getElementById(`ref-${refId}`);
   if (!el) return false;
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  // Flash highlight so the reader can spot the row after the jump.
+  const container = el.closest('[data-reader-scroll]');
+  if (container) {
+    const top = el.getBoundingClientRect().top
+      - container.getBoundingClientRect().top
+      + container.scrollTop
+      - (container.clientHeight - el.clientHeight) / 2;
+    container.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'auto' : 'smooth' });
+  } else {
+    el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
+  }
+  // A short orientation cue helps locate the destination without interrupting reading.
   el.classList.add('ref-flash');
-  setTimeout(() => el.classList.remove('ref-flash'), 1600);
+  setTimeout(() => el.classList.remove('ref-flash'), 220);
   return true;
 }
 
@@ -26,6 +36,7 @@ export const CitationRef = memo(function CitationRef({ refs, children }) {
   const [coords, setCoords] = useState({ top: 0, left: 0, placeAbove: false });
   const triggerRef = useRef(null);
   const closeTimer = useRef(null);
+  const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)');
   const cardId = useId();
 
   const place = useCallback(() => {
@@ -70,8 +81,8 @@ export const CitationRef = memo(function CitationRef({ refs, children }) {
   const onClick = useCallback((e) => {
     e.preventDefault();
     // Jump to the first matching reference in the list, if present on the page.
-    if (refs?.length) scrollToReference(refs[0].id);
-  }, [refs]);
+    if (refs?.length) scrollToReference(refs[0].id, reduceMotion);
+  }, [refs, reduceMotion]);
 
   // Defensive: if nothing resolved, render the text untouched (no link/card).
   if (!refs || refs.length === 0) return <>{children}</>;
@@ -103,9 +114,10 @@ export const CitationRef = memo(function CitationRef({ refs, children }) {
             left: coords.left,
             width: CARD_WIDTH,
             maxWidth: 'calc(100vw - 24px)',
-            transform: coords.placeAbove ? 'translateY(calc(-100% - 6px))' : 'translateY(6px)',
+            '--citation-translate': coords.placeAbove ? 'translateY(calc(-100% - 6px))' : 'translateY(6px)',
+            '--citation-origin': coords.placeAbove ? 'bottom left' : 'top left',
           }}
-          className="z-50 rounded-md border bg-popover text-popover-foreground shadow-lg p-3 text-xs leading-relaxed animate-in fade-in-0 zoom-in-95"
+          className="citation-tooltip z-50 rounded-md border bg-popover text-popover-foreground shadow-lg p-3 text-xs leading-relaxed"
         >
           {refs.map((r, i) => (
             <div key={r.id} className={i > 0 ? 'mt-2 pt-2 border-t' : ''}>

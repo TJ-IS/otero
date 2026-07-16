@@ -15,26 +15,27 @@ import { ItemTable } from '@/components/ItemTable';
 import { ItemDetail } from '@/components/ItemDetail';
 import { TopBar } from '@/components/TopBar';
 import { FloatingDetailPanel } from '@/components/FloatingDetailPanel';
-import { cn } from '@/lib/utils';
-import { ITEM_TYPE_LABELS, UNFILED } from '@/lib/items';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { ITEM_TYPE_LABELS } from '@/lib/items';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/useMediaQuery';
-import { api } from '@/api/client';
 
 const SIDEBAR_WIDTH = 260;
 const MIN_DETAIL = 360;
 const MAX_DETAIL = 640;
 
 export function LibraryView() {
-  const { canEdit, ready } = useAuth();
+  const { canEdit } = useAuth();
   const isMobile = useIsMobile();
-  const [filter, setFilter] = useState({ type: null, journal: '待归档', collection: null, search: null });
+  const [filter, setFilter] = useState({ type: null, journal: null, collection: null, search: null });
   const [selectedKey, setSelectedKey] = useState(null);
   const [itemsVersion, setItemsVersion] = useState(0);
   const [sidebarVersion, setSidebarVersion] = useState(0);
 
   // Left sidebar
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches,
+  );
 
   // Right detail panel (persistent, not Sheet)
   const [detailOpen, setDetailOpen] = useState(false);
@@ -46,29 +47,9 @@ export function LibraryView() {
 
   // Drag state refs (detail panel only)
   const detailResizing = useRef(false);
-  const [isDetailResizing, setIsDetailResizing] = useState(false);
 
   const refreshItems = useCallback(() => setItemsVersion(v => v + 1), []);
   const refreshSidebar = useCallback(() => setSidebarVersion(v => v + 1), []);
-
-  // The "待归档" bucket is editor-only. Once auth resolves, redirect a
-  // non-editor viewing it to their first available journal so they don't
-  // land on an empty, invisible filter.
-  useEffect(() => {
-    if (!ready || canEdit) return;
-    if (filter.journal !== UNFILED || filter.collection || filter.search) return;
-    let cancelled = false;
-    api.listJournals().then((journals) => {
-      if (cancelled) return;
-      const first = (journals || []).find(j => j.name !== UNFILED);
-      if (first) {
-        setFilter(prev => ({ ...prev, type: null, journal: first.name, collection: null, search: null }));
-        setSelectedKey(null);
-        setDetailOpen(false);
-      }
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [ready, canEdit, filter.journal, filter.collection, filter.search]);
 
   const onFilterChange = useCallback((next) => {
     setFilter(prev => ({ ...prev, ...next }));
@@ -149,7 +130,7 @@ export function LibraryView() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [detailOpen, detailDirty]);
+  }, [detailOpen, detailDirty, canEdit]);
 
   // Sidebar drag resize
   useEffect(() => {
@@ -185,7 +166,6 @@ export function LibraryView() {
       }
       if (detailResizing.current) {
         detailResizing.current = false;
-        setIsDetailResizing(false);
       }
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
@@ -202,51 +182,45 @@ export function LibraryView() {
   const startDetailResize = useCallback((e) => {
     e.preventDefault();
     detailResizing.current = true;
-    setIsDetailResizing(true);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, []);
 
   return (
-    <div className="relative flex h-screen w-screen overflow-hidden bg-background">
-      {/* Left sidebar — floats over the main content, does not affect layout */}
-      {sidebarOpen && (
-        <>
-          {/* Click-outside scrim: clicking anywhere outside the panel collapses it */}
-          <button
-            type="button"
-            aria-label="折叠侧栏"
-            tabIndex={-1}
-            onClick={() => setSidebarOpen(false)}
-            className="absolute inset-0 z-20 cursor-default bg-black/15 animate-in fade-in duration-150"
+    <div className="relative flex h-[100dvh] w-full overflow-hidden bg-background">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow">
+        跳到文献列表
+      </a>
+      {sidebarOpen && !isMobile && (
+        <aside className="hidden h-full shrink-0 border-r bg-background md:flex" style={{ width: SIDEBAR_WIDTH }}>
+          <Sidebar
+            filter={filter}
+            onFilterChange={onFilterChange}
+            version={sidebarVersion}
+            onRefresh={refreshSidebar}
+            onCollapse={() => setSidebarOpen(false)}
           />
-          <div
-            className={cn(
-              'z-30 flex',
-              isMobile ? 'fixed inset-0' : 'absolute left-3 top-3 bottom-3',
-            )}
-            style={isMobile ? undefined : { width: SIDEBAR_WIDTH }}
-          >
-            <div
-              className={cn(
-                'relative flex h-full flex-1 flex-col bg-background overflow-hidden animate-in slide-in-from-left-full duration-200',
-                isMobile ? '' : 'border shadow-2xl',
-              )}
-            >
-              <Sidebar
-                filter={filter}
-                onFilterChange={onFilterChange}
-                version={sidebarVersion}
-                onRefresh={refreshSidebar}
-                onCollapse={() => setSidebarOpen(false)}
-              />
-            </div>
-          </div>
-        </>
+        </aside>
+      )}
+      {isMobile && (
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent side="left" className="w-[min(20rem,calc(100vw-2.5rem))] max-w-none p-0">
+            <SheetTitle className="sr-only">期刊分类</SheetTitle>
+            <Sidebar
+              filter={filter}
+              onFilterChange={onFilterChange}
+              version={sidebarVersion}
+              onRefresh={refreshSidebar}
+              onCollapse={() => setSidebarOpen(false)}
+              onSelected={() => setSidebarOpen(false)}
+              showCollapse={false}
+            />
+          </SheetContent>
+        </Sheet>
       )}
 
       {/* Center: main content */}
-      <main className="relative flex flex-1 flex-col min-w-0 overflow-hidden">
+      <main id="main-content" className="relative flex flex-1 flex-col min-w-0 overflow-hidden" tabIndex={-1}>
         <TopBar
           filter={filter}
           onImported={onImported}
@@ -279,10 +253,11 @@ export function LibraryView() {
           setSelectedKey(null);
         }}
         width={Math.max(MIN_DETAIL, detailWidth)}
-        transitioning={isDetailResizing}
         resizeHandle={
-          <div
+          <button
+            type="button"
             onMouseDown={startDetailResize}
+            aria-label="调整详情面板宽度"
             className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/40 active:bg-primary/60 transition-colors"
           />
         }

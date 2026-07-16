@@ -229,9 +229,9 @@ function ExportModal({ open, onOpenChange, format, content }) {
 
 export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChanged, onDirtyChange }) {
   const { canEdit } = useAuth();
-  const { data: item, error, loading, refresh } = useAsync(() => api.getItem(itemKey), [itemKey]);
-  const { data: attachments } = useAsync(() => api.getItemAttachments(itemKey), [itemKey]);
-  const { data: fulltext, refresh: refreshFulltext } = useAsync(() => api.getFulltext(itemKey), [itemKey]);
+  const { data: item, error, loading, refresh } = useAsync((signal) => api.getItem(itemKey, { signal }), [itemKey]);
+  const { data: attachments } = useAsync((signal) => api.getItemAttachments(itemKey, { signal }), [itemKey]);
+  const { data: fulltext, refresh: refreshFulltext } = useAsync((signal) => api.getFulltext(itemKey, { signal }), [itemKey]);
 
   const [draft, setDraft] = useState(null);
   const [creatorsDraft, setCreatorsDraft] = useState([]);

@@ -25,16 +25,20 @@ export function useInfiniteItems({ filter = {}, sortField = 'dateModified', sort
 
   // Guards against out-of-order responses when filters/sort change rapidly.
   const reqIdRef = useRef(0);
+  const abortRef = useRef(null);
 
   const { type, journal, collection, search } = filter;
 
   const fetchPage = useCallback(async (pageNum, { append }) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     const reqId = ++reqIdRef.current;
     if (append) setLoadingMore(true); else setLoading(true);
     try {
       const res = await api.listItems({
         type, journal, collection, search,
-        page: pageNum, pageSize, sortField, sortDir,
+        page: pageNum, pageSize, sortField, sortDir, signal: controller.signal,
       });
       if (reqId !== reqIdRef.current) return; // superseded by a newer request
       setItems(prev => append ? [...prev, ...res.items] : res.items);
@@ -43,7 +47,7 @@ export function useInfiniteItems({ filter = {}, sortField = 'dateModified', sort
       setPage(res.page);
       setError(null);
     } catch (e) {
-      if (reqId !== reqIdRef.current) return;
+      if (reqId !== reqIdRef.current || e.name === 'AbortError') return;
       setError(e);
     } finally {
       if (reqId === reqIdRef.current) {
@@ -62,6 +66,8 @@ export function useInfiniteItems({ filter = {}, sortField = 'dateModified', sort
     fetchPage(1, { append: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, journal, collection, search, sortField, sortDir, version, enabled]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const hasMore = page < totalPages;
 

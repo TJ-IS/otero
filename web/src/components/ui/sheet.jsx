@@ -21,7 +21,7 @@ function SheetOverlay({ className, ...props }) {
   return (
     <SheetPrimitive.Overlay
       className={cn(
-        'fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+        'motion-panel fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         className,
       )}
       {...props}
@@ -35,8 +35,8 @@ function SheetContent({ className, children, side = 'right', ...props }) {
       <SheetOverlay />
       <SheetPrimitive.Content
         className={cn(
-          'fixed z-50 gap-4 bg-background shadow-lg transition ease-in-out overflow-hidden',
-          'data-[state=closed]:duration-300 data-[state=open]:duration-500',
+          'motion-panel fixed z-[60] gap-4 bg-background shadow-lg overflow-hidden',
+          'data-[state=closed]:duration-200 data-[state=open]:duration-200 [animation-timing-function:var(--motion-ease-drawer)]',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           side === 'right' &&
             'inset-y-0 right-0 h-full w-full max-w-full sm:max-w-[42%] sm:min-w-[420px] border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',

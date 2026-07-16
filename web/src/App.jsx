@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
-import { Navigate, Routes, Route } from 'react-router-dom';
+import { Link, Navigate, Routes, Route } from 'react-router-dom';
+import { FileQuestion } from 'lucide-react';
 import { Toaster } from '@/components/ui/sonner';
 
 function lazyNamed(loader, name) {
@@ -41,6 +42,17 @@ function RouteFallback() {
   );
 }
 
+function NotFoundPage() {
+  return (
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-background px-6 text-center">
+      <FileQuestion className="size-9 text-muted-foreground" />
+      <h1 className="text-lg font-semibold">找不到这个页面</h1>
+      <p className="max-w-md text-sm leading-relaxed text-muted-foreground">链接可能已失效，或页面地址有误。</p>
+      <Link to="/" className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">返回文库</Link>
+    </main>
+  );
+}
+
 export default function App() {
   return (
     <>
@@ -69,6 +81,7 @@ export default function App() {
           </Route>
           <Route path="/authors/:id" element={<AuthorPage />} />
           <Route path="/items/:key" element={<ItemPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
       <Toaster richColors position="bottom-right" />

@@ -26,9 +26,9 @@ const TYPE_ICONS = {
 export const AuthorPage = memo(function AuthorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
-  const { data, error, loading } = useAsync(() => api.getAuthor(id), [id]);
+  const { data, error, loading } = useAsync((signal) => api.getAuthor(id, { signal }), [id]);
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
@@ -55,11 +55,11 @@ export const AuthorPage = memo(function AuthorPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            title={resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
-            {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
         </div>
       </header>
@@ -103,12 +103,12 @@ export const AuthorPage = memo(function AuthorPage() {
               ) : (
                 <ul className="divide-y rounded-lg border">
                   {data.items.map((it) => (
-                    <li
-                      key={it.key}
-                      onClick={() => navigate(`/items/${it.key}`)}
-                      className="cursor-pointer px-4 py-3 transition-colors hover:bg-accent/60"
-                    >
-                      <div className="text-sm font-medium leading-snug">{itemTitle(it)}</div>
+                    <li key={it.key} className="px-4 py-3 transition-colors hover:bg-accent/60">
+                      <div className="text-sm font-medium leading-snug">
+                        <button type="button" onClick={() => navigate(`/items/${it.key}`)} className="text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                          {itemTitle(it)}
+                        </button>
+                      </div>
                       <div className="mt-0.5 truncate text-xs text-muted-foreground">
                         <AuthorLinks creators={it.creators} />
                       </div>

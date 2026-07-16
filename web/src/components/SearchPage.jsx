@@ -75,15 +75,16 @@ function ResultCard({ item, query, onSelect }) {
 
   return (
     <article
-      onClick={() => onSelect(item.key)}
-      className="group cursor-pointer rounded-md border bg-background px-4 py-3 transition-colors hover:bg-accent/40"
+      className="group rounded-md border bg-background px-4 py-3 transition-colors hover:bg-accent/40"
     >
       <div className="flex items-baseline gap-2">
         <span className="text-xs text-muted-foreground tabular-nums shrink-0">
           {ITEM_TYPE_LABELS[item.itemType] || item.itemType}
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-primary group-hover:underline">
-          {highlight(title, query)}
+        <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-primary">
+          <button type="button" onClick={() => onSelect(item.key)} className="max-w-full truncate text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+            {highlight(title, query)}
+          </button>
         </h3>
         {snippetFromFulltext ? (
           <Badge variant="outline" className="shrink-0 font-normal text-[10px]">正文</Badge>
@@ -137,7 +138,7 @@ export const SearchPage = memo(function SearchPage() {
   const [input, setInput] = useState(initialQ);
   const [submitted, setSubmitted] = useState(initialQ);
   const inputRef = useRef(null);
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   // Selected item detail (floating panel, mirrors LibraryView's UX).
   const [selectedKey, setSelectedKey] = useState(null);
@@ -215,7 +216,7 @@ export const SearchPage = memo(function SearchPage() {
   }, [hasMore, loadingMore, loading, loadMore]);
 
   return (
-    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-background">
+    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background">
       {/* Search header — mirrors TopBar's styling for visual consistency. */}
       <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
         <Button
@@ -255,11 +256,11 @@ export const SearchPage = memo(function SearchPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
+            title={resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
-            {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
         </div>
       </header>

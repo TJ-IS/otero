@@ -20,9 +20,9 @@ function messageText(message) {
 function TypingDots() {
   return (
     <span className="inline-flex items-center gap-1 py-1">
-      <span className="size-1.5 rounded-full bg-current opacity-40 animate-bounce [animation-delay:-0.3s]" />
-      <span className="size-1.5 rounded-full bg-current opacity-40 animate-bounce [animation-delay:-0.15s]" />
-      <span className="size-1.5 rounded-full bg-current opacity-40 animate-bounce" />
+      <span className="motion-typing-dot size-1.5 rounded-full bg-current" style={{ animationDelay: '-0.3s' }} />
+      <span className="motion-typing-dot size-1.5 rounded-full bg-current" style={{ animationDelay: '-0.15s' }} />
+      <span className="motion-typing-dot size-1.5 rounded-full bg-current" />
     </span>
   );
 }
@@ -55,7 +55,7 @@ function ChatBubble({ role, text, streaming }) {
           </div>
         )}
         {streaming && !isEmpty && (
-          <span className="inline-block w-1.5 h-3.5 bg-current opacity-50 align-middle ml-0.5 animate-pulse" />
+          <span className="motion-status inline-block w-1.5 h-3.5 bg-current opacity-50 align-middle ml-0.5 animate-pulse" />
         )}
       </div>
       {isUser && (
@@ -70,6 +70,8 @@ function ChatBubble({ role, text, streaming }) {
 export const ChatPanel = memo(function ChatPanel({ itemKey }) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
+  const [panelPresent, setPanelPresent] = useState(false);
+  const [panelState, setPanelState] = useState('closed');
   const [input, setInput] = useState('');
   const scrollRef = useRef(null);
 
@@ -88,6 +90,24 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
   });
 
   const sending = status === 'submitted' || status === 'streaming';
+
+  useEffect(() => {
+    let frame;
+    let closeTimer;
+
+    if (open) {
+      setPanelPresent(true);
+      frame = requestAnimationFrame(() => setPanelState('open'));
+    } else {
+      setPanelState('closed');
+      closeTimer = setTimeout(() => setPanelPresent(false), 220);
+    }
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      if (closeTimer) clearTimeout(closeTimer);
+    };
+  }, [open]);
 
   useEffect(() => {
     setMessages(loadChatHistory(itemKey));
@@ -142,7 +162,7 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
         {open ? <X className="size-5" /> : <Sparkles className="size-5" />}
       </Button>
 
-      {open && (
+      {panelPresent && (
         <>
           {isMobile && (
             <button
@@ -150,16 +170,18 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
               aria-label="关闭对话"
               tabIndex={-1}
               onClick={() => setOpen(false)}
-              className="fixed inset-0 z-40 cursor-default bg-black/20 backdrop-blur-[2px] animate-in fade-in duration-150"
+              data-state={panelState}
+              className="chat-scrim fixed inset-0 z-40 cursor-default bg-black/20 backdrop-blur-[2px]"
             />
           )}
           <div
             className={cn(
-              'z-50 flex flex-col bg-background border shadow-2xl overflow-hidden animate-in slide-in-from-right-full duration-200',
+              'chat-panel z-50 flex flex-col bg-background border shadow-2xl overflow-hidden',
               isMobile
                 ? 'fixed inset-0'
                 : 'fixed bottom-[5.5rem] right-5 w-[400px] h-[600px] max-h-[calc(100vh-7rem)] rounded-2xl',
             )}
+            data-state={panelState}
           >
             <div className="flex items-center justify-between gap-2 border-b bg-background px-4 py-3 shrink-0">
               <div className="flex items-center gap-2 text-sm font-semibold">

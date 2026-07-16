@@ -1,9 +1,8 @@
-import { memo, useMemo, useState } from 'react';
+import { lazy, memo, Suspense, useMemo, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
+import DOMPurify from 'dompurify';
 import {
   Dialog, DialogContent, DialogTitle,
 } from '@/components/ui/dialog';
@@ -27,8 +26,23 @@ function ImageLightbox({ src, alt, open, onOpenChange }) {
 
 import { headingId } from '@/lib/fulltext';
 
+const MathMarkdown = lazy(() => import('./MathMarkdown').then(module => ({ default: module.MathMarkdown })));
+
+function containsMath(markdown) {
+  return /\$\$|\$[^$\n]+\$|\\\(|\\\[/.test(markdown);
+}
+
 export const FulltextMarkdown = memo(function FulltextMarkdown({ markdown, imagesBaseUrl, className = '' }) {
   const [lightbox, setLightbox] = useState({ open: false, src: '', alt: '' });
+
+  // MinerU output is imported content. Keep supported HTML (notably tables)
+  // while removing executable markup before rehypeRaw turns it into React nodes.
+  const safeMarkdown = useMemo(() => DOMPurify.sanitize(markdown || '', {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['style', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
+    FORBID_ATTR: ['style'],
+  }), [markdown]);
+  const hasMath = useMemo(() => containsMath(safeMarkdown), [safeMarkdown]);
 
   const mdComponents = useMemo(() => ({
     h1: ({ children, ...rest }) => <h1 id={headingId(children)} {...rest}>{children}</h1>,
@@ -70,13 +84,15 @@ export const FulltextMarkdown = memo(function FulltextMarkdown({ markdown, image
   return (
     <>
       <article className={`fulltext-prose min-w-0 max-w-full overflow-x-hidden ${className}`.trim()}>
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[rehypeRaw, rehypeKatex]}
-          components={mdComponents}
-        >
-          {markdown}
-        </ReactMarkdown>
+        {hasMath ? (
+          <Suspense fallback={<p className="py-4 text-sm text-muted-foreground">正在加载公式排版…</p>}>
+            <MathMarkdown markdown={safeMarkdown} components={mdComponents} />
+          </Suspense>
+        ) : (
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={mdComponents}>
+            {safeMarkdown}
+          </ReactMarkdown>
+        )}
       </article>
       <ImageLightbox
         src={lightbox.src}

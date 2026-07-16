@@ -44,7 +44,7 @@ export const api = {
   },
 
   // Items
-  listItems({ type, journal, collection, search, topLevel = true, includeDeleted = false, page = 1, pageSize = 100, sortField = 'dateModified', sortDir = 'desc' } = {}) {
+  listItems({ type, journal, collection, search, topLevel = true, includeDeleted = false, page = 1, pageSize = 100, sortField = 'dateModified', sortDir = 'desc', signal } = {}) {
     const qs = new URLSearchParams();
     if (type) qs.set('type', type);
     if (journal) qs.set('journal', journal);
@@ -56,7 +56,7 @@ export const api = {
     qs.set('pageSize', String(pageSize));
     qs.set('sortField', sortField);
     qs.set('sortDir', sortDir);
-    return req(`/api/items?${qs.toString()}`);
+    return req(`/api/items?${qs.toString()}`, { signal });
   },
   listItemKeys({ type, journal, collection, search, includeDeleted = false } = {}) {
     const qs = new URLSearchParams();
@@ -77,8 +77,8 @@ export const api = {
     }
     return res.text();
   },
-  getItem(key) { return req(`/api/items/${key}`); },
-  getItemAttachments(key) { return req(`/api/items/${key}/attachments`).then(r => r.attachments); },
+  getItem(key, options) { return req(`/api/items/${key}`, options); },
+  getItemAttachments(key, options) { return req(`/api/items/${key}/attachments`, options).then(r => r.attachments); },
   createItem(body) { return req('/api/items', { method: 'POST', body: JSON.stringify(body) }); },
   updateItem(key, body) { return req(`/api/items/${key}`, { method: 'PATCH', body: JSON.stringify(body) }); },
   deleteItem(key, permanent = false) {
@@ -103,14 +103,14 @@ export const api = {
   },
 
   // Journals
-  listJournals() { return req('/api/journals').then(r => r.journals); },
+  listJournals(options) { return req('/api/journals', options).then(r => r.journals); },
 
   // Authors
   getAuthorGraph(minPapers = 3) {
     return req(`/api/authors/graph?minPapers=${encodeURIComponent(minPapers)}`);
   },
-  getAuthor(id) {
-    return req(`/api/authors/${encodeURIComponent(id)}`);
+  getAuthor(id, options) {
+    return req(`/api/authors/${encodeURIComponent(id)}`, options);
   },
 
   // Dashboard stats
@@ -155,8 +155,8 @@ export const api = {
     const qs = force ? '?force=true' : '';
     return req(`/api/items/${key}/fulltext/parse${qs}`, { method: 'POST' });
   },
-  getFulltext(key) { return req(`/api/items/${key}/fulltext`); },
-  getFulltextStructure(key) { return req(`/api/items/${key}/fulltext/structure`); },
+  getFulltext(key, options) { return req(`/api/items/${key}/fulltext`, options); },
+  getFulltextStructure(key, options) { return req(`/api/items/${key}/fulltext/structure`, options); },
   deleteFulltext(key) { return req(`/api/items/${key}/fulltext`, { method: 'DELETE' }); },
   parseFulltextBatch(keys) {
     return req('/api/fulltext/parse-batch', { method: 'POST', body: JSON.stringify({ keys }) });

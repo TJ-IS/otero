@@ -25,7 +25,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
   const searchRef = useRef(null);
   const [searchValue, setSearchValue] = useState('');
   const [logOpen, setLogOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const navigate = useNavigate();
   const { canEdit } = useAuth();
 
@@ -85,7 +85,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
   };
 
   const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   };
 
   const clearSearch = () => {
@@ -200,9 +200,9 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
             variant="ghost"
             size="sm"
             onClick={toggleTheme}
-            title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            title={resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
           >
-            {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
           <Button variant="outline" size="sm" onClick={refreshItems} title="刷新列表">
             <RefreshCw className="size-4" />
@@ -252,8 +252,8 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={toggleTheme} className="gap-2">
-                {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                {theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+                {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                {resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={refreshItems} className="gap-2">
                 <RefreshCw className="size-4" /> 刷新列表
