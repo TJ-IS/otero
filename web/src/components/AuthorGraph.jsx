@@ -1,311 +1,386 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  AlertTriangle, BarChart3, Scan, Search, SlidersHorizontal,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, BarChart3 } from 'lucide-react';
-import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { api } from '@/api/client';
-import { useForceLayout } from '@/lib/authorGraph';
+import { AIS_BASKET_JOURNALS } from '@/lib/items';
+import { AuthorGraphCanvas } from '@/components/AuthorGraphCanvas';
 
-const DEFAULT_MIN_PAPERS = 10;
+const DEFAULT_FILTERS = {
+  minPapers: 10,
+  minCollaborations: 1,
+  journal: '',
+  yearFrom: '',
+  yearTo: '',
+};
+
+const SIZE_METRICS = [
+  { id: 'paperCount', label: '发文量' },
+  { id: 'degree', label: '合作者数' },
+  { id: 'weightedDegree', label: '合作强度' },
+  { id: 'betweenness', label: '拓扑桥梁度' },
+];
+
+function useDebouncedValue(value, delay) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timeout);
+  }, [delay, value]);
+  return debounced;
+}
+
+function parseYear(value) {
+  if (value === '') return null;
+  if (!/^\d{4}$/.test(String(value))) return undefined;
+  const year = Number(value);
+  return year >= 1500 && year <= 2099 ? year : undefined;
+}
+
+function LoadingGraph() {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center">
+      <div className="w-72 space-y-4" aria-label="正在计算合作网络">
+        <div className="flex items-center justify-center gap-4">
+          <Skeleton className="size-12 rounded-full" />
+          <Skeleton className="size-20 rounded-full" />
+          <Skeleton className="size-9 rounded-full" />
+        </div>
+        <Skeleton className="mx-auto h-2 w-52" />
+        <p className="text-center text-xs text-muted-foreground">正在计算合作社区与网络指标…</p>
+      </div>
+    </div>
+  );
+}
+
+function CompactField({ label, children, className = '' }) {
+  return (
+    <label className={`grid shrink-0 gap-1 ${className}`}>
+      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  );
+}
 
 export function AuthorGraph() {
   const navigate = useNavigate();
-  const [minPapers, setMinPapers] = useState(DEFAULT_MIN_PAPERS);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const debouncedFilters = useDebouncedValue(filters, 280);
+  const [sizeMetric, setSizeMetric] = useState('paperCount');
   const [graph, setGraph] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [hoveredId, setHoveredId] = useState(null);
-  const containerRef = useRef(null);
-  const [size, setSize] = useState({ width: 800, height: 600 });
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
+  const [resetToken, setResetToken] = useState(0);
+  const [focusToken, setFocusToken] = useState(0);
 
-  // Pan/zoom state (manual, no d3-zoom — matches the project's existing
-  // hand-rolled drag pattern in LibraryView.jsx).
-  const [view, setView] = useState({ x: 0, y: 0, k: 1 });
-  const panRef = useRef({ dragging: false, startX: 0, startY: 0, startViewX: 0, startViewY: 0 });
-  // Tracks whether the current mouse/touch gesture moved past a small
-  // threshold, so a pan that ends over a node doesn't also fire its click
-  // and navigate away. Reset at the start of each new gesture (mousedown/
-  // touchstart) rather than at its end, since the click event fires after
-  // mouseup/touchend and needs to see this gesture's result.
-  const dragMovedRef = useRef(false);
-  const DRAG_THRESHOLD = 6;
+  const yearFrom = parseYear(debouncedFilters.yearFrom);
+  const yearTo = parseYear(debouncedFilters.yearTo);
+  const yearError = yearFrom === undefined || yearTo === undefined
+    ? '年份应为 1500–2099 之间的四位数'
+    : yearFrom != null && yearTo != null && yearFrom > yearTo
+      ? '起始年份不能晚于结束年份'
+      : null;
 
-  const loadGraph = useCallback((mp) => {
+  useEffect(() => {
+    if (yearError) {
+      setLoading(false);
+      return undefined;
+    }
+    const controller = new AbortController();
     setLoading(true);
-    api.getAuthorGraph(mp)
-      .then((g) => setGraph(g))
-      .catch((err) => toast.error(`加载学者关系图失败: ${err.message}`))
-      .finally(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    loadGraph(minPapers);
-  }, [minPapers, loadGraph]);
-
-  // Track container size for the force center + SVG viewport.
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => setSize({ width: el.clientWidth, height: el.clientHeight });
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    setError(null);
+    api.getAuthorGraph({
+      minPapers: debouncedFilters.minPapers,
+      minCollaborations: debouncedFilters.minCollaborations,
+      journal: debouncedFilters.journal,
+      yearFrom,
+      yearTo,
+      signal: controller.signal,
+    })
+      .then((result) => setGraph(result))
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') setError(requestError);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [debouncedFilters, yearError, yearFrom, yearTo]);
 
   const nodes = graph?.nodes || [];
-  const edges = graph?.edges || [];
-  const positions = useForceLayout(nodes, edges, size);
+  const searchMatches = useMemo(() => {
+    const normalized = searchQuery.trim().toLocaleLowerCase();
+    if (!normalized) return [];
+    return nodes
+      .filter((node) => node.name.toLocaleLowerCase().includes(normalized))
+      .slice(0, 7);
+  }, [nodes, searchQuery]);
 
-  const neighborIds = useMemo(() => {
-    if (!hoveredId) return null;
-    const set = new Set([hoveredId]);
-    for (const e of edges) {
-      if (e.source === hoveredId) set.add(e.target);
-      if (e.target === hoveredId) set.add(e.source);
-    }
-    return set;
-  }, [hoveredId, edges]);
-
-  const handleWheel = useCallback((e) => {
-    e.preventDefault();
-    const delta = -e.deltaY * 0.001;
-    setView((v) => {
-      const k = Math.min(4, Math.max(0.2, v.k * (1 + delta)));
-      return { ...v, k };
-    });
+  const updateFilter = useCallback((key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
   }, []);
 
-  const handleMouseDown = useCallback((e) => {
-    if (e.button !== 0) return;
-    dragMovedRef.current = false;
-    panRef.current = {
-      dragging: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      startViewX: view.x,
-      startViewY: view.y,
-    };
-  }, [view.x, view.y]);
-
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!panRef.current.dragging) return;
-      const dx = e.clientX - panRef.current.startX;
-      const dy = e.clientY - panRef.current.startY;
-      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) dragMovedRef.current = true;
-      setView((v) => ({ ...v, x: panRef.current.startViewX + dx, y: panRef.current.startViewY + dy }));
-    };
-    const handleMouseUp = () => { panRef.current.dragging = false; };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
+  const chooseAuthor = useCallback((id) => {
+    setSelectedId(id);
+    setSearchOpen(false);
+    setFocusToken((token) => token + 1);
   }, []);
 
-  // Touch pan + pinch-to-zoom. One finger drags the canvas, two fingers pinch
-  // to zoom around their midpoint. e.preventDefault() stops the browser from
-  // scrolling the page while interacting with the graph.
-  const touchRef = useRef({ mode: null, startX: 0, startY: 0, startViewX: 0, startViewY: 0, startDist: 0, startK: 1 });
+  const openAuthor = useCallback((id) => {
+    navigate(`/authors/${id}`);
+  }, [navigate]);
 
-  const handleTouchStart = useCallback((e) => {
-    if (e.touches.length === 1) {
-      dragMovedRef.current = false;
-      const t = e.touches[0];
-      touchRef.current = {
-        mode: 'pan',
-        startX: t.clientX,
-        startY: t.clientY,
-        startViewX: view.x,
-        startViewY: view.y,
-      };
-    } else if (e.touches.length === 2) {
-      dragMovedRef.current = true; // pinch is never a tap
-
-      const [a, b] = e.touches;
-      const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-      touchRef.current = {
-        mode: 'pinch',
-        startDist: dist,
-        startK: view.k,
-        startViewX: view.x,
-        startViewY: view.y,
-      };
-    }
-  }, [view.x, view.y, view.k]);
-
-  const handleTouchMove = useCallback((e) => {
-    e.preventDefault();
-    const mode = touchRef.current.mode;
-    if (mode === 'pan' && e.touches.length === 1) {
-      const t = e.touches[0];
-      const dx = t.clientX - touchRef.current.startX;
-      const dy = t.clientY - touchRef.current.startY;
-      if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) dragMovedRef.current = true;
-      setView((v) => ({ ...v, x: touchRef.current.startViewX + dx, y: touchRef.current.startViewY + dy }));
-    } else if (mode === 'pinch' && e.touches.length === 2) {
-      const [a, b] = e.touches;
-      const dist = Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-      const k = Math.min(4, Math.max(0.2, touchRef.current.startK * (dist / touchRef.current.startDist)));
-      setView((v) => ({ ...v, k }));
-    }
+  const resetFilters = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+    setSearchQuery('');
+    setSelectedId(null);
   }, []);
 
-  const handleTouchEnd = useCallback((e) => {
-    if (e.touches.length === 0) {
-      touchRef.current.mode = null;
-    } else if (e.touches.length === 1) {
-      // Pinch ended with one finger still down — restart as a pan from here.
-      const t = e.touches[0];
-      touchRef.current = {
-        mode: 'pan',
-        startX: t.clientX,
-        startY: t.clientY,
-        startViewX: view.x,
-        startViewY: view.y,
-      };
-    }
-  }, [view.x, view.y]);
-
-  const resetView = () => setView({ x: 0, y: 0, k: 1 });
-
-  const hoveredNode = hoveredId != null ? nodes.find(n => n.id === hoveredId) : null;
+  const meta = graph?.meta;
+  const visibleError = yearError || error?.message;
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
+      <header className="shrink-0 border-b bg-background">
+        <div className="flex min-h-12 flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
+          <div className="mr-1 min-w-0">
+            <h1 className="text-sm font-semibold tracking-tight">学者合作网络</h1>
+            <p className="hidden text-[11px] text-muted-foreground lg:block">AIS Basket · 指标基于当前显示网络</p>
+          </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground whitespace-nowrap">最少发文数</span>
-          <input
-            type="range"
-            min={1}
-            max={15}
-            value={minPapers}
-            onChange={(e) => setMinPapers(Number(e.target.value))}
-            className="w-32 accent-primary"
-          />
-          <Badge variant="outline" className="font-mono text-xs font-normal tabular-nums">{minPapers}</Badge>
-        </div>
+          {meta ? (
+            <div className="hidden items-center gap-1.5 md:flex">
+              <Badge variant="secondary" className="font-normal tabular-nums">{meta.nodeCount} 位学者</Badge>
+              <Badge variant="secondary" className="font-normal tabular-nums">{meta.edgeCount} 条关系</Badge>
+              <Badge variant="outline" className="font-normal tabular-nums">{meta.communityCount} 个社区</Badge>
+            </div>
+          ) : null}
 
-        {graph && (
-          <Badge variant="secondary" className="hidden font-normal md:inline-flex">
-            {nodes.length} 位学者 · {edges.length} 条合作关系
-          </Badge>
-        )}
+          <div
+            className="relative ml-auto w-full sm:w-64"
+            onFocus={() => setSearchOpen(true)}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false);
+            }}
+          >
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setSearchOpen(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && searchMatches[0]) chooseAuthor(searchMatches[0].id);
+                if (event.key === 'Escape') setSearchOpen(false);
+              }}
+              className="h-8 pl-8 text-xs"
+              placeholder="搜索当前网络中的学者"
+              aria-label="搜索当前网络中的学者"
+            />
+            {searchOpen && searchQuery.trim() ? (
+              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-md border bg-popover shadow-md">
+                {searchMatches.length ? searchMatches.map((node) => (
+                  <button
+                    key={node.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-xs last:border-0 hover:bg-muted/60 focus:bg-muted/60 focus:outline-none"
+                    onClick={() => chooseAuthor(node.id)}
+                  >
+                    <span className="min-w-0 truncate">{node.name}</span>
+                    <span className="shrink-0 font-mono tabular-nums text-muted-foreground">{node.paperCount} 篇</span>
+                  </button>
+                )) : (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">
+                    当前筛选范围内没有匹配学者，可降低发文阈值
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
 
-        <div className="ml-auto flex items-center gap-1.5">
           <Button
             variant="outline"
             size="sm"
+            className="h-8"
             onClick={() => navigate('/dashboard/authors/stats')}
             title="学者统计"
           >
             <BarChart3 className="size-4" />
-            <span className="hidden sm:inline">学者统计</span>
+            <span className="hidden lg:inline">统计</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={resetView} title="重置视图">
-            <RefreshCw className="size-4" />
+          <Button
+            variant="outline"
+            size="icon"
+            className="size-8"
+            onClick={() => setResetToken((token) => token + 1)}
+            title="适应画布"
+            aria-label="适应画布"
+          >
+            <Scan className="size-4" />
           </Button>
+        </div>
+
+        <div className="overflow-x-auto border-t bg-muted/20 px-3 py-2 sm:px-4">
+          <div className="flex min-w-max items-end gap-3">
+            <CompactField label="期刊" className="w-64">
+              <Select
+                value={filters.journal || 'all'}
+                onValueChange={(value) => updateFilter('journal', value === 'all' ? '' : value)}
+              >
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部 Basket 期刊</SelectItem>
+                  {AIS_BASKET_JOURNALS.map((journal) => (
+                    <SelectItem key={journal} value={journal}>{journal}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CompactField>
+
+            <CompactField label="年份从" className="w-24">
+              <Input
+                type="number"
+                min="1500"
+                max="2099"
+                inputMode="numeric"
+                value={filters.yearFrom}
+                onChange={(event) => updateFilter('yearFrom', event.target.value)}
+                className="h-8 text-xs tabular-nums"
+                placeholder="不限"
+              />
+            </CompactField>
+            <CompactField label="至" className="w-24">
+              <Input
+                type="number"
+                min="1500"
+                max="2099"
+                inputMode="numeric"
+                value={filters.yearTo}
+                onChange={(event) => updateFilter('yearTo', event.target.value)}
+                className="h-8 text-xs tabular-nums"
+                placeholder="不限"
+              />
+            </CompactField>
+
+            <CompactField label={`最少发文 · ${filters.minPapers}`} className="w-36">
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={filters.minPapers}
+                onChange={(event) => updateFilter('minPapers', Number(event.target.value))}
+                className="h-8 w-full accent-primary"
+                aria-label="最少发文数"
+                aria-valuetext={`${filters.minPapers} 篇`}
+              />
+            </CompactField>
+
+            <CompactField label={`最少共同论文 · ${filters.minCollaborations}`} className="w-36">
+              <input
+                type="range"
+                min="1"
+                max="5"
+                value={filters.minCollaborations}
+                onChange={(event) => updateFilter('minCollaborations', Number(event.target.value))}
+                className="h-8 w-full accent-primary"
+                aria-label="最少共同论文数"
+                aria-valuetext={`${filters.minCollaborations} 篇`}
+              />
+            </CompactField>
+
+            <CompactField label="节点大小" className="w-36">
+              <Select value={sizeMetric} onValueChange={setSizeMetric}>
+                <SelectTrigger className="h-8 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SIZE_METRICS.map((metric) => (
+                    <SelectItem key={metric.id} value={metric.id}>{metric.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CompactField>
+
+            <Button variant="ghost" size="sm" className="h-8 active:scale-[0.98]" onClick={resetFilters}>
+              <SlidersHorizontal className="size-4" />
+              重置筛选
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div
-        ref={containerRef}
-        className="relative min-h-0 flex-1 overflow-hidden"
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        style={{ cursor: panRef.current.dragging ? 'grabbing' : 'grab', touchAction: 'none' }}
-      >
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center gap-3 text-muted-foreground">
-            <RefreshCw className="size-5 animate-spin opacity-60" />
-            <span className="text-sm">正在计算合作网络…</span>
-          </div>
-        )}
+      {visibleError ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-destructive/30 bg-destructive/5 px-4 py-2 text-xs text-destructive">
+          <AlertTriangle className="size-4 shrink-0" />
+          {visibleError}
+        </div>
+      ) : null}
 
-        {!loading && nodes.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
-            没有满足条件的学者，试试降低最少发文数
-          </div>
-        )}
+      {meta?.truncated ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+          <AlertTriangle className="size-4 shrink-0" />
+          当前条件有 {meta.eligibleNodeCount.toLocaleString('zh-CN')} 位学者，仅分析发文量最高的 {meta.nodeCount} 位；提高最少发文数可获得完整网络。
+        </div>
+      ) : null}
 
-        <svg width={size.width} height={size.height} className="select-none">
-          <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
-            <g className="opacity-70">
-              {edges.map((e, i) => {
-                const s = positions.get(e.source);
-                const t = positions.get(e.target);
-                if (!s || !t) return null;
-                const dimmed = neighborIds && !(neighborIds.has(e.source) && neighborIds.has(e.target));
-                return (
-                  <line
-                    key={i}
-                    x1={s.x} y1={s.y} x2={t.x} y2={t.y}
-                    stroke="hsl(var(--muted-foreground))"
-                    strokeWidth={Math.min(3, 0.5 + e.weight * 0.4)}
-                    strokeOpacity={dimmed ? 0.06 : Math.min(0.6, 0.15 + e.weight * 0.1)}
-                  />
-                );
-              })}
-            </g>
-            <g>
-              {nodes.map((n) => {
-                const p = positions.get(n.id);
-                if (!p) return null;
-                const dimmed = neighborIds && !neighborIds.has(n.id);
-                const isHovered = hoveredId === n.id;
-                return (
-                  <g
-                    key={n.id}
-                    transform={`translate(${p.x},${p.y})`}
-                    onMouseEnter={() => setHoveredId(n.id)}
-                    onMouseLeave={() => setHoveredId((cur) => (cur === n.id ? null : cur))}
-                    onClick={() => { if (!dragMovedRef.current) navigate(`/authors/${n.id}`); }}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <circle
-                      r={p.radius}
-                      fill="hsl(var(--primary))"
-                      fillOpacity={dimmed ? 0.12 : isHovered ? 0.9 : 0.55}
-                      stroke="hsl(var(--primary))"
-                      strokeOpacity={dimmed ? 0.2 : 1}
-                      strokeWidth={isHovered ? 2 : 1}
-                    />
-                    {p.radius > 14 && (
-                      <text
-                        textAnchor="middle"
-                        dy="0.32em"
-                        fontSize={Math.min(12, p.radius * 0.4)}
-                        fill="hsl(var(--primary-foreground))"
-                        opacity={dimmed ? 0.15 : 1}
-                        style={{ pointerEvents: 'none' }}
-                      >
-                        {n.name}
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
-          </g>
-        </svg>
+      {!graph && loading ? <LoadingGraph /> : null}
 
-        {hoveredNode && (
-          <div className="pointer-events-none absolute left-4 top-4 rounded-md border bg-popover px-3 py-2 text-sm shadow-lg">
-            <div className="font-medium">{hoveredNode.name || '(未命名)'}</div>
-            <div className="text-xs text-muted-foreground">
-              {hoveredNode.paperCount} 篇论文 · {neighborIds ? neighborIds.size - 1 : 0} 位合作者
-            </div>
-            <div className="text-xs text-muted-foreground/70 mt-0.5">点击查看论文列表</div>
+      {!graph && !loading && error ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <AlertTriangle className="size-6 text-destructive" />
+          <div>
+            <p className="text-sm font-medium">合作网络加载失败</p>
+            <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
           </div>
-        )}
-      </div>
+          <Button variant="outline" size="sm" onClick={() => setFilters((current) => ({ ...current }))}>
+            重试
+          </Button>
+        </div>
+      ) : null}
+
+      {graph && nodes.length === 0 ? (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+          <p className="text-sm font-medium">当前条件下没有学者网络</p>
+          <p className="text-xs text-muted-foreground">可扩大年份范围，或降低最少发文与共同论文阈值。</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={resetFilters}>重置筛选</Button>
+        </div>
+      ) : null}
+
+      {graph && nodes.length > 0 ? (
+        <AuthorGraphCanvas
+          nodes={nodes}
+          edges={graph.edges || []}
+          communities={graph.communities || []}
+          meta={meta}
+          sizeMetric={sizeMetric}
+          searchQuery={searchQuery}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onOpenAuthor={openAuthor}
+          resetToken={resetToken}
+          focusToken={focusToken}
+        />
+      ) : null}
+
+      {loading && graph ? (
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
+          正在更新网络…
+        </div>
+      ) : null}
     </div>
   );
 }

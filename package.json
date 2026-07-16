@@ -21,6 +21,8 @@
     "ai": "^7.0.20",
     "commander": "^12.1.0",
     "express": "^4.21.0",
+    "graphology": "^0.26.0",
+    "graphology-communities-louvain": "^2.0.2",
     "jose": "^6.2.3",
     "minio": "^8.0.7",
     "multer": "^1.4.5-lts.1",

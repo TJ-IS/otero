@@ -6,6 +6,7 @@ import {
   itemTypeIdByName,
 } from './itemRepo.js';
 import { JOURNAL_WHITELIST } from '../services/journalWhitelist.js';
+import { analyzeUndirectedGraph } from '../services/graphAnalysis.js';
 
 function creatorDisplayName({ firstName, lastName, fieldMode }) {
   if (fieldMode === 1 || !firstName) return lastName || '';
@@ -33,51 +34,133 @@ function bucketCount(buckets, value) {
   return b ? b.id : null;
 }
 
+function emptyCoauthorGraph({
+  minPapers, minCollaborations, maxNodes, journal, yearFrom, yearTo,
+} = {}) {
+  return {
+    nodes: [],
+    edges: [],
+    communities: [],
+    meta: {
+      nodeCount: 0,
+      eligibleNodeCount: 0,
+      edgeCount: 0,
+      communityCount: 0,
+      componentCount: 0,
+      largestComponentSize: 0,
+      isolatedNodeCount: 0,
+      density: 0,
+      modularity: 0,
+      truncated: false,
+      metricScope: 'displayed-network',
+      filters: { minPapers, minCollaborations, maxNodes, journal, yearFrom, yearTo },
+    },
+  };
+}
+
 /**
- * Co-authorship graph for creators with at least minPapers items.
+ * Basket-scoped co-authorship graph plus metrics for the displayed induced
+ * network. Filtering happens before paper counts and edge weights are built.
  */
-export async function getCoauthorGraph({ minPapers = 1 } = {}) {
+export async function getCoauthorGraph({
+  minPapers = 1,
+  minCollaborations = 1,
+  maxNodes = 600,
+  journal,
+  yearFrom,
+  yearTo,
+  basketOnly = true,
+} = {}) {
   const authorTypeId = await creatorTypeIdByName('author');
-  if (authorTypeId == null) return { nodes: [], edges: [] };
+  const filterMeta = {
+    minPapers, minCollaborations, maxNodes, journal: journal || null,
+    yearFrom: yearFrom ?? null, yearTo: yearTo ?? null,
+  };
+  if (authorTypeId == null) return emptyCoauthorGraph(filterMeta);
+
+  const candidateWhere = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
+  const candidateParams = [authorTypeId, minPapers, maxNodes];
+  const nextParam = await appendItemScopeFilters(candidateWhere, candidateParams, 4, {
+    journal, yearFrom, yearTo, basketOnly,
+  });
+  if (nextParam == null) return emptyCoauthorGraph(filterMeta);
 
   const candidateRows = await query(`
-    SELECT c."creatorID" AS id, c."firstName" AS "firstName", c."lastName" AS "lastName",
-           c."fieldMode" AS "fieldMode", COUNT(*)::int AS "paperCount"
+    SELECT c."creatorID" AS id, c."firstName", c."lastName", c."fieldMode",
+           COUNT(DISTINCT ic."itemID")::int AS "paperCount",
+           COUNT(*) OVER()::int AS "eligibleCount"
     FROM "itemCreators" ic
     JOIN creators c ON c."creatorID" = ic."creatorID"
     JOIN items i ON i."itemID" = ic."itemID"
     WHERE ic."creatorTypeID" = $1
-      AND i.deleted = 0
-      AND i."parentItemID" IS NULL
+      AND ${candidateWhere.join(' AND ')}
     GROUP BY c."creatorID"
-    HAVING COUNT(*) >= $2
-  `, [authorTypeId, minPapers]);
+    HAVING COUNT(DISTINCT ic."itemID") >= $2
+    ORDER BY "paperCount" DESC, c."creatorID" ASC
+    LIMIT $3
+  `, candidateParams);
 
-  if (candidateRows.length === 0) return { nodes: [], edges: [] };
-
-  const nodes = candidateRows.map(r => ({
-    id: r.id,
-    name: creatorDisplayName(r),
-    paperCount: r.paperCount,
+  const rawNodes = candidateRows.map((node) => ({
+    id: node.id,
+    name: creatorDisplayName(node),
+    paperCount: Number(node.paperCount) || 0,
   }));
+  if (rawNodes.length === 0) return emptyCoauthorGraph(filterMeta);
 
-  const candidateIds = candidateRows.map(r => r.id);
-  const placeholders = candidateIds.map((_, i) => `$${i + 3}`).join(',');
-
+  const candidateIds = rawNodes.map((node) => node.id);
+  const edgeWhere = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
+  const edgeParams = [authorTypeId, candidateIds, minCollaborations];
+  const edgeNextParam = await appendItemScopeFilters(edgeWhere, edgeParams, 4, {
+    journal, yearFrom, yearTo, basketOnly,
+  });
+  if (edgeNextParam == null) return emptyCoauthorGraph(filterMeta);
   const edgeRows = await query(`
-    SELECT ic1."creatorID" AS source, ic2."creatorID" AS target, COUNT(*)::int AS weight
+    SELECT ic1."creatorID" AS source, ic2."creatorID" AS target,
+           COUNT(DISTINCT ic1."itemID")::int AS weight
     FROM "itemCreators" ic1
-    JOIN "itemCreators" ic2 ON ic1."itemID" = ic2."itemID" AND ic1."creatorID" < ic2."creatorID"
+    JOIN "itemCreators" ic2
+      ON ic1."itemID" = ic2."itemID" AND ic1."creatorID" < ic2."creatorID"
     JOIN items i ON i."itemID" = ic1."itemID"
-    WHERE ic1."creatorTypeID" = $1 AND ic2."creatorTypeID" = $2
-      AND i.deleted = 0
-      AND i."parentItemID" IS NULL
-      AND ic1."creatorID" IN (${placeholders})
-      AND ic2."creatorID" IN (${placeholders})
+    WHERE ic1."creatorTypeID" = $1 AND ic2."creatorTypeID" = $1
+      AND ic1."creatorID" = ANY($2::int[])
+      AND ic2."creatorID" = ANY($2::int[])
+      AND ${edgeWhere.join(' AND ')}
     GROUP BY ic1."creatorID", ic2."creatorID"
-  `, [authorTypeId, authorTypeId, ...candidateIds]);
+    HAVING COUNT(DISTINCT ic1."itemID") >= $3
+    ORDER BY weight DESC, source ASC, target ASC
+  `, edgeParams);
 
-  return { nodes, edges: edgeRows };
+  const paperCountById = new Map(rawNodes.map((node) => [node.id, node.paperCount]));
+  const edges = edgeRows.map((edge) => {
+    const weight = Number(edge.weight) || 0;
+    const sourcePapers = paperCountById.get(edge.source) || 0;
+    const targetPapers = paperCountById.get(edge.target) || 0;
+    const union = sourcePapers + targetPapers - weight;
+    return {
+      source: edge.source,
+      target: edge.target,
+      weight,
+      jaccard: union > 0 ? Number((weight / union).toFixed(6)) : 0,
+      cosine: sourcePapers > 0 && targetPapers > 0
+        ? Number((weight / Math.sqrt(sourcePapers * targetPapers)).toFixed(6))
+        : 0,
+    };
+  });
+
+  const analysis = analyzeUndirectedGraph(rawNodes, edges);
+  const eligibleNodeCount = Number(candidateRows[0]?.eligibleCount) || rawNodes.length;
+  return {
+    nodes: analysis.nodes,
+    edges,
+    communities: analysis.communities,
+    meta: {
+      ...analysis.stats,
+      eligibleNodeCount,
+      truncated: eligibleNodeCount > rawNodes.length,
+      metricScope: 'displayed-network',
+      filters: filterMeta,
+    },
+  };
 }
 
 export async function getAuthorDetail(creatorId) {

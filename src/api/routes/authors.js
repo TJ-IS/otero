@@ -2,13 +2,64 @@ import { Router } from 'express';
 import { getCoauthorGraph, getAuthorDetail, getAuthorAnalytics } from '../../repositories/authorRepo.js';
 import { Item } from '../../models/Item.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
+import { JOURNAL_WHITELIST } from '../../services/journalWhitelist.js';
 
 export const authorsRouter = Router();
 
-// GET /api/authors/graph?minPapers=3
+const MAX_GRAPH_NODES = 600;
+
+function parseIntegerParam(value, { name, fallback, min, max }) {
+  if (value == null || value === '') return { value: fallback };
+  if (Array.isArray(value) || !/^\d+$/.test(String(value))) {
+    return { error: `${name} must be an integer` };
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    return { error: `${name} must be between ${min} and ${max}` };
+  }
+  return { value: parsed };
+}
+
+// GET /api/authors/graph?minPapers=3&minCollaborations=1&journal=&yearFrom=&yearTo=
 authorsRouter.get('/graph', asyncHandler(async (req, res) => {
-  const minPapers = Math.max(1, parseInt(req.query.minPapers, 10) || 3);
-  res.json(await getCoauthorGraph({ minPapers }));
+  const minPapersResult = parseIntegerParam(req.query.minPapers, {
+    name: 'minPapers', fallback: 3, min: 1, max: 1000,
+  });
+  const minCollaborationsResult = parseIntegerParam(req.query.minCollaborations, {
+    name: 'minCollaborations', fallback: 1, min: 1, max: 100,
+  });
+  const yearFromResult = parseIntegerParam(req.query.yearFrom, {
+    name: 'yearFrom', fallback: null, min: 1500, max: 2099,
+  });
+  const yearToResult = parseIntegerParam(req.query.yearTo, {
+    name: 'yearTo', fallback: null, min: 1500, max: 2099,
+  });
+  const invalid = [
+    minPapersResult, minCollaborationsResult, yearFromResult, yearToResult,
+  ].find((result) => result.error);
+  if (invalid) return res.status(400).json({ error: invalid.error });
+
+  const journal = typeof req.query.journal === 'string' ? req.query.journal.trim() : '';
+  if (req.query.journal != null && typeof req.query.journal !== 'string') {
+    return res.status(400).json({ error: 'journal must be a single value' });
+  }
+  if (journal && !JOURNAL_WHITELIST.includes(journal)) {
+    return res.status(400).json({ error: 'journal must be an AIS Basket journal' });
+  }
+  if (yearFromResult.value != null && yearToResult.value != null
+    && yearFromResult.value > yearToResult.value) {
+    return res.status(400).json({ error: 'yearFrom must be less than or equal to yearTo' });
+  }
+
+  return res.json(await getCoauthorGraph({
+    minPapers: minPapersResult.value,
+    minCollaborations: minCollaborationsResult.value,
+    maxNodes: MAX_GRAPH_NODES,
+    journal: journal || undefined,
+    yearFrom: yearFromResult.value,
+    yearTo: yearToResult.value,
+    basketOnly: true,
+  }));
 }));
 
 // GET /api/authors/analytics

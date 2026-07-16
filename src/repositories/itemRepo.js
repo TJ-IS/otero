@@ -248,8 +248,10 @@ export async function appendItemScopeFilters(where, params, p, {
     if (!dfid) return null;
     const dParam = p++;
     params.push(dfid);
-    const yearExpr = `SUBSTRING(v.value FROM 1 FOR 4)`;
-    const yearConds = [`${yearExpr} ~ '^[0-9]{4}$'`];
+    // Match the first plausible publication year anywhere in the date string
+    // (e.g. "Spring 2020"), consistent with the open API and timeline stats.
+    const yearExpr = `SUBSTRING(v.value FROM '(1[5-9][0-9]{2}|20[0-9]{2})')`;
+    const yearConds = [];
     if (hasYearFrom) {
       yearConds.push(`${yearExpr}::int >= $${p++}`);
       params.push(yearFrom);

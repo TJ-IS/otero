@@ -106,8 +106,19 @@ export const api = {
   listJournals(options) { return req('/api/journals', options).then(r => r.journals); },
 
   // Authors
-  getAuthorGraph(minPapers = 3) {
-    return req(`/api/authors/graph?minPapers=${encodeURIComponent(minPapers)}`);
+  getAuthorGraph(options = {}) {
+    const normalized = typeof options === 'number' ? { minPapers: options } : options;
+    const {
+      minPapers, minCollaborations, journal, yearFrom, yearTo, signal,
+    } = normalized || {};
+    const qs = new URLSearchParams();
+    if (minPapers != null) qs.set('minPapers', String(minPapers));
+    if (minCollaborations != null) qs.set('minCollaborations', String(minCollaborations));
+    if (journal) qs.set('journal', journal);
+    if (yearFrom != null && yearFrom !== '') qs.set('yearFrom', String(yearFrom));
+    if (yearTo != null && yearTo !== '') qs.set('yearTo', String(yearTo));
+    const query = qs.toString();
+    return req(`/api/authors/graph${query ? `?${query}` : ''}`, { signal });
   },
   getAuthor(id, options) {
     return req(`/api/authors/${encodeURIComponent(id)}`, options);
