@@ -19,7 +19,9 @@ import { toast } from 'sonner';
 import DOMPurify from 'dompurify';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
-import { ITEM_TYPE_LABELS, itemTitle, UNFILED } from '@/lib/items';
+import { usePageMeta } from '@/hooks/usePageMeta';
+import { ITEM_TYPE_LABELS, itemTitle, UNFILED, creatorsList, yearOf } from '@/lib/items';
+import { scholarlyArticleJsonLd, truncateMeta } from '@/lib/seo';
 import { AuthorLinks } from './AuthorLinks';
 import { headingId } from '@/lib/fulltext';
 import { cn } from '@/lib/utils';
@@ -134,6 +136,27 @@ export const ItemPage = memo(function ItemPage() {
   const { data: attachments } = useAsync((signal) => api.getItemAttachments(key, { signal }), [key]);
   const { data: fulltext, loading: fulltextLoading, refresh: refreshFulltext } = useAsync((signal) => api.getFulltext(key, { signal }), [key]);
   const { data: structure, loading: structureLoading } = useAsync((signal) => api.getFulltextStructure(key, { signal }), [key]);
+
+  const seoTitle = item
+    ? t('common:seo.itemTitle', { title: itemTitle(item) })
+    : t('common:seo.siteTitle');
+  const seoDescription = item
+    ? truncateMeta(
+      item.fields?.abstractNote
+        || [creatorsList(item.creators), item.fields?.publicationTitle, yearOf(item.fields?.date)]
+          .filter(Boolean)
+          .join(' · ')
+        || itemTitle(item),
+    )
+    : t('common:seo.siteDescription');
+  usePageMeta({
+    title: seoTitle,
+    description: seoDescription,
+    canonicalPath: key ? `/items/${key}` : '/',
+    robots: !itemLoading && (itemError || !item) ? 'noindex, follow' : 'index, follow',
+    ogType: 'article',
+    jsonLd: item ? scholarlyArticleJsonLd(item) : null,
+  });
 
   const state = fulltext?.state || (fulltextLoading ? 'loading' : 'idle');
   const isActive = ACTIVE_STATES.has(state);

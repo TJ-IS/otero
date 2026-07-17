@@ -1,15 +1,23 @@
-import { Outlet, useNavigate, NavLink } from 'react-router-dom';
+import { Outlet, useNavigate, NavLink, useLocation } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Moon, Sun, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { usePageMeta } from '@/hooks/usePageMeta';
 
 export function DashboardLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { resolvedTheme, setTheme } = useTheme();
   const { t } = useTranslation(['dashboard', 'common']);
+
+  usePageMeta({
+    title: t('common:seo.dashboardTitle'),
+    description: t('common:seo.dashboardDescription'),
+    canonicalPath: location.pathname.startsWith('/dashboard') ? location.pathname : '/dashboard',
+  });
 
   const tabs = [
     { to: '/dashboard', label: t('nav.overview'), end: true },

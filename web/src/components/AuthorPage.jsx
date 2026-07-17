@@ -10,7 +10,9 @@ import {
 } from 'lucide-react';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { ITEM_TYPE_LABELS, itemTitle, yearOf, volumeIssuePages } from '@/lib/items';
+import { personJsonLd } from '@/lib/seo';
 import { AuthorLinks } from './AuthorLinks';
 
 const TYPE_ICONS = {
@@ -31,6 +33,19 @@ export const AuthorPage = memo(function AuthorPage() {
   const { t } = useTranslation(['item', 'common']);
 
   const { data, error, loading } = useAsync((signal) => api.getAuthor(id, { signal }), [id]);
+
+  usePageMeta({
+    title: data?.name
+      ? t('common:seo.authorTitle', { name: data.name })
+      : t('common:seo.siteTitle'),
+    description: data?.name
+      ? t('common:seo.authorDescription', { name: data.name, count: data.items?.length || 0 })
+      : t('common:seo.siteDescription'),
+    canonicalPath: id ? `/authors/${id}` : '/',
+    robots: !loading && (error || !data) ? 'noindex, follow' : 'index, follow',
+    ogType: 'profile',
+    jsonLd: data ? personJsonLd(data) : null,
+  });
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">

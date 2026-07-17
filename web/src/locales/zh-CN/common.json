@@ -53,5 +53,22 @@
   "unnamed": "(未命名)",
   "noData": "暂无数据",
   "yes": "是",
-  "no": "否"
+  "no": "否",
+  "seo": {
+    "siteTitle": "Otero | AIS Basket 文献 API",
+    "siteDescription": "Otero 是面向 AIS Senior Scholars' Basket 期刊的只读文献库与开放 API，支持检索文章与作者、查看语料统计。",
+    "searchTitle": "检索 | Otero",
+    "searchDescription": "在 Otero 中检索 AIS Senior Scholars' Basket 文章与元数据。",
+    "dashboardTitle": "仪表盘 | Otero",
+    "dashboardDescription": "AIS Basket 语料概览：覆盖度、期刊、时间线与作者网络。",
+    "adminTitle": "管理 | Otero",
+    "adminDescription": "Otero 管理后台（仅编辑者）。",
+    "docsApiTitle": "开放 API | Otero",
+    "docsApiDescription": "Otero 开放 API 是面向 AIS Basket 文献库的只读 HTTP 接口：检索、元数据、结构化全文、引用导出与语料统计。",
+    "docsAgentsTitle": "Agent Skill | Otero",
+    "docsAgentsDescription": "安装 Otero 的 Agent Skill（SKILL.md），让自主 Agent 发现并调用 AIS Basket 只读 Open API。",
+    "itemTitle": "{{title}} | Otero",
+    "authorTitle": "{{name}} | Otero",
+    "authorDescription": "{{name}} — 在 Otero 中有 {{count}} 篇 AIS Basket 论文。"
+  }
 }

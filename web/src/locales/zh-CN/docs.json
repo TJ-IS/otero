@@ -6,7 +6,9 @@
     "agents": "AGENTS.md"
   },
   "api": {
-    "intro": "Otero 开放只读 API，面向 AIS Senior Scholars' Basket 文献库。支持从检索结果继续读取条目、结构化全文和引用导出，也提供聚合与时间线统计。所有接口均为 GET，不会修改数据库。",
+    "answerHeading": "什么是 Otero 开放 API？",
+    "answer": "Otero 开放 API 是面向 AIS Senior Scholars' Basket 文献库的只读 HTTP 接口。可用于检索文章与作者、按 DOI 或 item key 取值、在可用时获取结构化全文、导出 BibTeX/RIS，以及查询语料统计；全部为 GET，不会修改数据库。",
+    "intro": "支持从检索结果继续读取条目、结构化全文和引用导出，也提供聚合与时间线统计。",
     "baseUrl": "Base URL：",
     "queryLabel": "Query：",
     "ruleWhitelist": "仅暴露白名单 11 刊内、未删除的顶层条目",
@@ -48,6 +50,8 @@
     }
   },
   "agents": {
+    "answerHeading": "Agent 如何使用 Otero？",
+    "answer": "Otero 提供实时 SKILL.md，供自主 Agent 发现只读 Open API、检索 AIS Basket 文献库、获取条目与全文并导出引用。可复制下方内容，或直接请求 /api/open/v1/SKILL.md。",
     "hint": "复制下方内容保存为 AGENTS.md 或 SKILL.md，供其他 Agent 访问本站开放数据。",
     "copy": "复制",
     "copied": "已复制",

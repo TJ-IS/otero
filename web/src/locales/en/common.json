@@ -53,5 +53,22 @@
   "unnamed": "(unnamed)",
   "noData": "No data",
   "yes": "Yes",
-  "no": "No"
+  "no": "No",
+  "seo": {
+    "siteTitle": "Otero | AIS Basket Literature API",
+    "siteDescription": "Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics.",
+    "searchTitle": "Search | Otero",
+    "searchDescription": "Search AIS Senior Scholars' Basket articles and metadata in Otero.",
+    "dashboardTitle": "Dashboard | Otero",
+    "dashboardDescription": "Corpus overview for the AIS Senior Scholars' Basket library: coverage, journals, timeline, and author networks.",
+    "adminTitle": "Admin | Otero",
+    "adminDescription": "Otero administration (editors only).",
+    "docsApiTitle": "Open API | Otero",
+    "docsApiDescription": "Otero Open API is a read-only HTTP interface to the AIS Basket literature library: search, metadata, structured full text, citation export, and corpus stats.",
+    "docsAgentsTitle": "Agent Skill | Otero",
+    "docsAgentsDescription": "Install Otero's agent skill (SKILL.md) so autonomous agents can discover and call the read-only Open API for AIS Basket literature.",
+    "itemTitle": "{{title}} | Otero",
+    "authorTitle": "{{name}} | Otero",
+    "authorDescription": "{{name}} — {{count}} AIS Basket paper(s) in Otero."
+  }
 }

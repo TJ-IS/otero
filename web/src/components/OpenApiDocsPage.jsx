@@ -4,6 +4,8 @@ import { Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { usePageMeta } from '@/hooks/usePageMeta';
+import { webApiJsonLd } from '@/lib/seo';
 
 const ENDPOINTS = [
   {
@@ -166,6 +168,13 @@ export function OpenApiDocsPage() {
   const { t } = useTranslation(['docs', 'common']);
   const base = typeof window !== 'undefined' ? window.location.origin : '';
 
+  usePageMeta({
+    title: t('common:seo.docsApiTitle'),
+    description: t('common:seo.docsApiDescription'),
+    canonicalPath: '/docs/api',
+    jsonLd: webApiJsonLd(),
+  });
+
   const filterRows = useMemo(() => [
     { param: 'journal', descKey: 'filterJournal' },
     { param: 'journals', descKey: 'filterJournals' },
@@ -187,8 +196,13 @@ export function OpenApiDocsPage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 space-y-10">
       <section className="space-y-3">
+        <h2 className="text-base font-semibold tracking-tight">{t('api.answerHeading')}</h2>
+        <p className="text-sm leading-relaxed text-foreground">
+          {t('api.answer')}
+        </p>
         <p className="text-sm text-muted-foreground leading-relaxed">
           {t('api.intro')}
+          {' '}
           {t('api.baseUrl')}
         </p>
         <CodeBlock>{`${base}/api/open/v1`}</CodeBlock>

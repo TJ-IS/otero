@@ -19,6 +19,7 @@ import { statsRouter } from './routes/stats.js';
 import { authRouter } from './routes/auth.js';
 import { openRouter } from './routes/open.js';
 import { adminRouter } from './routes/admin.js';
+import { seoRouter, spaSeoFallback } from './routes/seo.js';
 import { optionalAuth, editorWriteGate, requireEditor } from './middleware/auth.js';
 import { startFullTextWorker } from '../services/fulltextWorker.js';
 import { recoverSubmittingOnStartup } from '../services/fulltextService.js';
@@ -35,6 +36,9 @@ export function buildApp() {
   app.use(json({ limit: '5mb' }));
 
   app.get('/health', (_req, res) => res.json({ ok: true, version: '0.1.0' }));
+
+  // Machine-readable SEO files (always available, even without a web build).
+  app.use(seoRouter);
 
   app.use('/api/auth', authRouter);
   app.use('/api', optionalAuth(), editorWriteGate);
@@ -59,16 +63,12 @@ export function buildApp() {
   app.use('/api', merkleRouter);
   app.use('/api', chatRouter);
 
-  // In production, serve the built Vite frontend if present.
+  // Serve built Vite assets when present. Disable the automatic index.html so
+  // HTML navigations go through spaSeoFallback (meta + crawlable body inject).
   if (fs.existsSync(WEB_DIST)) {
-    app.use(express.static(WEB_DIST));
-    // SPA fallback: non-/api, non-/health routes go to index.html
-    app.get(/^\/(?!api|health).*/, (req, res, next) => {
-      const indexFile = path.join(WEB_DIST, 'index.html');
-      if (fs.existsSync(indexFile)) return res.sendFile(indexFile);
-      next();
-    });
+    app.use(express.static(WEB_DIST, { index: false }));
   }
+  app.get(/^\/(?!api|health).*/, spaSeoFallback);
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, _req, res, _next) => {

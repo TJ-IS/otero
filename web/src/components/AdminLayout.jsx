@@ -6,12 +6,20 @@ import { ArrowLeft, Moon, Sun, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { usePageMeta } from '@/hooks/usePageMeta';
 
 export function AdminLayout() {
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
   const { canEdit } = useAuth();
   const { t } = useTranslation(['admin', 'common']);
+
+  usePageMeta({
+    title: t('common:seo.adminTitle'),
+    description: t('common:seo.adminDescription'),
+    canonicalPath: '/admin',
+    robots: 'noindex, nofollow',
+  });
 
   const tabs = [
     { to: '/admin', label: t('nav.status'), end: true },

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Search as SearchIcon, X, FileText, Moon, Sun, Loader2 } from 'lucide-react';
 import { useInfiniteItems } from '@/hooks/useInfiniteItems';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import {
   ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle,
   AIS_BASKET_JOURNALS, UNFILED,
@@ -142,6 +143,14 @@ export const SearchPage = memo(function SearchPage() {
   const [submitted, setSubmitted] = useState(initialQ);
   const inputRef = useRef(null);
   const { resolvedTheme, setTheme } = useTheme();
+
+  const hasSearchParams = Boolean([...searchParams.keys()].length);
+  usePageMeta({
+    title: t('common:seo.searchTitle'),
+    description: t('common:seo.searchDescription'),
+    canonicalPath: '/search',
+    robots: hasSearchParams ? 'noindex, follow' : 'index, follow',
+  });
 
   // Selected item detail (floating panel, mirrors LibraryView's UX).
   const [selectedKey, setSelectedKey] = useState(null);

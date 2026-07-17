@@ -4,6 +4,7 @@ import { Check, Copy, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { usePageMeta } from '@/hooks/usePageMeta';
 
 async function copyText(text) {
   await navigator.clipboard.writeText(text);
@@ -27,6 +28,12 @@ export function AgentsMdPage() {
   const [agentsMd, setAgentsMd] = useState('');
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+
+  usePageMeta({
+    title: t('common:seo.docsAgentsTitle'),
+    description: t('common:seo.docsAgentsDescription'),
+    canonicalPath: '/docs/agents',
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -68,9 +75,13 @@ export function AgentsMdPage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 space-y-6">
       <section className="space-y-3">
+        <h2 className="text-base font-semibold tracking-tight">{t('agents.answerHeading')}</h2>
+        <p className="text-sm leading-relaxed text-foreground">
+          {t('agents.answer')}
+        </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
-            <h2 className="text-base font-semibold tracking-tight">AGENTS.md</h2>
+            <h3 className="text-sm font-semibold tracking-tight">AGENTS.md</h3>
             <p className="text-sm text-muted-foreground">
               {t('agents.hint')}
             </p>

@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePageMeta } from '@/hooks/usePageMeta';
+import { websiteJsonLd } from '@/lib/seo';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -29,6 +31,13 @@ export function LibraryView() {
   const { t } = useTranslation(['library', 'common']);
   const { canEdit } = useAuth();
   const isMobile = useIsMobile();
+
+  usePageMeta({
+    title: t('common:seo.siteTitle'),
+    description: t('common:seo.siteDescription'),
+    canonicalPath: '/',
+    jsonLd: websiteJsonLd(),
+  });
   const [filter, setFilter] = useState({ type: null, journal: null, collection: null, search: null });
   const [selectedKey, setSelectedKey] = useState(null);
   const [itemsVersion, setItemsVersion] = useState(0);

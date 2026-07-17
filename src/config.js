@@ -45,6 +45,11 @@ export const config = {
   dataDir: path.join(projectRoot, 'data'),
   /** PostgreSQL connection string (required). */
   databaseUrl: process.env.DATABASE_URL || '',
+  /**
+   * Absolute public site origin for canonical URLs, sitemap, OG, and llms.txt.
+   * Override locally with PUBLIC_BASE_URL.
+   */
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL || 'https://wtf-is.eu.cc').replace(/\/$/, ''),
   storageDir: path.join(projectRoot, 'data', 'storage'),
   schemaVersion: 5,
   storage: {

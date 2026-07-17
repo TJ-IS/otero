@@ -6,7 +6,9 @@
     "agents": "AGENTS.md"
   },
   "api": {
-    "intro": "Otero's read-only Open API for the AIS Senior Scholars' Basket library. Continue from search results to items, structured full text, and citation export; also offers aggregates and timeline stats. All endpoints are GET and never modify the database.",
+    "answerHeading": "What is the Otero Open API?",
+    "answer": "Otero Open API is a read-only HTTP interface to the AIS Senior Scholars' Basket literature library. Use it to search articles and authors, resolve DOIs or item keys, fetch structured full text when available, export BibTeX or RIS, and query corpus statistics—all via GET requests that never modify the database.",
+    "intro": "Continue from search results to items, structured full text, and citation export; also offers aggregates and timeline stats.",
     "baseUrl": "Base URL: ",
     "queryLabel": "Query: ",
     "ruleWhitelist": "Only non-deleted top-level items in the 11 whitelisted journals",
@@ -48,6 +50,8 @@
     }
   },
   "agents": {
+    "answerHeading": "How do agents use Otero?",
+    "answer": "Otero publishes a live SKILL.md so autonomous agents can discover the read-only Open API, search the AIS Basket library, fetch items and full text, and export citations. Copy the skill below or fetch /api/open/v1/SKILL.md directly.",
     "hint": "Copy below and save as AGENTS.md or SKILL.md so other agents can access this site's open data.",
     "copy": "Copy",
     "copied": "Copied",
