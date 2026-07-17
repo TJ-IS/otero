@@ -336,11 +336,9 @@ export async function buildSitemapXml(which = 'index') {
   if (which === 'items') return buildUrlset(itemEntries);
   if (which === 'authors') return buildUrlset(authorEntries);
 
-  const total = staticEntries.length + itemEntries.length + authorEntries.length;
-  if (total <= SITEMAP_URL_LIMIT) {
-    return buildUrlset([...staticEntries, ...itemEntries, ...authorEntries]);
-  }
-
+  // Always return a sitemap index for `/sitemap.xml`. A monolithic ~5MB urlset
+  // often makes Google Search Console report "Couldn't fetch" even when under
+  // the 50MB / 50k-URL hard limits; child sitemaps are smaller and more reliable.
   return buildSitemapIndex([
     absoluteUrl('/sitemap-static.xml'),
     absoluteUrl('/sitemap-items.xml'),
