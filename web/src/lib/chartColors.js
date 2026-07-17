@@ -7,6 +7,8 @@
 // to rank — so a type keeps its color across renders/filters regardless of
 // its count.
 
+import i18n from '../i18n';
+
 export const CATEGORICAL_COLORS = [
   'hsl(var(--chart-1))',
   'hsl(var(--chart-2))',
@@ -44,16 +46,22 @@ export function colorForItemType(itemType) {
 }
 
 // MinerU full-text parse state machine: idle|submitting|pending|running|
-// converting|done|failed. Grouped into status roles.
-export const FULLTEXT_STATE_LABELS = {
-  idle: '未开始',
-  submitting: '提交中',
-  pending: '排队中',
-  running: '解析中',
-  converting: '转换中',
-  done: '已完成',
-  failed: '失败',
-};
+// converting|done|failed. Grouped into status roles. Labels via i18n.
+export function getFulltextStateLabel(state) {
+  if (!state) return '';
+  const key = `dashboard:fulltextState.${state}`;
+  const translated = i18n.t(key);
+  return translated === key ? state : translated;
+}
+
+export const FULLTEXT_STATE_LABELS = new Proxy(
+  {},
+  {
+    get(_, state) {
+      return getFulltextStateLabel(state);
+    },
+  },
+);
 
 export function colorForFulltextState(state) {
   if (state === 'done') return STATUS_COLORS.good;

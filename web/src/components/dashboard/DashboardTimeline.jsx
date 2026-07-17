@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -9,11 +10,11 @@ import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { SINGLE_SERIES_COLOR } from '@/lib/chartColors';
 
-function ChartTooltip({ active, payload, label, formatter }) {
+function ChartTooltip({ active, payload, label, formatter, yearLabel }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-lg">
-      {label != null && <div className="mb-1 font-medium text-popover-foreground">{label}年</div>}
+      {label != null && <div className="mb-1 font-medium text-popover-foreground">{yearLabel(label)}</div>}
       {payload.map((p, i) => (
         <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
           <span className="inline-block size-2 rounded-full" style={{ background: p.color || p.fill }} />
@@ -25,6 +26,7 @@ function ChartTooltip({ active, payload, label, formatter }) {
 }
 
 export function DashboardTimeline() {
+  const { t } = useTranslation('dashboard');
   const { data: years, error, loading } = useAsync(() => api.getStatsYears(), []);
 
   const total = useMemo(() => (years || []).reduce((sum, y) => sum + y.count, 0), [years]);
@@ -38,13 +40,13 @@ export function DashboardTimeline() {
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6">
       {loading && (
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" /> 加载中…
+          <Loader2 className="size-5 animate-spin" /> {t('loading')}
         </div>
       )}
       {error && (
         <div className="flex flex-col items-center gap-2 py-16 text-sm text-destructive">
           <AlertCircle className="size-8" />
-          <p>加载失败: {error.message}</p>
+          <p>{t('loadFailed', { message: error.message })}</p>
         </div>
       )}
 
@@ -53,19 +55,19 @@ export function DashboardTimeline() {
           <div className="grid grid-cols-3 gap-3">
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">发文总数</p>
+                <p className="text-xs text-muted-foreground">{t('timeline.totalPubs')}</p>
                 <p className="text-lg font-semibold tabular-nums leading-tight">{total}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">年份跨度</p>
+                <p className="text-xs text-muted-foreground">{t('timeline.yearSpan')}</p>
                 <p className="text-lg font-semibold tabular-nums leading-tight">{span || '—'}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">发文峰值年</p>
+                <p className="text-xs text-muted-foreground">{t('timeline.peakYear')}</p>
                 <p className="text-lg font-semibold tabular-nums leading-tight">
                   {peak ? `${peak.year} (${peak.count})` : '—'}
                 </p>
@@ -75,14 +77,14 @@ export function DashboardTimeline() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">发表年份分布</CardTitle>
+              <CardTitle className="text-base">{t('timeline.distTitle')}</CardTitle>
               <CardDescription>
-                按出版年份统计的条目数量（已剔除 1990 年前及超前年份的异常噪声数据）
+                {t('timeline.distDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {years.length === 0 ? (
-                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">暂无数据</div>
+                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('noData')}</div>
               ) : (
                 <>
                   <ResponsiveContainer width="100%" height={320}>
@@ -95,8 +97,8 @@ export function DashboardTimeline() {
                         minTickGap={16}
                       />
                       <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} width={40} />
-                      <Tooltip content={<ChartTooltip />} />
-                      <Bar dataKey="count" name="条目数" fill={SINGLE_SERIES_COLOR} radius={[4, 4, 0, 0]} />
+                      <Tooltip content={<ChartTooltip yearLabel={(y) => t('timeline.yearTooltip', { year: y })} />} />
+                      <Bar dataKey="count" name={t('itemCount')} fill={SINGLE_SERIES_COLOR} radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
 
@@ -105,8 +107,8 @@ export function DashboardTimeline() {
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 z-10 bg-background text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
                         <tr>
-                          <th className="px-4 py-2 font-medium">年份</th>
-                          <th className="px-4 py-2 font-medium text-right">条目数</th>
+                          <th className="px-4 py-2 font-medium">{t('timeline.colYear')}</th>
+                          <th className="px-4 py-2 font-medium text-right">{t('timeline.colCount')}</th>
                         </tr>
                       </thead>
                       <tbody>

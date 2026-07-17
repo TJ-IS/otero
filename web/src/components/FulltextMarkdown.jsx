@@ -1,4 +1,5 @@
 import { lazy, memo, Suspense, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -6,6 +7,7 @@ import DOMPurify from 'dompurify';
 import {
   Dialog, DialogContent, DialogTitle,
 } from '@/components/ui/dialog';
+import { headingId } from '@/lib/fulltext';
 
 // KaTeX CSS — imported once for this view. Vite bundles it.
 import 'katex/dist/katex.min.css';
@@ -14,17 +16,16 @@ import 'katex/dist/katex.min.css';
  * Lightweight "image lightbox" using the existing Dialog primitive.
  */
 function ImageLightbox({ src, alt, open, onOpenChange }) {
+  const { t } = useTranslation('item');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[90vw] max-h-[90vh] p-2 overflow-hidden flex flex-col items-center justify-center">
-        <DialogTitle className="sr-only">{alt || '图片预览'}</DialogTitle>
+        <DialogTitle className="sr-only">{alt || t('page.imagePreview')}</DialogTitle>
         <img src={src} alt={alt || ''} className="max-w-full max-h-[85vh] object-contain rounded" />
       </DialogContent>
     </Dialog>
   );
 }
-
-import { headingId } from '@/lib/fulltext';
 
 const MathMarkdown = lazy(() => import('./MathMarkdown').then(module => ({ default: module.MathMarkdown })));
 
@@ -33,6 +34,7 @@ function containsMath(markdown) {
 }
 
 export const FulltextMarkdown = memo(function FulltextMarkdown({ markdown, imagesBaseUrl, className = '' }) {
+  const { t } = useTranslation('item');
   const [lightbox, setLightbox] = useState({ open: false, src: '', alt: '' });
 
   // MinerU output is imported content. Keep supported HTML (notably tables)
@@ -85,7 +87,7 @@ export const FulltextMarkdown = memo(function FulltextMarkdown({ markdown, image
     <>
       <article className={`fulltext-prose min-w-0 max-w-full overflow-x-hidden ${className}`.trim()}>
         {hasMath ? (
-          <Suspense fallback={<p className="py-4 text-sm text-muted-foreground">正在加载公式排版…</p>}>
+          <Suspense fallback={<p className="py-4 text-sm text-muted-foreground">{t('page.loadingMath')}</p>}>
             <MathMarkdown markdown={safeMarkdown} components={mdComponents} />
           </Suspense>
         ) : (

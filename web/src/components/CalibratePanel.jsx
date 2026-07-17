@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from './ui/dialog';
@@ -11,31 +12,26 @@ import {
   ChevronRight, ChevronDown, Copy, Check,
 } from 'lucide-react';
 
-// Status → shadcn Badge variant + optional muted tint. Matches the app's
-// neutral-palette convention (see MineruTaskLog.StateBadge): neutral/secondary
-// for non-actionable, destructive for errors, outline + subtle color for
-// warnings. No saturated background pills.
-const STATUS_META = {
-  correct:   { label: '正确', variant: 'secondary' },
-  incorrect: { label: '有误', variant: 'destructive' },
-  missing:   { label: '缺失', variant: 'outline', cls: 'text-amber-600 dark:text-amber-500' },
-  extra:     { label: '多余', variant: 'outline', cls: 'text-muted-foreground' },
+const STATUS_VARIANTS = {
+  correct: { variant: 'secondary' },
+  incorrect: { variant: 'destructive' },
+  missing: { variant: 'outline', cls: 'text-amber-600 dark:text-amber-500' },
+  extra: { variant: 'outline', cls: 'text-muted-foreground' },
 };
 
-// Overall accuracy rendered as inline colored text in the header description,
-// mirroring MineruTaskLog's `text-green-600` / `text-red-600` count style.
-const ACCURACY_TEXT = {
-  high:    { label: '高',   cls: 'text-green-600 dark:text-green-500' },
-  medium:  { label: '中',   cls: 'text-amber-600 dark:text-amber-500' },
-  low:     { label: '低',   cls: 'text-red-600 dark:text-red-500' },
-  unknown: { label: '未知', cls: 'text-muted-foreground' },
+const ACCURACY_CLS = {
+  high: 'text-green-600 dark:text-green-500',
+  medium: 'text-amber-600 dark:text-amber-500',
+  low: 'text-red-600 dark:text-red-500',
+  unknown: 'text-muted-foreground',
 };
 
 function StatusBadge({ status }) {
-  const m = STATUS_META[status] || STATUS_META.correct;
+  const { t } = useTranslation('item');
+  const m = STATUS_VARIANTS[status] || STATUS_VARIANTS.correct;
   return (
     <Badge variant={m.variant} className={`font-normal ${m.cls || ''}`}>
-      {m.label}
+      {t(`calibrate.status.${status}`, { defaultValue: status })}
     </Badge>
   );
 }
@@ -46,9 +42,8 @@ function confidencePct(c) {
   return Math.round(n * 100);
 }
 
-// Collapsible LLM I/O block with a copy button. Used for tracing what was
-// actually sent to / received from the model.
 function DebugBlock({ label, content, copied, onCopy }) {
+  const { t } = useTranslation(['item', 'common']);
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
@@ -60,20 +55,22 @@ function DebugBlock({ label, content, copied, onCopy }) {
           onClick={() => onCopy(content)}
         >
           {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
-          {copied ? '已复制' : '复制'}
+          {copied ? t('common:copied') : t('calibrate.copy')}
         </Button>
       </div>
       <pre className="max-h-[60vh] overflow-auto rounded-md border bg-background p-3 text-xs leading-relaxed whitespace-pre-wrap break-all font-mono">
-        {content || '（空）'}
+        {content || t('calibrate.empty')}
       </pre>
     </div>
   );
 }
 
 function FieldRow({ field, checked, onToggle }) {
+  const { t } = useTranslation('item');
   const changed = field.suggested !== field.current && field.status !== 'correct';
   const pct = confidencePct(field.confidence);
   const isCorrect = field.status === 'correct';
+  const fieldLabel = t(`field.${field.field}`, field.field);
 
   return (
     <label
@@ -89,21 +86,21 @@ function FieldRow({ field, checked, onToggle }) {
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium">{field.field}</span>
+          <span className="text-sm font-medium">{fieldLabel}</span>
           <StatusBadge status={field.status} />
           {pct != null && (
-            <span className="text-xs text-muted-foreground tabular-nums">置信度 {pct}%</span>
+            <span className="text-xs text-muted-foreground tabular-nums">{t('calibrate.confidencePct', { pct })}</span>
           )}
         </div>
         <div className="mt-1 space-y-0.5 text-xs">
           <div className="text-muted-foreground">
-            <span className="text-muted-foreground/80">当前：</span>
-            <span className="break-all">{field.current || <em>（空）</em>}</span>
+            <span className="text-muted-foreground/80">{t('calibrate.current')}</span>
+            <span className="break-all">{field.current || <em>{t('calibrate.empty')}</em>}</span>
           </div>
           {changed && (
             <div className="text-foreground">
-              <span className="text-muted-foreground/80">建议：</span>
-              <span className="break-all font-medium">{field.suggested || <em className="text-muted-foreground">（清空）</em>}</span>
+              <span className="text-muted-foreground/80">{t('calibrate.suggested')}</span>
+              <span className="break-all font-medium">{field.suggested || <em className="text-muted-foreground">{t('calibrate.clearValue')}</em>}</span>
             </div>
           )}
           {field.reason && (
@@ -116,10 +113,11 @@ function FieldRow({ field, checked, onToggle }) {
 }
 
 function CreatorRow({ creator, checked, onToggle }) {
+  const { t } = useTranslation('item');
   const cur = creator.current || {};
   const sug = creator.suggested || {};
-  const curName = [cur.lastName, cur.firstName].filter(Boolean).join(', ') || '（空）';
-  const sugName = [sug.lastName, sug.firstName].filter(Boolean).join(', ') || '（空）';
+  const curName = [cur.lastName, cur.firstName].filter(Boolean).join(', ') || t('calibrate.empty');
+  const sugName = [sug.lastName, sug.firstName].filter(Boolean).join(', ') || t('calibrate.empty');
   const changed = curName !== sugName && creator.status !== 'correct';
   const pct = confidencePct(creator.confidence);
   const isCorrect = creator.status === 'correct';
@@ -139,21 +137,21 @@ function CreatorRow({ creator, checked, onToggle }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium">
-            作者 #{(creator.index ?? 0) + 1}
+            {t('calibrate.authorN', { n: (creator.index ?? 0) + 1 })}
             <span className="text-muted-foreground font-normal"> · {cur.creatorType || 'author'}</span>
           </span>
           <StatusBadge status={creator.status} />
           {pct != null && (
-            <span className="text-xs text-muted-foreground tabular-nums">置信度 {pct}%</span>
+            <span className="text-xs text-muted-foreground tabular-nums">{t('calibrate.confidencePct', { pct })}</span>
           )}
         </div>
         <div className="mt-1 space-y-0.5 text-xs">
           <div className="text-muted-foreground">
-            <span className="text-muted-foreground/80">当前：</span>{curName}
+            <span className="text-muted-foreground/80">{t('calibrate.current')}</span>{curName}
           </div>
           {changed && (
             <div className="text-foreground">
-              <span className="text-muted-foreground/80">建议：</span>
+              <span className="text-muted-foreground/80">{t('calibrate.suggested')}</span>
               <span className="font-medium">{sugName}</span>
             </div>
           )}
@@ -167,6 +165,7 @@ function CreatorRow({ creator, checked, onToggle }) {
 export const CalibratePanel = memo(function CalibratePanel({
   open, onOpenChange, result, loading, error, onApply,
 }) {
+  const { t } = useTranslation(['item', 'common']);
   const [fieldSel, setFieldSel] = useState({});
   const [creatorSel, setCreatorSel] = useState({});
   const [debugOpen, setDebugOpen] = useState(false);
@@ -176,14 +175,13 @@ export const CalibratePanel = memo(function CalibratePanel({
     try {
       await navigator.clipboard.writeText(text || '');
       setCopiedKey(key);
-      toast.success('已复制');
+      toast.success(t('common:copied'));
       setTimeout(() => setCopiedKey(k => (k === key ? null : k)), 1500);
     } catch {
-      toast.error('复制失败');
+      toast.error(t('common:copyFailed'));
     }
   };
 
-  // Reset selection whenever a new result arrives.
   useEffect(() => {
     if (!result) { setFieldSel({}); setCreatorSel({}); return; }
     const fs = {};
@@ -241,13 +239,14 @@ export const CalibratePanel = memo(function CalibratePanel({
         orderIndex: c.index ?? 0,
       }));
     if (totalSelected === 0) {
-      toast.info('未选择任何修改');
+      toast.info(t('calibrate.noSelection'));
       return;
     }
     onApply({ fields: acceptedFields, creators: acceptedCreators });
   };
 
-  const acc = ACCURACY_TEXT[result?.overallAccuracy] || ACCURACY_TEXT.unknown;
+  const accuracyKey = result?.overallAccuracy || 'unknown';
+  const accCls = ACCURACY_CLS[accuracyKey] || ACCURACY_CLS.unknown;
   const fieldTotal = result?.fields?.length || 0;
   const creatorTotal = result?.creators?.length || 0;
 
@@ -256,16 +255,19 @@ export const CalibratePanel = memo(function CalibratePanel({
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-3 border-b">
           <DialogTitle className="flex items-center gap-2">
-            <Wand2 className="size-5" /> AI 元数据校准
+            <Wand2 className="size-5" /> {t('calibrate.title')}
           </DialogTitle>
           <DialogDescription>
             {result ? (
               <>
-                整体准确度<span className={`ml-1 font-medium ${acc.cls}`}>{acc.label}</span>
-                <span className="text-muted-foreground/80"> · 可在「PDF」标签页对照原文</span>
+                {t('calibrate.overallAccuracy')}
+                <span className={`ml-1 font-medium ${accCls}`}>
+                  {t(`calibrate.confidence.${accuracyKey}`, { defaultValue: accuracyKey })}
+                </span>
+                <span className="text-muted-foreground/80">{t('calibrate.comparePdf')}</span>
               </>
             ) : (
-              '对比 LLM 建议与当前元数据，勾选要采纳的修改后应用到草稿。'
+              t('calibrate.hint')
             )}
           </DialogDescription>
         </DialogHeader>
@@ -273,33 +275,31 @@ export const CalibratePanel = memo(function CalibratePanel({
         {loading ? (
           <div className="flex h-40 items-center justify-center gap-3 text-sm text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
-            正在调用 LLM 分析全文与元数据，请稍候…
+            {t('calibrate.loading')}
           </div>
         ) : error ? (
           <div className="flex h-40 flex-col items-center justify-center gap-3 text-center">
             <AlertCircle className="size-5 text-destructive" />
             <span className="text-sm text-destructive">{error}</span>
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>关闭</Button>
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>{t('common:close')}</Button>
           </div>
         ) : result ? (
           <>
-            {/* Action bar */}
             <div className="flex items-center justify-between px-6 py-2 border-b">
               <div className="text-xs text-muted-foreground">
-                {fieldTotal} 个字段，<span className="text-amber-600 dark:text-amber-500">{changeableFields.length}</span> 处建议修改
+                {t('calibrate.fieldSummary', { total: fieldTotal, changes: changeableFields.length })}
                 {creatorTotal > 0 && (
-                  <> · {creatorTotal} 位作者，<span className="text-amber-600 dark:text-amber-500">{changeableCreators.length}</span> 处建议修改</>
+                  <> {t('calibrate.creatorSummary', { total: creatorTotal, changes: changeableCreators.length })}</>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={selectAll}>全选建议</Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={selectNone}>清空</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={selectAll}>{t('calibrate.selectAll')}</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={selectNone}>{t('calibrate.clear')}</Button>
               </div>
             </div>
 
-            {/* Comparison list */}
             <div className="flex-1 overflow-auto px-6 py-3">
-              <h3 className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">字段</h3>
+              <h3 className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('calibrate.fields')}</h3>
               <div className="divide-y">
                 {(result.fields || []).map(f => (
                   <FieldRow
@@ -313,7 +313,7 @@ export const CalibratePanel = memo(function CalibratePanel({
 
               {result.creators && result.creators.length > 0 && (
                 <>
-                  <h3 className="mb-1 mt-5 text-xs font-medium uppercase tracking-wider text-muted-foreground">作者</h3>
+                  <h3 className="mb-1 mt-5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('calibrate.authors')}</h3>
                   <div className="divide-y">
                     {result.creators.map((c, i) => (
                       <CreatorRow
@@ -328,37 +328,35 @@ export const CalibratePanel = memo(function CalibratePanel({
               )}
             </div>
 
-            {/* LLM I/O tracing panel, collapsed by default */}
             {debugOpen && result?.debug && (
               <div className="max-h-[40vh] overflow-auto border-t bg-muted/30 px-6 py-3 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
-                    模型 <span className="font-mono text-foreground">{result.debug.model}</span>
-                    · 输入 Markdown {result.debug.markdownChars?.toLocaleString()} 字符
+                    {t('calibrate.model')} <span className="font-mono text-foreground">{result.debug.model}</span>
+                    {t('calibrate.markdownChars', { count: result.debug.markdownChars?.toLocaleString() ?? 0 })}
                   </span>
                 </div>
                 <DebugBlock
-                  label="System Prompt"
+                  label={t('calibrate.systemPrompt')}
                   content={result.debug.systemPrompt}
                   copied={copiedKey === 'system'}
-                  onCopy={t => copyDebug('system', t)}
+                  onCopy={text => copyDebug('system', text)}
                 />
                 <DebugBlock
-                  label="User Prompt"
+                  label={t('calibrate.userPrompt')}
                   content={result.debug.userPrompt}
                   copied={copiedKey === 'user'}
-                  onCopy={t => copyDebug('user', t)}
+                  onCopy={text => copyDebug('user', text)}
                 />
                 <DebugBlock
-                  label="Raw Response"
+                  label={t('calibrate.rawResponse')}
                   content={result.debug.rawResponse}
                   copied={copiedKey === 'raw'}
-                  onCopy={t => copyDebug('raw', t)}
+                  onCopy={text => copyDebug('raw', text)}
                 />
               </div>
             )}
 
-            {/* Footer */}
             <div className="flex items-center justify-between px-6 py-3 border-t">
               <div className="flex items-center gap-2">
                 {result?.debug && (
@@ -369,24 +367,24 @@ export const CalibratePanel = memo(function CalibratePanel({
                     onClick={() => setDebugOpen(o => !o)}
                   >
                     {debugOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                    LLM 输入/输出
+                    {t('calibrate.io')}
                   </Button>
                 )}
                 <span className="text-xs text-muted-foreground">
-                  应用后写入草稿，需在详情页点「保存」才生效
+                  {t('calibrate.applyDraftHint')}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>取消</Button>
+                <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>{t('common:cancel')}</Button>
                 <Button size="sm" onClick={handleApply} disabled={totalSelected === 0}>
                   <CheckCircle2 className="size-3.5" />
-                  应用到草稿（{totalSelected}）
+                  {t('calibrate.applyDraft', { count: totalSelected })}
                 </Button>
               </div>
             </div>
           </>
         ) : (
-          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">无结果</div>
+          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">{t('calibrate.noResult')}</div>
         )}
       </DialogContent>
     </Dialog>

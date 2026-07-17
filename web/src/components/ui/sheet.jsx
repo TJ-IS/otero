@@ -51,7 +51,7 @@ function SheetContent({ className, children, side = 'right', ...props }) {
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
             <path d="M4 4l7 7M11 4l-7 7" />
           </svg>
-          <span className="sr-only">关闭</span>
+          <span className="sr-only">Close</span>
         </SheetPrimitive.Close>
       </SheetPrimitive.Content>
     </SheetPortal>

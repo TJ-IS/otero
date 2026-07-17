@@ -1,5 +1,6 @@
 import { memo, useCallback, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 // An in-text author-year citation (e.g. "Samuelson 2001") that resolves to one
@@ -32,6 +33,7 @@ function scrollToReference(refId, reduceMotion) {
 }
 
 export const CitationRef = memo(function CitationRef({ refs, children }) {
+  const { t } = useTranslation('item');
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, placeAbove: false });
   const triggerRef = useRef(null);
@@ -124,7 +126,7 @@ export const CitationRef = memo(function CitationRef({ refs, children }) {
               <p className="text-foreground/90">{r.text}</p>
             </div>
           ))}
-          <p className="mt-2 text-[10px] text-muted-foreground">点击跳转到文献列表</p>
+          <p className="mt-2 text-[10px] text-muted-foreground">{t('page.citeJump')}</p>
         </div>,
         document.body,
       )}

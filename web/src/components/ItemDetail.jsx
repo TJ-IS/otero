@@ -1,12 +1,12 @@
 import { memo, Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose,
 } from '@/components/ui/dialog';
@@ -30,7 +30,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { Save, Trash2, FileText, Plus, X, ExternalLink, Copy, Check, ChevronUp, ChevronDown, BookOpen, Sparkles, Loader2, Wand2, Braces, Globe } from 'lucide-react';
+import { Save, Trash2, FileText, Plus, X, ExternalLink, Copy, Check, ChevronUp, ChevronDown, Sparkles, Loader2, Wand2, Braces, Globe } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
@@ -107,20 +107,6 @@ const FIELDS_BY_TYPE = {
   },
 };
 
-const FIELD_LABELS = {
-  title: '标题', abstractNote: '摘要', publicationTitle: '期刊',
-  volume: '卷', issue: '期', pages: '页码',
-  date: '日期', DOI: 'DOI', ISBN: 'ISBN', ISSN: 'ISSN', url: 'URL',
-  language: '语言', shortTitle: '短标题', extra: '附加信息',
-  bookTitle: '书名', conferenceName: '会议名称', proceedingsTitle: '会议录',
-  place: '地点', publisher: '出版社', numPages: '页数',
-  series: '系列', seriesNumber: '系列编号', edition: '版次', thesisType: '学位类型',
-  university: '大学', reportType: '报告类型', reportNumber: '报告编号',
-  repository: '仓库', arXivID: 'arXiv ID', rights: '权限',
-  libraryCatalog: '目录', archive: '存档', archiveLocation: '存档位置',
-  callNumber: '索书号',
-};
-
 const CREATOR_TYPES = ['author', 'editor', 'translator', 'contributor'];
 
 // Fields that should span the full row in the two-column grid (long content).
@@ -141,10 +127,11 @@ function fieldHref(name, value) {
 }
 
 const Field = memo(function Field({ name, value, onChange, multiline, readOnly }) {
+  const { t } = useTranslation('item');
   const href = useMemo(() => fieldHref(name, value), [name, value]);
   return (
     <div className={FULL_WIDTH_FIELDS.has(name) ? 'col-span-2' : ''}>
-      <Label className="text-xs text-muted-foreground">{FIELD_LABELS[name] || name}</Label>
+      <Label className="text-xs text-muted-foreground">{t(`field.${name}`, { defaultValue: name })}</Label>
       <div className="relative mt-1">
         {multiline ? (
           <Textarea
@@ -167,7 +154,7 @@ const Field = memo(function Field({ name, value, onChange, multiline, readOnly }
             target="_blank"
             rel="noreferrer"
             className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
-            title="跳转"
+            title={t('detail.jump')}
             onClick={e => e.stopPropagation()}
           >
             <ExternalLink className="size-3.5" />
@@ -191,6 +178,7 @@ const Section = memo(function Section({ title, action, children }) {
 });
 
 function ExportModal({ open, onOpenChange, format, content }) {
+  const { t } = useTranslation(['item', 'common']);
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -198,9 +186,9 @@ function ExportModal({ open, onOpenChange, format, content }) {
       await navigator.clipboard.writeText(content);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      toast.success('已复制到剪贴板');
+      toast.success(t('detail.copiedClipboard'));
     } catch {
-      toast.error('复制失败');
+      toast.error(t('common:copyFailed'));
     }
   };
 
@@ -208,18 +196,18 @@ function ExportModal({ open, onOpenChange, format, content }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>导出 {format === 'bibtex' ? 'BibTeX' : 'RIS'}</DialogTitle>
+          <DialogTitle>{t('detail.exportTitle', { format: format === 'bibtex' ? 'BibTeX' : 'RIS' })}</DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-auto rounded-md border bg-muted/30 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
-          {content || '加载中...'}
+          {content || t('common:loadingDots')}
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <DialogClose asChild>
-            <Button variant="outline">关闭</Button>
+            <Button variant="outline">{t('common:close')}</Button>
           </DialogClose>
           <Button onClick={copy}>
             {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            {copied ? '已复制' : '复制'}
+            {copied ? t('common:copied') : t('detail.copy')}
           </Button>
         </div>
       </DialogContent>
@@ -228,6 +216,7 @@ function ExportModal({ open, onOpenChange, format, content }) {
 }
 
 export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChanged, onDirtyChange }) {
+  const { t } = useTranslation(['item', 'common']);
   const { canEdit } = useAuth();
   const { data: item, error, loading, refresh } = useAsync((signal) => api.getItem(itemKey, { signal }), [itemKey]);
   const { data: attachments } = useAsync((signal) => api.getItemAttachments(itemKey, { signal }), [itemKey]);
@@ -287,8 +276,8 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   const pdfAttachments = (attachments || []).filter(a => (a.contentType || '').includes('pdf'));
   const previewUrl = activePdfKey ? `/api/attachments/${activePdfKey}/file` : null;
 
-  if (loading) return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">加载中...</div>;
-  if (error) return <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">加载失败: {error.message}</div>;
+  if (loading) return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t('common:loadingDots')}</div>;
+  if (error) return <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">{t('common:loadFailed', { message: error.message })}</div>;
   if (!item || !draft) return null;
 
   const setField = (name, value) => {
@@ -357,12 +346,12 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
         fields: fieldsPayload,
         creators: creatorsDraft.map((c, i) => ({ ...c, orderIndex: i })),
       });
-      toast.success('已保存');
+      toast.success(t('detail.saved'));
       setDirty(false);
       refresh();
       onChanged();
     } catch (err) {
-      toast.error(`保存失败: ${err.message}`);
+      toast.error(t('detail.saveFailed', { message: err.message }));
     }
   };
 
@@ -371,7 +360,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     setDraft({ fields: { ...item.fields }, itemType: item.itemType });
     setCreatorsDraft(item.creators || []);
     setDirty(false);
-    toast.info('已恢复');
+    toast.info(t('detail.reverted'));
   };
 
   const del = async () => {
@@ -380,7 +369,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
       await api.deleteItem(item.key);
       onDeleted();
     } catch (err) {
-      toast.error(`删除失败: ${err.message}`);
+      toast.error(t('detail.deleteFailed', { message: err.message }));
     }
   };
 
@@ -397,7 +386,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
       const text = await api.fetchItemExport(item.key, format);
       setExportContent(text);
     } catch (err) {
-      setExportContent(`导出失败: ${err.message}`);
+      setExportContent(t('detail.exportFailed', { message: err.message }));
     }
   };
 
@@ -414,11 +403,11 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     const force = fulltextState === 'done' || fulltextState === 'failed';
     try {
       await api.parseFulltext(itemKey, { force });
-      toast.success('已提交解析任务');
+      toast.success(t('fulltext.submitted'));
       setTab('fulltext');
       refreshFulltext();
     } catch (err) {
-      toast.error(`提交失败: ${err.message}`);
+      toast.error(t('fulltext.submitFailed', { message: err.message }));
     } finally {
       setParseBusy(false);
     }
@@ -427,7 +416,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   const triggerCalibrate = async () => {
     if (!canEdit || calibrateLoading) return;
     if (fulltextState !== 'done') {
-      toast.warning('请先解析全文后再校准');
+      toast.warning(t('detail.parseBeforeCalibrate'));
       setTab('fulltext');
       return;
     }
@@ -470,14 +459,16 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     setDirty(true);
     setCalibrateOpen(false);
     setTab('detail');
-    toast.success(`已应用到草稿（${fieldCount} 字段${creators?.length ? `，${creators.length} 作者` : ''}），请核对后保存`);
+    const parts = [t('detail.fieldCount', { count: fieldCount })];
+    if (creators?.length) parts.push(t('detail.creatorCount', { count: creators.length }));
+    toast.success(t('detail.appliedDraft', { parts: parts.join('，') }));
   };
 
   const triggerCrossref = async () => {
     if (!canEdit || crossrefLoading) return;
     const doi = (draft?.fields?.DOI || '').trim();
     if (!doi) {
-      toast.warning('请先填写 DOI');
+      toast.warning(t('detail.fillDoiFirst'));
       return;
     }
     setCrossrefOpen(true);
@@ -522,18 +513,26 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     setCrossrefOpen(false);
     setTab('detail');
     const parts = [];
-    if (fieldCount) parts.push(`${fieldCount} 字段`);
-    if (creators) parts.push(`${creators.length} 作者`);
-    if (itemType) parts.push('类型');
-    toast.success(`已应用到草稿（${parts.join('，') || '无变更'}），请核对后保存`);
+    if (fieldCount) parts.push(t('detail.fieldCount', { count: fieldCount }));
+    if (creators) parts.push(t('detail.creatorCount', { count: creators.length }));
+    if (itemType) parts.push(t('detail.typePart'));
+    toast.success(t('detail.appliedDraft', { parts: parts.join('，') || t('detail.noChanges') }));
   };
+
+  const parseTitle = fulltextActive
+    ? t('fulltext.titleActive')
+    : fulltextState === 'done'
+      ? t('fulltext.titleReparse')
+      : fulltextState === 'failed'
+        ? t('fulltext.reparse')
+        : t('fulltext.titleParse');
 
   return (
     <div className="flex h-full flex-col">
       {/* Dirty indicator bar */}
       {dirty && (
         <div className="bg-yellow-500/20 dark:bg-yellow-600/30 border-b border-yellow-500/40 px-3 py-1 text-xs text-yellow-900 dark:text-yellow-100 flex items-center gap-2">
-          <span className="font-medium">未保存的修改</span>
+          <span className="font-medium">{t('common:unsavedChanges')}</span>
         </div>
       )}
 
@@ -546,7 +545,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
-          <Button size="sm" variant="outline" asChild title="在新标签打开专门页">
+          <Button size="sm" variant="outline" asChild title={t('detail.openDedicated')}>
             <Link to={`/items/${itemKey}`} target="_blank" rel="noreferrer">
               <ExternalLink className="size-3.5" />
             </Link>
@@ -557,7 +556,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               variant="outline"
               onClick={triggerParse}
               disabled={parseBusy || fulltextActive}
-              title={fulltextActive ? '解析进行中' : fulltextState === 'done' ? '重新解析为 Markdown 全文' : fulltextState === 'failed' ? '重新解析' : '解析为 Markdown 全文'}
+              title={parseTitle}
             >
               {fulltextActive || parseBusy
                 ? <Loader2 className="size-3.5 animate-spin" />
@@ -570,29 +569,29 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               variant="outline"
               onClick={triggerCalibrate}
               disabled={calibrateLoading || fulltextState !== 'done'}
-              title={fulltextState !== 'done' ? '需先解析全文后才能校准' : '用 AI 对比全文校准元数据'}
+              title={fulltextState !== 'done' ? t('fulltext.titleCalibrateNeed') : t('fulltext.titleCalibrate')}
             >
               {calibrateLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => openExport('bibtex')} title="导出 BibTeX">
+          <Button size="sm" variant="outline" onClick={() => openExport('bibtex')} title={t('fulltext.exportBibtex')}>
             <Braces className="size-3.5" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => openExport('ris')} title="导出 RIS">
+          <Button size="sm" variant="outline" onClick={() => openExport('ris')} title={t('fulltext.exportRis')}>
             <FileText className="size-3.5" />
           </Button>
           {canEdit && (
-            <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)} title="删除">
+            <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)} title={t('common:delete')}>
               <Trash2 className="size-3.5" />
             </Button>
           )}
           {canEdit && dirty && (
-            <Button size="sm" variant="outline" onClick={revert} title="取消">
+            <Button size="sm" variant="outline" onClick={revert} title={t('common:cancel')}>
               <X className="size-3.5" />
             </Button>
           )}
           {canEdit && (
-            <Button size="sm" onClick={save} disabled={!dirty} title="保存">
+            <Button size="sm" onClick={save} disabled={!dirty} title={t('common:save')}>
               <Save className="size-3.5" />
             </Button>
           )}
@@ -601,12 +600,12 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
       <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TabsList className="mx-3 mt-2 w-fit">
-          <TabsTrigger value="detail">详情</TabsTrigger>
+          <TabsTrigger value="detail">{t('detail.tabDetail')}</TabsTrigger>
           {pdfAttachments.length > 0 && (
-            <TabsTrigger value="pdf">PDF</TabsTrigger>
+            <TabsTrigger value="pdf">{t('detail.tabPdf')}</TabsTrigger>
           )}
           {pdfAttachments.length > 0 && (
-            <TabsTrigger value="fulltext">全文</TabsTrigger>
+            <TabsTrigger value="fulltext">{t('detail.tabFulltext')}</TabsTrigger>
           )}
         </TabsList>
 
@@ -614,15 +613,15 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
           <ScrollArea className="h-full">
             <div className="space-y-4 px-4 pb-6">
               {/* Basic info */}
-              <Section title="基本信息">
+              <Section title={t('detail.basic')}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                   <div className="col-span-2">
-                    <Label className="text-xs text-muted-foreground">类型</Label>
+                    <Label className="text-xs text-muted-foreground">{t('detail.type')}</Label>
                     <Select value={draft.itemType} onValueChange={setItemType} disabled={!canEdit}>
                       <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {ITEM_TYPES.map(t => (
-                          <SelectItem key={t} value={t}>{ITEM_TYPE_LABELS[t] || t}</SelectItem>
+                        {ITEM_TYPES.map(type => (
+                          <SelectItem key={type} value={type}>{ITEM_TYPE_LABELS[type] || type}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -640,29 +639,31 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               </Section>
 
               {fields.publication && fields.publication.length > 0 && (
-                <Section title="发表信息">
+                <Section title={t('detail.publication')}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                     {fields.publication.map(name => (
                       name === 'publicationTitle' ? (
                         <div key={name} className="col-span-2">
-                          <Label className="text-xs text-muted-foreground">期刊</Label>
+                          <Label className="text-xs text-muted-foreground">{t('detail.journal')}</Label>
                           <Select
                             value={draft.fields.publicationTitle || ''}
                             onValueChange={v => setField('publicationTitle', v)}
                             disabled={doiMissing || !canEdit}
                           >
                             <SelectTrigger className="mt-1 h-8 text-sm">
-                              <SelectValue placeholder={doiMissing ? UNFILED : '选择期刊'} />
+                              <SelectValue placeholder={doiMissing ? t('common:unfiled') : t('detail.selectJournal')} />
                             </SelectTrigger>
                             <SelectContent>
                               {ALLOWED_PUBLICATION_TITLES.map(j => (
-                                <SelectItem key={j} value={j}>{j}</SelectItem>
+                                <SelectItem key={j} value={j}>
+                                  {j === UNFILED ? t('common:unfiled') : j}
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                           {doiMissing && (
                             <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
-                              DOI 缺失，仅可归入「待归档」
+                              {t('detail.doiMissingUnfiled')}
                             </p>
                           )}
                         </div>
@@ -681,12 +682,12 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               )}
 
               {fields.identifiers && fields.identifiers.length > 0 && (
-                <Section title="标识符">
+                <Section title={t('detail.identifiers')}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                     {fields.identifiers.map(name => (
                       name === 'DOI' ? (
                         <div key={name} className="col-span-2">
-                          <Label className="text-xs text-muted-foreground">{FIELD_LABELS[name] || name}</Label>
+                          <Label className="text-xs text-muted-foreground">{t(`field.${name}`, { defaultValue: name })}</Label>
                           <div className="mt-1 flex items-center gap-1.5">
                             <div className="relative flex-1 min-w-0">
                               <Input
@@ -701,7 +702,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                                   target="_blank"
                                   rel="noreferrer"
                                   className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
-                                  title="跳转 DOI"
+                                  title={t('detail.jumpDoi')}
                                   onClick={e => e.stopPropagation()}
                                 >
                                   <ExternalLink className="size-3.5" />
@@ -715,7 +716,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                                 className="h-8 shrink-0 px-2"
                                 onClick={triggerCrossref}
                                 disabled={crossrefLoading || !(draft.fields.DOI || '').trim()}
-                                title="用 CrossRef 解析 DOI 并填充元数据"
+                                title={t('crossref.resolveTitle')}
                               >
                                 {crossrefLoading
                                   ? <Loader2 className="size-3.5 animate-spin" />
@@ -740,7 +741,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               )}
 
               {fields.abstract && fields.abstract.includes('abstractNote') && (
-                <Section title="摘要">
+                <Section title={t('detail.abstract')}>
                   <Field
                     name="abstractNote"
                     value={draft.fields.abstractNote}
@@ -753,11 +754,11 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
               {/* Creators */}
               <Section
-                title="作者"
+                title={t('detail.authors')}
                 action={
                   canEdit ? (
                     <Button size="sm" variant="ghost" onClick={addCreator} className="h-7 text-xs">
-                      <Plus className="size-3.5" /> 添加
+                      <Plus className="size-3.5" /> {t('detail.addAuthor')}
                     </Button>
                   ) : null
                 }
@@ -767,14 +768,14 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                     <div key={idx} className="flex items-start gap-2">
                       <div className="flex-1 grid grid-cols-2 gap-2">
                         <Input
-                          placeholder="姓"
+                          placeholder={t('detail.lastName')}
                           value={c.lastName || ''}
                           onChange={e => setCreator(idx, { lastName: e.target.value, fieldMode: 0 })}
                           readOnly={!canEdit}
                           className={`h-8 text-sm ${!canEdit ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                         />
                         <Input
-                          placeholder="名"
+                          placeholder={t('detail.firstName')}
                           value={c.firstName || ''}
                           onChange={e => setCreator(idx, { firstName: e.target.value, fieldMode: 0 })}
                           readOnly={!canEdit}
@@ -788,8 +789,8 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           >
                             <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {CREATOR_TYPES.map(t => (
-                                <SelectItem key={t} value={t}>{t}</SelectItem>
+                              {CREATOR_TYPES.map(ctype => (
+                                <SelectItem key={ctype} value={ctype}>{ctype}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -802,7 +803,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           onClick={() => moveCreator(idx, -1)}
                           disabled={idx === 0 || !canEdit}
                           className="h-6 w-6"
-                          title="上移"
+                          title={t('detail.moveUp')}
                         >
                           <ChevronUp className="size-3" />
                         </Button>
@@ -812,7 +813,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           onClick={() => moveCreator(idx, 1)}
                           disabled={idx === creatorsDraft.length - 1 || !canEdit}
                           className="h-6 w-6"
-                          title="下移"
+                          title={t('detail.moveDown')}
                         >
                           <ChevronDown className="size-3" />
                         </Button>
@@ -822,7 +823,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           onClick={() => removeCreator(idx)}
                           disabled={!canEdit}
                           className="h-6 w-6"
-                          title="删除"
+                          title={t('common:delete')}
                         >
                           <X className="size-3" />
                         </Button>
@@ -830,13 +831,13 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                     </div>
                   ))}
                   {creatorsDraft.length === 0 && (
-                    <div className="text-xs text-muted-foreground">暂无作者</div>
+                    <div className="text-xs text-muted-foreground">{t('detail.noAuthors')}</div>
                   )}
                 </div>
               </Section>
 
               {fields.other && fields.other.length > 0 && (
-                <Section title="其他">
+                <Section title={t('detail.other')}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
                     {fields.other.map(name => (
                       <Field
@@ -853,7 +854,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               )}
 
               {/* Attachments */}
-              <Section title="附件">
+              <Section title={t('detail.attachments')}>
                 <div className="space-y-1">
                   {(attachments || []).map(a => {
                     const isPdf = (a.contentType || '').includes('pdf');
@@ -874,7 +875,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                     );
                   })}
                   {(attachments || []).length === 0 && (
-                    <div className="text-xs text-muted-foreground">无附件</div>
+                    <div className="text-xs text-muted-foreground">{t('detail.noAttachments')}</div>
                   )}
                 </div>
               </Section>
@@ -906,7 +907,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                     rel="noreferrer"
                     className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                   >
-                    <ExternalLink className="size-3" /> 新窗口
+                    <ExternalLink className="size-3" /> {t('detail.newWindow')}
                   </a>
                 )}
               </div>
@@ -919,7 +920,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                 />
               ) : (
                 <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-                  无可预览的 PDF
+                  {t('detail.noPdfPreview')}
                 </div>
               )}
             </div>
@@ -928,7 +929,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
         {pdfAttachments.length > 0 && (
           <TabsContent value="fulltext" className="min-h-0 flex-1 overflow-hidden mt-2">
-            <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted-foreground">加载中...</div>}>
+            <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t('common:loadingDots')}</div>}>
               <FullTextView itemKey={item.key} hasPdf={pdfAttachments.length > 0} />
             </Suspense>
           </TabsContent>
@@ -945,14 +946,14 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
       <AlertDialog open={canEdit && deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>删除该条目？</AlertDialogTitle>
+            <AlertDialogTitle>{t('detail.deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              移入回收站，可恢复。附件与元数据将一并标记为已删除。
+              {t('detail.deleteDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={del}>删除</AlertDialogAction>
+            <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={del}>{t('common:delete')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

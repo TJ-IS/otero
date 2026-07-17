@@ -1,0 +1,61 @@
+{
+  "title": "Open API docs",
+  "toggleTheme": "Toggle theme",
+  "nav": {
+    "api": "API",
+    "agents": "AGENTS.md"
+  },
+  "api": {
+    "intro": "Otero's read-only Open API for the AIS Senior Scholars' Basket library. Continue from search results to items, structured full text, and citation export; also offers aggregates and timeline stats. All endpoints are GET and never modify the database.",
+    "baseUrl": "Base URL: ",
+    "queryLabel": "Query: ",
+    "ruleWhitelist": "Only non-deleted top-level items in the 11 whitelisted journals",
+    "ruleKey": "The key in search results can be used with item, full-text, and export endpoints",
+    "rulePaging": "Pagination: page (default 1), pageSize (default 20, max 100)",
+    "listResponse": "List response:",
+    "filterTitle": "Filter parameters",
+    "filterApplies": "Applies to /articles, /authors, /search, /export/articles, /facets, and /stats/timeline.",
+    "colParam": "Parameter",
+    "colDesc": "Description",
+    "filterJournal": "Exact single journal name (Basket whitelist)",
+    "filterJournals": "Multiple journals, comma-separated; mutually exclusive with journal",
+    "filterYear": "Exact year",
+    "filterYearRange": "Year range (inclusive)",
+    "filterType": "Item type, e.g. journalArticle",
+    "endpointsTitle": "Endpoints",
+    "copyCurl": "Copy curl",
+    "copiedCurl": "curl copied",
+    "copyFailed": "Copy failed",
+    "endpoints": {
+      "journals": "Basket journals on this site (with itemCount; excludes Unfiled)",
+      "articles": "Keyword search for articles; q optional; filter-only browsing allowed",
+      "exportArticles": "Batch-export BibTeX or RIS for article search filters",
+      "facets": "Journal, year, type, and resource-availability aggregates for the current query",
+      "authors": "Keyword search for authors; q required; filters narrow papers and paperCount",
+      "authorItems": "Paginated articles for one author (filterable)",
+      "search": "Unified search: articles + authors buckets on one page",
+      "doiItem": "Exact DOI metadata lookup",
+      "doiMarkdown": "Full-text Markdown by DOI (must be parsed)",
+      "doiPdf": "PDF download URLs by DOI (url / absoluteUrl)",
+      "item": "Full metadata by item key from search results",
+      "itemMarkdown": "Parsed full-text Markdown by item key",
+      "itemPdf": "Relative and absolute PDF URLs by item key",
+      "itemStructure": "Structured full text: outline, figures, equations, references, footnotes",
+      "itemExport": "Export a single item as BibTeX or RIS",
+      "statsOverview": "Basket-wide overview of articles, authors, DOI, PDF, and full-text coverage",
+      "statsTimeline": "Article counts by publication year; supports query and shared filters",
+      "skill": "Agent Skill source (curl / copy to install)"
+    }
+  },
+  "agents": {
+    "hint": "Copy below and save as AGENTS.md or SKILL.md so other agents can access this site's open data.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copiedMd": "AGENTS.md copied",
+    "copyFailed": "Copy failed",
+    "rawFile": "Raw file",
+    "loading": "Loading…",
+    "empty": "(empty)",
+    "loadFailed": "Failed to load AGENTS.md: {{message}}"
+  }
+}

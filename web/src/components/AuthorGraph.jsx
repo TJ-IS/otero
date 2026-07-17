@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   AlertTriangle, BarChart3, Scan, Search, SlidersHorizontal,
 } from 'lucide-react';
@@ -22,12 +23,7 @@ const DEFAULT_FILTERS = {
   yearTo: '',
 };
 
-const SIZE_METRICS = [
-  { id: 'paperCount', label: '发文量' },
-  { id: 'degree', label: '合作者数' },
-  { id: 'weightedDegree', label: '合作强度' },
-  { id: 'betweenness', label: '拓扑桥梁度' },
-];
+const SIZE_METRIC_IDS = ['paperCount', 'degree', 'weightedDegree', 'betweenness'];
 
 function useDebouncedValue(value, delay) {
   const [debounced, setDebounced] = useState(value);
@@ -46,16 +42,17 @@ function parseYear(value) {
 }
 
 function LoadingGraph() {
+  const { t } = useTranslation('dashboard');
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center">
-      <div className="w-72 space-y-4" aria-label="正在计算合作网络">
+      <div className="w-72 space-y-4" aria-label={t('authors.computing')}>
         <div className="flex items-center justify-center gap-4">
           <Skeleton className="size-12 rounded-full" />
           <Skeleton className="size-20 rounded-full" />
           <Skeleton className="size-9 rounded-full" />
         </div>
         <Skeleton className="mx-auto h-2 w-52" />
-        <p className="text-center text-xs text-muted-foreground">正在计算合作社区与网络指标…</p>
+        <p className="text-center text-xs text-muted-foreground">{t('authors.computingHint')}</p>
       </div>
     </div>
   );
@@ -72,6 +69,7 @@ function CompactField({ label, children, className = '' }) {
 
 export function AuthorGraph() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation(['dashboard', 'common']);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const debouncedFilters = useDebouncedValue(filters, 280);
   const [sizeMetric, setSizeMetric] = useState('paperCount');
@@ -87,9 +85,9 @@ export function AuthorGraph() {
   const yearFrom = parseYear(debouncedFilters.yearFrom);
   const yearTo = parseYear(debouncedFilters.yearTo);
   const yearError = yearFrom === undefined || yearTo === undefined
-    ? '年份应为 1500–2099 之间的四位数'
+    ? t('authors.yearInvalid')
     : yearFrom != null && yearTo != null && yearFrom > yearTo
-      ? '起始年份不能晚于结束年份'
+      ? t('authors.yearOrder')
       : null;
 
   useEffect(() => {
@@ -155,15 +153,15 @@ export function AuthorGraph() {
       <header className="shrink-0 border-b bg-background">
         <div className="flex min-h-12 flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
           <div className="mr-1 min-w-0">
-            <h1 className="text-sm font-semibold tracking-tight">学者合作网络</h1>
-            <p className="hidden text-[11px] text-muted-foreground lg:block">AIS Basket · 指标基于当前显示网络</p>
+            <h1 className="text-sm font-semibold tracking-tight">{t('authors.graphTitle')}</h1>
+            <p className="hidden text-[11px] text-muted-foreground lg:block">{t('authors.graphSubtitle')}</p>
           </div>
 
           {meta ? (
             <div className="hidden items-center gap-1.5 md:flex">
-              <Badge variant="secondary" className="font-normal tabular-nums">{meta.nodeCount} 位学者</Badge>
-              <Badge variant="secondary" className="font-normal tabular-nums">{meta.edgeCount} 条关系</Badge>
-              <Badge variant="outline" className="font-normal tabular-nums">{meta.communityCount} 个社区</Badge>
+              <Badge variant="secondary" className="font-normal tabular-nums">{t('authors.nScholars', { count: meta.nodeCount })}</Badge>
+              <Badge variant="secondary" className="font-normal tabular-nums">{t('authors.nEdges', { count: meta.edgeCount })}</Badge>
+              <Badge variant="outline" className="font-normal tabular-nums">{t('authors.nCommunities', { count: meta.communityCount })}</Badge>
             </div>
           ) : null}
 
@@ -186,8 +184,8 @@ export function AuthorGraph() {
                 if (event.key === 'Escape') setSearchOpen(false);
               }}
               className="h-8 pl-8 text-xs"
-              placeholder="搜索当前网络中的学者"
-              aria-label="搜索当前网络中的学者"
+              placeholder={t('authors.searchPlaceholder')}
+              aria-label={t('authors.searchPlaceholder')}
             />
             {searchOpen && searchQuery.trim() ? (
               <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-md border bg-popover shadow-md">
@@ -199,11 +197,11 @@ export function AuthorGraph() {
                     onClick={() => chooseAuthor(node.id)}
                   >
                     <span className="min-w-0 truncate">{node.name}</span>
-                    <span className="shrink-0 font-mono tabular-nums text-muted-foreground">{node.paperCount} 篇</span>
+                    <span className="shrink-0 font-mono tabular-nums text-muted-foreground">{t('authors.nPapersShort', { count: node.paperCount })}</span>
                   </button>
                 )) : (
                   <div className="px-3 py-2 text-xs text-muted-foreground">
-                    当前筛选范围内没有匹配学者，可降低发文阈值
+                    {t('authors.noMatchScholars')}
                   </div>
                 )}
               </div>
@@ -215,18 +213,18 @@ export function AuthorGraph() {
             size="sm"
             className="h-8"
             onClick={() => navigate('/dashboard/authors/stats')}
-            title="学者统计"
+            title={t('authors.statsTitle')}
           >
             <BarChart3 className="size-4" />
-            <span className="hidden lg:inline">统计</span>
+            <span className="hidden lg:inline">{t('authors.stats')}</span>
           </Button>
           <Button
             variant="outline"
             size="icon"
             className="size-8"
             onClick={() => setResetToken((token) => token + 1)}
-            title="适应画布"
-            aria-label="适应画布"
+            title={t('authors.fitCanvas')}
+            aria-label={t('authors.fitCanvas')}
           >
             <Scan className="size-4" />
           </Button>
@@ -234,7 +232,7 @@ export function AuthorGraph() {
 
         <div className="overflow-x-auto border-t bg-muted/20 px-3 py-2 sm:px-4">
           <div className="flex min-w-max items-end gap-3">
-            <CompactField label="期刊" className="w-64">
+            <CompactField label={t('authors.journal')} className="w-64">
               <Select
                 value={filters.journal || 'all'}
                 onValueChange={(value) => updateFilter('journal', value === 'all' ? '' : value)}
@@ -243,7 +241,7 @@ export function AuthorGraph() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">全部 Basket 期刊</SelectItem>
+                  <SelectItem value="all">{t('authors.allBasketJournals')}</SelectItem>
                   {AIS_BASKET_JOURNALS.map((journal) => (
                     <SelectItem key={journal} value={journal}>{journal}</SelectItem>
                   ))}
@@ -251,7 +249,7 @@ export function AuthorGraph() {
               </Select>
             </CompactField>
 
-            <CompactField label="年份从" className="w-24">
+            <CompactField label={t('authors.yearFrom')} className="w-24">
               <Input
                 type="number"
                 min="1500"
@@ -260,10 +258,10 @@ export function AuthorGraph() {
                 value={filters.yearFrom}
                 onChange={(event) => updateFilter('yearFrom', event.target.value)}
                 className="h-8 text-xs tabular-nums"
-                placeholder="不限"
+                placeholder={t('authors.unlimited')}
               />
             </CompactField>
-            <CompactField label="至" className="w-24">
+            <CompactField label={t('authors.yearTo')} className="w-24">
               <Input
                 type="number"
                 min="1500"
@@ -272,11 +270,11 @@ export function AuthorGraph() {
                 value={filters.yearTo}
                 onChange={(event) => updateFilter('yearTo', event.target.value)}
                 className="h-8 text-xs tabular-nums"
-                placeholder="不限"
+                placeholder={t('authors.unlimited')}
               />
             </CompactField>
 
-            <CompactField label={`最少发文 · ${filters.minPapers}`} className="w-36">
+            <CompactField label={t('authors.minPapers', { count: filters.minPapers })} className="w-36">
               <input
                 type="range"
                 min="1"
@@ -284,12 +282,12 @@ export function AuthorGraph() {
                 value={filters.minPapers}
                 onChange={(event) => updateFilter('minPapers', Number(event.target.value))}
                 className="h-8 w-full accent-primary"
-                aria-label="最少发文数"
-                aria-valuetext={`${filters.minPapers} 篇`}
+                aria-label={t('authors.minPapersAria')}
+                aria-valuetext={t('authors.nPapersValue', { count: filters.minPapers })}
               />
             </CompactField>
 
-            <CompactField label={`最少共同论文 · ${filters.minCollaborations}`} className="w-36">
+            <CompactField label={t('authors.minCollab', { count: filters.minCollaborations })} className="w-36">
               <input
                 type="range"
                 min="1"
@@ -297,19 +295,19 @@ export function AuthorGraph() {
                 value={filters.minCollaborations}
                 onChange={(event) => updateFilter('minCollaborations', Number(event.target.value))}
                 className="h-8 w-full accent-primary"
-                aria-label="最少共同论文数"
-                aria-valuetext={`${filters.minCollaborations} 篇`}
+                aria-label={t('authors.minCollabAria')}
+                aria-valuetext={t('authors.nPapersValue', { count: filters.minCollaborations })}
               />
             </CompactField>
 
-            <CompactField label="节点大小" className="w-36">
+            <CompactField label={t('authors.nodeSize')} className="w-36">
               <Select value={sizeMetric} onValueChange={setSizeMetric}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SIZE_METRICS.map((metric) => (
-                    <SelectItem key={metric.id} value={metric.id}>{metric.label}</SelectItem>
+                  {SIZE_METRIC_IDS.map((id) => (
+                    <SelectItem key={id} value={id}>{t(`authors.sizeBy.${id}`)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -317,7 +315,7 @@ export function AuthorGraph() {
 
             <Button variant="ghost" size="sm" className="h-8 active:scale-[0.98]" onClick={resetFilters}>
               <SlidersHorizontal className="size-4" />
-              重置筛选
+              {t('authors.resetFilters')}
             </Button>
           </div>
         </div>
@@ -333,7 +331,10 @@ export function AuthorGraph() {
       {meta?.truncated ? (
         <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
           <AlertTriangle className="size-4 shrink-0" />
-          当前条件有 {meta.eligibleNodeCount.toLocaleString('zh-CN')} 位学者，仅分析发文量最高的 {meta.nodeCount} 位；提高最少发文数可获得完整网络。
+          {t('authors.truncatedNote', {
+            eligible: meta.eligibleNodeCount.toLocaleString(i18n.language),
+            shown: meta.nodeCount.toLocaleString(i18n.language),
+          })}
         </div>
       ) : null}
 
@@ -343,20 +344,20 @@ export function AuthorGraph() {
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
           <AlertTriangle className="size-6 text-destructive" />
           <div>
-            <p className="text-sm font-medium">合作网络加载失败</p>
+            <p className="text-sm font-medium">{t('authors.loadFailed')}</p>
             <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setFilters((current) => ({ ...current }))}>
-            重试
+            {t('common:retry')}
           </Button>
         </div>
       ) : null}
 
       {graph && nodes.length === 0 ? (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-          <p className="text-sm font-medium">当前条件下没有学者网络</p>
-          <p className="text-xs text-muted-foreground">可扩大年份范围，或降低最少发文与共同论文阈值。</p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={resetFilters}>重置筛选</Button>
+          <p className="text-sm font-medium">{t('authors.emptyNetwork')}</p>
+          <p className="text-xs text-muted-foreground">{t('authors.emptyHint')}</p>
+          <Button variant="outline" size="sm" className="mt-2" onClick={resetFilters}>{t('authors.resetFilters')}</Button>
         </div>
       ) : null}
 
@@ -378,7 +379,7 @@ export function AuthorGraph() {
 
       {loading && graph ? (
         <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
-          正在更新网络…
+          {t('authors.updating')}
         </div>
       ) : null}
     </div>

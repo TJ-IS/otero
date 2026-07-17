@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,7 @@ export const AuthorPage = memo(function AuthorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { resolvedTheme, setTheme } = useTheme();
+  const { t } = useTranslation(['item', 'common']);
 
   const { data, error, loading } = useAsync((signal) => api.getAuthor(id, { signal }), [id]);
 
@@ -37,17 +39,17 @@ export const AuthorPage = memo(function AuthorPage() {
           variant="ghost"
           size="sm"
           onClick={() => navigate('/dashboard/authors')}
-          title="返回学者关系图"
+          title={t('page.backToGraph')}
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
         </Button>
 
-        <span className="truncate text-sm font-medium">{data?.name || '学者'}</span>
+        <span className="truncate text-sm font-medium">{data?.name || t('page.author')}</span>
 
         {data && (
           <Badge variant="secondary" className="shrink-0 font-normal">
-            {data.items.length} 篇论文
+            {t('page.nPapers', { count: data.items.length })}
           </Badge>
         )}
 
@@ -56,7 +58,7 @@ export const AuthorPage = memo(function AuthorPage() {
             variant="ghost"
             size="sm"
             onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            title={resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            title={resolvedTheme === 'dark' ? t('common:themeToLight') : t('common:themeToDark')}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
             {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -68,17 +70,17 @@ export const AuthorPage = memo(function AuthorPage() {
         <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
           {loading && (
             <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-              <Loader2 className="size-5 animate-spin" /> 加载中…
+              <Loader2 className="size-5 animate-spin" /> {t('common:loading')}
             </div>
           )}
 
           {error && (
             <div className="flex flex-col items-center gap-3 py-16 text-sm text-destructive">
               <AlertCircle className="size-8" />
-              <p>加载失败: {error.message}</p>
+              <p>{t('common:loadFailed', { message: error.message })}</p>
               <Button variant="outline" size="sm" asChild>
                 <Link to="/dashboard/authors">
-                  <ArrowLeft className="size-4 mr-1" /> 返回学者关系图
+                  <ArrowLeft className="size-4 mr-1" /> {t('page.backToGraph')}
                 </Link>
               </Button>
             </div>
@@ -92,13 +94,13 @@ export const AuthorPage = memo(function AuthorPage() {
                 </div>
                 <div className="min-w-0">
                   <h1 className="truncate text-xl font-semibold tracking-tight">{data.name}</h1>
-                  <p className="text-sm text-muted-foreground">共 {data.items.length} 篇论文</p>
+                  <p className="text-sm text-muted-foreground">{t('page.totalPapers', { count: data.items.length })}</p>
                 </div>
               </header>
 
               {data.items.length === 0 ? (
                 <div className="rounded-lg border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
-                  暂无收录的论文
+                  {t('page.noPapers')}
                 </div>
               ) : (
                 <ul className="divide-y rounded-lg border">

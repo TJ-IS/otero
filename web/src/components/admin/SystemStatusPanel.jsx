@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,11 +11,12 @@ import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 
 function StatusBadge({ status }) {
+  const { t } = useTranslation('admin');
   const map = {
-    connected: { label: '已连接', cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400', icon: CheckCircle2 },
-    not_configured: { label: '未启用', cls: 'bg-muted text-muted-foreground', icon: HardDrive },
-    bucket_not_found: { label: '存储桶缺失', cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', icon: AlertCircle },
-    error: { label: '连接失败', cls: 'bg-red-500/15 text-red-600 dark:text-red-400', icon: XCircle },
+    connected: { label: t('status.connState.connected'), cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400', icon: CheckCircle2 },
+    not_configured: { label: t('status.connState.not_configured'), cls: 'bg-muted text-muted-foreground', icon: HardDrive },
+    bucket_not_found: { label: t('status.connState.bucket_not_found'), cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', icon: AlertCircle },
+    error: { label: t('status.connState.error'), cls: 'bg-red-500/15 text-red-600 dark:text-red-400', icon: XCircle },
   };
   const s = map[status] || map.error;
   const Icon = s.icon;
@@ -34,12 +36,16 @@ function Row({ label, value, mono }) {
   );
 }
 
-function formatUptime(sec) {
+function formatUptime(sec, t) {
   if (sec == null) return '—';
   const d = Math.floor(sec / 86400);
   const h = Math.floor((sec % 86400) / 3600);
   const m = Math.floor((sec % 3600) / 60);
-  return [d && `${d}天`, h && `${h}小时`, `${m}分钟`].filter(Boolean).join(' ');
+  return [
+    d && t('status.uptimeDays', { n: d }),
+    h && t('status.uptimeHours', { n: h }),
+    t('status.uptimeMinutes', { n: m }),
+  ].filter(Boolean).join(' ');
 }
 
 function formatBytes(bytes) {
@@ -50,6 +56,7 @@ function formatBytes(bytes) {
 }
 
 export function SystemStatusPanel() {
+  const { t } = useTranslation(['admin', 'common']);
   const { data, error, loading, refresh } = useAsync(() => api.getAdminStatus(), []);
 
   if (loading && !data) {
@@ -61,7 +68,7 @@ export function SystemStatusPanel() {
       <div className="mx-auto max-w-2xl p-6">
         <Card className="border-red-500/40">
           <CardContent className="flex items-center gap-3 p-4 text-red-600 dark:text-red-400">
-            <AlertCircle className="size-5" /> 加载失败：{error.message}
+            <AlertCircle className="size-5" /> {t('status.loadFailed', { message: error.message })}
           </CardContent>
         </Card>
       </div>
@@ -76,9 +83,9 @@ export function SystemStatusPanel() {
   return (
     <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">数据库与存储连接</h2>
+        <h2 className="text-lg font-semibold">{t('status.title')}</h2>
         <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} /> 刷新
+          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('status.refresh')}
         </Button>
       </div>
 
@@ -92,29 +99,37 @@ export function SystemStatusPanel() {
               </CardTitle>
               <StatusBadge status={pg?.status} />
             </div>
-            <CardDescription>元数据主库</CardDescription>
+            <CardDescription>{t('status.pgDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
             {pg?.status === 'connected' ? (
               <>
-                <Row label="连接串" value={pg.connection?.url} mono />
-                <Row label="数据库" value={pg.database?.name} />
-                <Row label="库大小" value={pg.database?.size} />
-                <Row label="Schema 版本" value={pg.database?.schemaVersion} />
-                <Row label="服务端时间" value={pg.server?.serverTime && new Date(pg.server.serverTime).toLocaleString()} />
+                <Row label={t('status.connUrl')} value={pg.connection?.url} mono />
+                <Row label={t('status.database')} value={pg.database?.name} />
+                <Row label={t('status.dbSize')} value={pg.database?.size} />
+                <Row label={t('status.schemaVersion')} value={pg.database?.schemaVersion} />
+                <Row label={t('status.serverTime')} value={pg.server?.serverTime && new Date(pg.server.serverTime).toLocaleString()} />
                 <Row
-                  label="连接数"
-                  value={pg.connections && `活跃 ${pg.connections.active_connections} / 空闲 ${pg.connections.idle_connections} / 共 ${pg.connections.total_connections}`}
+                  label={t('status.connections')}
+                  value={pg.connections && t('status.connectionsValue', {
+                    active: pg.connections.active_connections,
+                    idle: pg.connections.idle_connections,
+                    total: pg.connections.total_connections,
+                  })}
                 />
                 <Row
-                  label="连接池"
-                  value={pg.connection?.poolStats && `总 ${pg.connection.poolStats.totalCount} · 空闲 ${pg.connection.poolStats.idleCount} · 等待 ${pg.connection.poolStats.waitingCount}`}
+                  label={t('status.pool')}
+                  value={pg.connection?.poolStats && t('status.poolValue', {
+                    total: pg.connection.poolStats.totalCount,
+                    idle: pg.connection.poolStats.idleCount,
+                    waiting: pg.connection.poolStats.waitingCount,
+                  })}
                 />
-                <Row label="版本" value={pg.server?.version?.split(' ').slice(0, 2).join(' ')} mono />
+                <Row label={t('status.version')} value={pg.server?.version?.split(' ').slice(0, 2).join(' ')} mono />
               </>
             ) : (
               <div className="py-4 text-sm text-red-600 dark:text-red-400">
-                {pg?.error || '无法连接'}
+                {pg?.error || t('status.cannotConnect')}
                 <div className="mt-1 font-mono text-xs text-muted-foreground">{pg?.connection?.url}</div>
               </div>
             )}
@@ -130,7 +145,7 @@ export function SystemStatusPanel() {
               </CardTitle>
               <StatusBadge status={r2?.status} />
             </div>
-            <CardDescription>{r2?.storageType === 's3' ? 'S3 兼容对象存储' : '本地文件系统'}</CardDescription>
+            <CardDescription>{r2?.storageType === 's3' ? t('status.r2S3') : t('status.r2Local')}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
             {r2?.storageType === 's3' ? (
@@ -142,20 +157,20 @@ export function SystemStatusPanel() {
                 </div>
               ) : (
                 <>
-                  <Row label="端点" value={r2.endpoint?.url} mono />
-                  <Row label="端口 / SSL" value={`${r2.endpoint?.port} / ${r2.endpoint?.useSSL ? '是' : '否'}`} />
+                  <Row label={t('status.endpoint')} value={r2.endpoint?.url} mono />
+                  <Row label={t('status.portSsl')} value={`${r2.endpoint?.port} / ${r2.endpoint?.useSSL ? t('common:yes') : t('common:no')}`} />
                   <Row label="Region" value={r2.endpoint?.region} />
-                  <Row label="存储桶" value={r2.bucket?.name} mono />
-                  <Row label="桶状态" value={r2.bucket?.exists ? '存在' : '不存在'} />
-                  <Row label="存储桶访问" value={r2.bucket?.exists ? '正常' : '不可用'} />
+                  <Row label={t('status.bucket')} value={r2.bucket?.name} mono />
+                  <Row label={t('status.bucketStatus')} value={r2.bucket?.exists ? t('status.bucketExists') : t('status.bucketMissing')} />
+                  <Row label={t('status.bucketAccess')} value={r2.bucket?.exists ? t('status.accessOk') : t('status.accessBad')} />
                   <Row label="Access Key" value={r2.credentials?.accessKey} mono />
-                  <Row label="Secret Key" value={r2.credentials?.secretKeySet ? '已配置' : '未配置'} />
+                  <Row label={t('status.secretKey')} value={r2.credentials?.secretKeySet ? t('status.configured') : t('status.notConfigured')} />
                 </>
               )
             ) : (
               <>
-                <Row label="模式" value="本地文件系统" />
-                <Row label="路径" value={r2?.localPath} mono />
+                <Row label={t('status.mode')} value={t('status.r2Local')} />
+                <Row label={t('status.path')} value={r2?.localPath} mono />
               </>
             )}
           </CardContent>
@@ -164,24 +179,24 @@ export function SystemStatusPanel() {
 
       {/* Data + runtime */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={<FileText className="size-4" />} label="有效条目" value={stats?.items?.active_items ?? '—'} sub={`已删除 ${stats?.items?.deleted_items ?? 0}`} />
-        <StatTile icon={<Paperclip className="size-4" />} label="附件" value={stats?.attachments?.total_attachments ?? '—'} />
+        <StatTile icon={<FileText className="size-4" />} label={t('status.activeItems')} value={stats?.items?.active_items ?? '—'} sub={t('status.deletedItems', { count: stats?.items?.deleted_items ?? 0 })} />
+        <StatTile icon={<Paperclip className="size-4" />} label={t('status.attachments')} value={stats?.attachments?.total_attachments ?? '—'} />
         <StatTile icon={<Cpu className="size-4" />} label="Node" value={sys?.nodeVersion} sub={sys?.platform} />
-        <StatTile icon={<Server className="size-4" />} label="运行时长" value={formatUptime(sys?.uptime)} sub={sys?.memory && `内存 ${formatBytes(sys.memory.rss)}`} />
+        <StatTile icon={<Server className="size-4" />} label={t('status.uptime')} value={formatUptime(sys?.uptime, t)} sub={sys?.memory && t('status.memory', { size: formatBytes(sys.memory.rss) })} />
       </div>
 
       {/* Table sizes */}
       {pg?.tables?.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">表空间占用（Top 10）</CardTitle>
+            <CardTitle className="text-sm">{t('status.tableSpace')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="divide-y text-sm">
-              {pg.tables.map((t) => (
-                <div key={t.tablename} className="flex items-center justify-between py-1.5">
-                  <span className="font-mono text-xs">{t.tablename}</span>
-                  <Badge variant="secondary" className="font-mono text-xs">{t.size}</Badge>
+              {pg.tables.map((tbl) => (
+                <div key={tbl.tablename} className="flex items-center justify-between py-1.5">
+                  <span className="font-mono text-xs">{tbl.tablename}</span>
+                  <Badge variant="secondary" className="font-mono text-xs">{tbl.size}</Badge>
                 </div>
               ))}
             </div>
@@ -190,18 +205,19 @@ export function SystemStatusPanel() {
       )}
 
       <p className="text-center text-xs text-muted-foreground">
-        采集于 {data?.timestamp && new Date(data.timestamp).toLocaleString()}
+        {t('status.collectedAt', { time: data?.timestamp && new Date(data.timestamp).toLocaleString() })}
       </p>
     </div>
   );
 }
 
 function StatusSkeleton() {
+  const { t } = useTranslation('admin');
   return (
     <div
       className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6"
       aria-busy="true"
-      aria-label="正在加载系统状态"
+      aria-label={t('status.loadingAria')}
     >
       <div className="flex items-center justify-between">
         <div className="space-y-2">

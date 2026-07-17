@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,12 +23,13 @@ import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 
 function ItemKeyButton({ itemKey, onSelect }) {
+  const { t } = useTranslation('admin');
   return (
     <button
       type="button"
       onClick={() => onSelect(itemKey)}
       className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
-      title="打开条目详情"
+      title={t('duplicates.openItem')}
     >
       {itemKey} <PanelRightOpen className="size-3" />
     </button>
@@ -35,12 +37,13 @@ function ItemKeyButton({ itemKey, onSelect }) {
 }
 
 function DuplicateGroup({ label, count, keys, dates, titles, onSelectItem }) {
+  const { t } = useTranslation('admin');
   return (
     <Card>
       <CardContent className="p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">{label}</span>
-          <Badge variant="destructive" className="shrink-0">{count} 份</Badge>
+          <Badge variant="destructive" className="shrink-0">{t('duplicates.copies', { count })}</Badge>
         </div>
         <ul className="space-y-1">
           {keys?.map((key, i) => (
@@ -58,12 +61,13 @@ function DuplicateGroup({ label, count, keys, dates, titles, onSelectItem }) {
 }
 
 function AllDuplicates({ onSelectItem, version }) {
+  const { t } = useTranslation('admin');
   const { data, error, loading, refresh } = useAsync(() => api.getAdminDuplicates(), [version]);
 
   if (loading && !data) {
     return (
       <div className="flex h-48 items-center justify-center text-muted-foreground">
-        <Loader2 className="mr-2 size-5 animate-spin" /> 正在扫描重复条目...
+        <Loader2 className="mr-2 size-5 animate-spin" /> {t('duplicates.scanning')}
       </div>
     );
   }
@@ -84,19 +88,19 @@ function AllDuplicates({ onSelectItem, version }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
-          <Badge variant="secondary">DOI 重复组 {summary?.totalDoiDuplicates ?? 0}</Badge>
-          <Badge variant="secondary">标题重复组 {summary?.totalTitleDuplicates ?? 0}</Badge>
-          <Badge variant="outline">受影响条目 {summary?.affectedItems ?? 0}</Badge>
+          <Badge variant="secondary">{t('duplicates.doiGroups', { count: summary?.totalDoiDuplicates ?? 0 })}</Badge>
+          <Badge variant="secondary">{t('duplicates.titleGroups', { count: summary?.totalTitleDuplicates ?? 0 })}</Badge>
+          <Badge variant="outline">{t('duplicates.affected', { count: summary?.affectedItems ?? 0 })}</Badge>
         </div>
         <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} /> 重新扫描
+          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('duplicates.rescan')}
         </Button>
       </div>
 
       {duplicateDois.length === 0 && duplicateTitles.length === 0 && (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            未发现重复条目 🎉
+            {t('duplicates.noneFound')}
           </CardContent>
         </Card>
       )}
@@ -104,7 +108,7 @@ function AllDuplicates({ onSelectItem, version }) {
       {duplicateDois.length > 0 && (
         <section>
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
-            <Copy className="size-4" /> DOI 完全重复
+            <Copy className="size-4" /> {t('duplicates.doiExact')}
           </h3>
           <div className="grid gap-3 md:grid-cols-2">
             {duplicateDois.map((d) => (
@@ -124,7 +128,7 @@ function AllDuplicates({ onSelectItem, version }) {
       {duplicateTitles.length > 0 && (
         <section>
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
-            <Copy className="size-4" /> 标题重复（忽略大小写与首尾空格）
+            <Copy className="size-4" /> {t('duplicates.titleDup')}
           </h3>
           <div className="grid gap-3 md:grid-cols-2">
             {duplicateTitles.map((d, i) => (
@@ -145,6 +149,7 @@ function AllDuplicates({ onSelectItem, version }) {
 }
 
 function DuplicateSearch({ onSelectItem }) {
+  const { t } = useTranslation('admin');
   const [form, setForm] = useState({ doi: '', title: '', author: '' });
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -168,18 +173,18 @@ function DuplicateSearch({ onSelectItem }) {
     <div className="space-y-4">
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">入库前查重</CardTitle>
-          <CardDescription>按 DOI / 标题 / 作者查询库中是否已存在，避免重复收录。</CardDescription>
+          <CardTitle className="text-sm">{t('duplicates.precheckTitle')}</CardTitle>
+          <CardDescription>{t('duplicates.precheckDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSearch} className="grid gap-3 sm:grid-cols-3">
             <Input placeholder="DOI" value={form.doi} onChange={(e) => setForm({ ...form, doi: e.target.value })} />
-            <Input placeholder="标题" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            <Input placeholder="作者姓氏" value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} />
+            <Input placeholder={t('duplicates.phTitle')} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+            <Input placeholder={t('duplicates.phAuthor')} value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} />
             <div className="sm:col-span-3">
               <Button type="submit" size="sm" disabled={loading || (!form.doi && !form.title && !form.author)}>
                 {loading ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Search className="mr-1.5 size-3.5" />}
-                查询
+                {t('duplicates.query')}
               </Button>
             </div>
           </form>
@@ -200,6 +205,7 @@ function DuplicateSearch({ onSelectItem }) {
 }
 
 function SearchResult({ result, onSelectItem }) {
+  const { t } = useTranslation('admin');
   const doiHits = result.byDoi || [];
   const titleExact = result.byTitle?.exact || [];
   const titleFuzzy = result.byTitle?.fuzzy || [];
@@ -210,7 +216,7 @@ function SearchResult({ result, onSelectItem }) {
     return (
       <Card>
         <CardContent className="py-8 text-center text-sm text-muted-foreground">
-          未找到匹配条目，可安全入库。
+          {t('duplicates.safe')}
         </CardContent>
       </Card>
     );
@@ -219,14 +225,14 @@ function SearchResult({ result, onSelectItem }) {
   return (
     <div className="space-y-3">
       {doiHits.length > 0 && (
-        <ResultBlock title="DOI 命中" tone="destructive" rows={doiHits.map((r) => ({ key: r.key, extra: r.doi }))} onSelectItem={onSelectItem} />
+        <ResultBlock title={t('duplicates.doiHit')} tone="destructive" rows={doiHits.map((r) => ({ key: r.key, extra: r.doi }))} onSelectItem={onSelectItem} />
       )}
       {titleExact.length > 0 && (
-        <ResultBlock title="标题完全匹配" tone="destructive" rows={titleExact.map((r) => ({ key: r.key, extra: r.title }))} onSelectItem={onSelectItem} />
+        <ResultBlock title={t('duplicates.titleExact')} tone="destructive" rows={titleExact.map((r) => ({ key: r.key, extra: r.title }))} onSelectItem={onSelectItem} />
       )}
       {titleFuzzy.length > 0 && (
         <ResultBlock
-          title="标题相似"
+          title={t('duplicates.titleSimilar')}
           tone="warning"
           rows={titleFuzzy.map((r) => ({ key: r.key, extra: `${r.title} (${Math.round(r.similarity_score * 100)}%)` }))}
           onSelectItem={onSelectItem}
@@ -234,7 +240,7 @@ function SearchResult({ result, onSelectItem }) {
       )}
       {authorHits.length > 0 && (
         <ResultBlock
-          title="作者匹配"
+          title={t('duplicates.authorMatch')}
           tone="secondary"
           rows={authorHits.map((r) => ({ key: r.key, extra: `${r.firstName || ''} ${r.lastName || ''}`.trim() }))}
           onSelectItem={onSelectItem}
@@ -268,6 +274,7 @@ function ResultBlock({ title, tone, rows, onSelectItem }) {
 }
 
 export function DuplicatesPanel() {
+  const { t } = useTranslation(['admin', 'common']);
   const [selectedKey, setSelectedKey] = useState(null);
   const [detailDirty, setDetailDirty] = useState(false);
   const [pendingKey, setPendingKey] = useState(null);
@@ -284,11 +291,11 @@ export function DuplicatesPanel() {
 
   const closeDetail = useCallback(() => {
     if (detailDirty) {
-      toast.message('当前条目有未保存的修改', { description: '请先保存或放弃修改后再关闭。' });
+      toast.message(t('common:unsavedChangesToast'), { description: t('common:unsavedCloseDesc') });
       return;
     }
     setSelectedKey(null);
-  }, [detailDirty]);
+  }, [detailDirty, t]);
 
   const confirmSwitch = useCallback(() => {
     setDetailDirty(false);
@@ -300,8 +307,8 @@ export function DuplicatesPanel() {
     setSelectedKey(null);
     setDetailDirty(false);
     setDuplicatesVersion((version) => version + 1);
-    toast.success('条目已删除');
-  }, []);
+    toast.success(t('duplicates.itemDeleted'));
+  }, [t]);
 
   const handleChanged = useCallback(() => {
     setDuplicatesVersion((version) => version + 1);
@@ -312,12 +319,12 @@ export function DuplicatesPanel() {
       <div className="h-full overflow-auto">
         <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <FileSearch className="size-5" /> 文献条目查重
+            <FileSearch className="size-5" /> {t('duplicates.title')}
           </h2>
           <Tabs defaultValue="all">
             <TabsList>
-              <TabsTrigger value="all">全库扫描</TabsTrigger>
-              <TabsTrigger value="search">按条件查询</TabsTrigger>
+              <TabsTrigger value="all">{t('duplicates.tabAll')}</TabsTrigger>
+              <TabsTrigger value="search">{t('duplicates.tabSearch')}</TabsTrigger>
             </TabsList>
             <TabsContent value="all" className="mt-4">
               <AllDuplicates onSelectItem={selectItem} version={duplicatesVersion} />
@@ -345,12 +352,12 @@ export function DuplicatesPanel() {
       <AlertDialog open={!!pendingKey} onOpenChange={(open) => { if (!open) setPendingKey(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle>
-            <AlertDialogDescription>当前条目有未保存的修改，切换后将丢失这些改动。</AlertDialogDescription>
+            <AlertDialogTitle>{t('common:unsavedSwitchTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('common:unsavedSwitchDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>继续编辑</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSwitch}>放弃并切换</AlertDialogAction>
+            <AlertDialogCancel>{t('common:continueEditing')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSwitch}>{t('common:discardAndSwitch')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

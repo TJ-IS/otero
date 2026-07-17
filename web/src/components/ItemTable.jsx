@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,11 +34,11 @@ const TYPE_ICONS = {
 const ROW_HEIGHT = 37;
 const MOBILE_ROW_HEIGHT = 84;
 
-const SORT_OPTIONS = [
-  { value: 'title', label: '标题' },
-  { value: 'date', label: '年份' },
-  { value: 'vip', label: '卷期页' },
-  { value: 'itemType', label: '类型' },
+const SORT_OPTION_KEYS = [
+  { value: 'title', labelKey: 'table.title' },
+  { value: 'date', labelKey: 'table.year' },
+  { value: 'vip', labelKey: 'table.vip' },
+  { value: 'itemType', labelKey: 'table.type' },
 ];
 
 function SortIcon({ field, sortField, sortDir }) {
@@ -48,6 +49,7 @@ function SortIcon({ field, sortField, sortDir }) {
 }
 
 export const ItemTable = memo(function ItemTable({ filter, version, selectedKey, onSelect }) {
+  const { t } = useTranslation(['library', 'common']);
   const { canEdit } = useAuth();
   const isMobile = useIsMobile();
 
@@ -100,12 +102,12 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
 
   const batchParseAll = useCallback(async () => {
     if (!canEdit) {
-      toast.error('请先连接白名单钱包');
+      toast.error(t('common:connectWhitelistFirst'));
       return;
     }
     if (!total || batchParsing) return;
     setBatchParsing(true);
-    const tid = toast.loading('正在收集条目并入队全文解析...');
+    const tid = toast.loading(t('table.collecting'));
     try {
       // The table only holds loaded pages; fetch every matching key so batch
       // parse covers the whole filtered set, not just what's scrolled into view.
@@ -114,30 +116,30 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
         collection: filter?.collection, search: filter?.search,
       });
       if (!keys.length) {
-        toast.info('没有可解析的条目', { id: tid });
+        toast.info(t('table.nothingToParse'), { id: tid });
         return;
       }
-      toast.loading(`正在入队 ${keys.length} 篇全文解析...`, { id: tid });
+      toast.loading(t('table.queuing', { count: keys.length }), { id: tid });
       const res = await api.parseFulltextBatch(keys);
       const s = res.summary || {};
       const parts = [];
-      if (s.queued) parts.push(`${s.queued} 篇已入队`);
-      if (s.skippedDone) parts.push(`${s.skippedDone} 篇已完成跳过`);
-      if (s.skippedRunning) parts.push(`${s.skippedRunning} 篇进行中跳过`);
-      if (s.noPdf) parts.push(`${s.noPdf} 篇无 PDF`);
-      if (s.notFound) parts.push(`${s.notFound} 篇未找到`);
-      const summary = parts.length ? parts.join('，') : '无操作';
+      if (s.queued) parts.push(t('table.queued', { count: s.queued }));
+      if (s.skippedDone) parts.push(t('table.skippedDone', { count: s.skippedDone }));
+      if (s.skippedRunning) parts.push(t('table.skippedRunning', { count: s.skippedRunning }));
+      if (s.noPdf) parts.push(t('table.noPdf', { count: s.noPdf }));
+      if (s.notFound) parts.push(t('table.notFound', { count: s.notFound }));
+      const summary = parts.length ? parts.join('，') : t('table.noOp');
       if (s.queued > 0) {
-        toast.success(`批量解析：${summary}（后台陆续提交到 MinerU）`, { id: tid });
+        toast.success(t('table.batchSuccess', { summary }), { id: tid });
       } else {
-        toast.info(`批量解析：${summary}`, { id: tid });
+        toast.info(t('table.batchInfo', { summary }), { id: tid });
       }
     } catch (err) {
-      toast.error(`批量解析失败: ${err.message}`, { id: tid });
+      toast.error(t('table.batchFailed', { message: err.message }), { id: tid });
     } finally {
       setBatchParsing(false);
     }
-  }, [canEdit, total, batchParsing, filter?.type, filter?.journal, filter?.collection, filter?.search]);
+  }, [canEdit, total, batchParsing, filter?.type, filter?.journal, filter?.collection, filter?.search, t]);
 
   // Keyboard navigation
   const onKeyDown = useCallback((e) => {
@@ -164,12 +166,13 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
   }, [selectedKey, keyToIndex, virtualizer]);
 
   if (error) {
-    return <div className="p-4 text-sm text-destructive">加载失败: {error.message}</div>;
+    return <div className="p-4 text-sm text-destructive">{t('common:loadFailed', { message: error.message })}</div>;
   }
 
   const hasActiveFilter = filter?.search || filter?.journal || filter?.collection;
   const searchQuery = filter?.search || '';
   const title = filterTitle(filter);
+  const emptyMessage = hasActiveFilter ? t('table.emptyFiltered') : t('table.emptyImport');
 
   const thClass = 'px-3 py-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors';
 
@@ -188,14 +191,14 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               onClick={batchParseAll}
               disabled={batchParsing}
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
-              title="将当前筛选下的所有条目提交给 MinerU 解析为 Markdown 全文"
+              title={t('table.batchParseTitle')}
             >
               {batchParsing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
-              批量解析全文
+              {t('table.batchParse')}
             </button>
           )}
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            {loading ? '加载中...' : `${total} 个条目`}
+            {loading ? t('common:loadingDots') : t('table.itemCount', { count: total })}
           </span>
         </div>
       </div>
@@ -209,15 +212,15 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SORT_OPTIONS.map(o => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              {SORT_OPTION_KEYS.map(o => (
+                <SelectItem key={o.value} value={o.value}>{t(o.labelKey)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <button
             onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:text-foreground transition-colors"
-            title={sortDir === 'asc' ? '升序' : '降序'}
+            title={sortDir === 'asc' ? t('table.sortAsc') : t('table.sortDesc')}
           >
             <ArrowUpDown className="size-4" />
           </button>
@@ -235,15 +238,13 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
             {loading && sortedItems.length === 0 && <CardSkeleton />}
             {!loading && sortedItems.length === 0 && (
               <div className="px-3 py-16 text-center text-muted-foreground">
-                {hasActiveFilter
-                  ? '没有匹配的条目，请尝试调整筛选条件'
-                  : '暂无条目，点击右上角"导入 PDF"开始'}
+                {emptyMessage}
               </div>
             )}
             {paddingTop > 0 && <div style={{ height: paddingTop }} />}
             {virtualItems.map(virtualRow => {
               const it = sortedItems[virtualRow.index];
-              const title = itemTitle(it);
+              const rowTitle = itemTitle(it);
               return (
                 <div
                   key={it.key}
@@ -257,7 +258,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                   )}
                 >
                   <div className="text-sm font-medium leading-snug">
-                    {highlight(title, searchQuery)}
+                    {highlight(rowTitle, searchQuery)}
                   </div>
                   <div className="mt-0.5 truncate text-xs text-muted-foreground">
                     <AuthorLinks creators={it.creators} query={searchQuery} />
@@ -276,7 +277,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
             {paddingBottom > 0 && <div style={{ height: paddingBottom }} />}
             {loadingMore && (
               <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
-                <Loader2 className="size-3 animate-spin" /> 加载更多...
+                <Loader2 className="size-3 animate-spin" /> {t('search.loadMore')}
               </div>
             )}
           </div>
@@ -286,23 +287,23 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                 <th className={cn(thClass, 'w-auto')} onClick={() => toggleSort('title')}>
                   <span className="inline-flex items-center">
-                    标题 <SortIcon field="title" sortField={sortField} sortDir={sortDir} />
+                    {t('table.title')} <SortIcon field="title" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
-                <th className={cn(thClass, 'w-40')}>作者</th>
+                <th className={cn(thClass, 'w-40')}>{t('table.authors')}</th>
                 <th className={cn(thClass, 'w-16')} onClick={() => toggleSort('date')}>
                   <span className="inline-flex items-center">
-                    年份 <SortIcon field="date" sortField={sortField} sortDir={sortDir} />
+                    {t('table.year')} <SortIcon field="date" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
                 <th className={cn(thClass, 'w-28')} onClick={() => toggleSort('vip')}>
                   <span className="inline-flex items-center">
-                    卷期页 <SortIcon field="vip" sortField={sortField} sortDir={sortDir} />
+                    {t('table.vip')} <SortIcon field="vip" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
-                <th className={cn(thClass, 'w-32')} onClick={() => toggleSort('itemType')}>
+                <th className={cn(thClass, 'w-40')} onClick={() => toggleSort('itemType')}>
                   <span className="inline-flex items-center">
-                    类型 <SortIcon field="itemType" sortField={sortField} sortDir={sortDir} />
+                    {t('table.type')} <SortIcon field="itemType" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
               </tr>
@@ -312,9 +313,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               {!loading && sortedItems.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-3 py-16 text-center text-muted-foreground">
-                    {hasActiveFilter
-                      ? '没有匹配的条目，请尝试调整筛选条件'
-                      : '暂无条目，点击右上角"导入 PDF"开始'}
+                    {emptyMessage}
                   </td>
                 </tr>
               )}
@@ -325,7 +324,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               )}
               {virtualItems.map(virtualRow => {
                 const it = sortedItems[virtualRow.index];
-                const title = itemTitle(it);
+                const rowTitle = itemTitle(it);
                 return (
                   <tr
                     key={it.key}
@@ -338,8 +337,8 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                       selectedKey === it.key && 'bg-primary/10 text-foreground',
                     )}
                   >
-                    <td className="truncate px-3 py-2" title={title}>
-                      {highlight(title, searchQuery)}
+                    <td className="truncate px-3 py-2" title={rowTitle}>
+                      {highlight(rowTitle, searchQuery)}
                     </td>
                     <td className="w-40 truncate px-3 py-2 text-muted-foreground">
                       <AuthorLinks creators={it.creators} query={searchQuery} className="truncate" />
@@ -350,8 +349,8 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                     <td className="w-28 truncate px-3 py-2 text-muted-foreground tabular-nums" title={volumeIssuePages(it.fields)}>
                       {volumeIssuePages(it.fields) || '—'}
                     </td>
-                    <td className="w-32 px-3 py-2">
-                      <Badge variant="secondary" className="inline-flex items-center gap-1 font-normal">
+                    <td className="w-40 px-3 py-2">
+                      <Badge variant="secondary" className="inline-flex max-w-full items-center gap-1 whitespace-nowrap font-normal">
                         {TYPE_ICONS[it.itemType]}
                         {ITEM_TYPE_LABELS[it.itemType] || it.itemType}
                       </Badge>
@@ -368,7 +367,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                 <tr key="__loading-more">
                   <td colSpan={5} className="py-4 text-center text-xs text-muted-foreground">
                     <span className="inline-flex items-center gap-2">
-                      <Loader2 className="size-3 animate-spin" /> 加载更多...
+                      <Loader2 className="size-3 animate-spin" /> {t('search.loadMore')}
                     </span>
                   </td>
                 </tr>

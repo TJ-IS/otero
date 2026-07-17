@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MissingDoisModal } from '@/components/dashboard/MissingDoisModal';
@@ -7,8 +8,8 @@ const TARGET_FILL = 'hsl(var(--chart-1))';
 const COLLECTED_FILL = 'hsl(var(--chart-2))';
 const INTERSECTION_FILL = 'hsl(var(--chart-good))';
 
-function formatCount(n) {
-  return Number(n || 0).toLocaleString('zh-CN');
+function formatCount(n, lng) {
+  return Number(n || 0).toLocaleString(lng || 'zh-CN');
 }
 
 /** Intersection area of two circles with radii r1, r2 and center distance d. */
@@ -122,35 +123,37 @@ function layoutVenn(targetOnly, intersection, collectedOnly) {
   };
 }
 
-const REGIONS = [
-  {
-    id: 'targetOnly',
-    label: '目标未收录',
-    hint: 'AIS Basket 目标清单中有、文库尚未收录',
-    color: TARGET_FILL,
-    actionable: true,
-  },
-  {
-    id: 'intersection',
-    label: '已收录',
-    hint: '目标清单与文库的交集',
-    color: INTERSECTION_FILL,
-    actionable: false,
-  },
-  {
-    id: 'collectedOnly',
-    label: '清单外收录',
-    hint: '文库已有、但不在 AIS Basket 目标清单中',
-    color: COLLECTED_FILL,
-    actionable: false,
-  },
-];
-
 export function DoiCoverageVenn({ data }) {
+  const { t, i18n } = useTranslation('dashboard');
   const uid = useId();
   const clipLeft = `${uid}-clip-left`;
   const [hover, setHover] = useState(null);
   const [missingOpen, setMissingOpen] = useState(false);
+  const lng = i18n.language;
+
+  const regions = [
+    {
+      id: 'targetOnly',
+      label: t('venn.targetMissing'),
+      hint: t('venn.targetMissingHint'),
+      color: TARGET_FILL,
+      actionable: true,
+    },
+    {
+      id: 'intersection',
+      label: t('venn.collected'),
+      hint: t('venn.collectedHint'),
+      color: INTERSECTION_FILL,
+      actionable: false,
+    },
+    {
+      id: 'collectedOnly',
+      label: t('venn.extra'),
+      hint: t('venn.extraHint'),
+      color: COLLECTED_FILL,
+      actionable: false,
+    },
+  ];
 
   const layout = useMemo(
     () => layoutVenn(data.targetOnly, data.intersection, data.collectedOnly),
@@ -172,7 +175,11 @@ export function DoiCoverageVenn({ data }) {
           viewBox={`0 0 ${layout.width} ${layout.height}`}
           className="mx-auto h-auto w-full"
           role="img"
-          aria-label={`AIS Basket DOI 收录维恩图：目标 ${formatCount(data.targetTotal)}，已收录交集 ${formatCount(data.intersection)}，清单外 ${formatCount(data.collectedOnly)}`}
+          aria-label={t('venn.aria', {
+            target: formatCount(data.targetTotal, lng),
+            intersection: formatCount(data.intersection, lng),
+            extra: formatCount(data.collectedOnly, lng),
+          })}
         >
           <defs>
             <clipPath id={clipLeft}>
@@ -241,7 +248,7 @@ export function DoiCoverageVenn({ data }) {
             onMouseEnter={() => setHover('targetOnly')}
             onMouseLeave={() => setHover(null)}
           >
-            {formatCount(data.targetOnly)}
+            {formatCount(data.targetOnly, lng)}
           </text>
           <text
             x={layout.labels.intersection.x}
@@ -253,7 +260,7 @@ export function DoiCoverageVenn({ data }) {
             onMouseEnter={() => setHover('intersection')}
             onMouseLeave={() => setHover(null)}
           >
-            {formatCount(data.intersection)}
+            {formatCount(data.intersection, lng)}
           </text>
           <text
             x={layout.labels.collectedOnly.x}
@@ -265,18 +272,18 @@ export function DoiCoverageVenn({ data }) {
             onMouseEnter={() => setHover('collectedOnly')}
             onMouseLeave={() => setHover(null)}
           >
-            {formatCount(data.collectedOnly)}
+            {formatCount(data.collectedOnly, lng)}
           </text>
         </svg>
 
         <div className="mt-2 flex items-center justify-between gap-4 px-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <span className="size-2 shrink-0 rounded-full" style={{ background: TARGET_FILL }} />
-            AIS Basket 目标清单
+            {t('venn.targetList')}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="size-2 shrink-0 rounded-full" style={{ background: COLLECTED_FILL }} />
-            文库已有 DOI
+            {t('venn.libraryDois')}
           </span>
         </div>
       </div>
@@ -284,7 +291,7 @@ export function DoiCoverageVenn({ data }) {
       <div className="space-y-4">
         <div>
           <div className="mb-1.5 flex items-baseline justify-between gap-3">
-            <p className="text-sm font-medium">目标清单覆盖率</p>
+            <p className="text-sm font-medium">{t('venn.coverageRate')}</p>
             <p className="text-2xl font-semibold tabular-nums tracking-tight">
               {data.coveragePct}
               <span className="ml-0.5 text-sm font-medium text-muted-foreground">%</span>
@@ -297,12 +304,15 @@ export function DoiCoverageVenn({ data }) {
             />
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
-            已收录 {formatCount(data.intersection)} / 目标 {formatCount(data.targetTotal)} 篇
+            {t('venn.collectedOfTarget', {
+              intersection: formatCount(data.intersection, lng),
+              target: formatCount(data.targetTotal, lng),
+            })}
           </p>
         </div>
 
         <ul className="divide-y rounded-lg border">
-          {REGIONS.map((r) => {
+          {regions.map((r) => {
             const active = hover === r.id;
             const isAction = r.actionable && canOpenMissing;
             return (
@@ -331,7 +341,7 @@ export function DoiCoverageVenn({ data }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="text-sm font-medium">{r.label}</p>
-                      <p className="text-sm font-semibold tabular-nums">{formatCount(counts[r.id])}</p>
+                      <p className="text-sm font-semibold tabular-nums">{formatCount(counts[r.id], lng)}</p>
                     </div>
                     <p className="text-xs text-muted-foreground">{r.hint}</p>
                     {isAction ? (
@@ -345,7 +355,7 @@ export function DoiCoverageVenn({ data }) {
                           setMissingOpen(true);
                         }}
                       >
-                        查看缺失 DOI
+                        {t('venn.viewMissing')}
                         <ExternalLink className="size-3" />
                       </Button>
                     ) : null}

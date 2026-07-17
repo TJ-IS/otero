@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Copy, Check, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -11,11 +12,13 @@ import { api } from '@/api/client';
 
 const ROW_HEIGHT = 32;
 
-function formatCount(n) {
-  return Number(n || 0).toLocaleString('zh-CN');
+function formatCount(n, lng) {
+  return Number(n || 0).toLocaleString(lng || 'zh-CN');
 }
 
 export function MissingDoisModal({ open, onOpenChange, journal = null, year = null }) {
+  const { t, i18n } = useTranslation(['dashboard', 'common']);
+  const lng = i18n.language;
   const [dois, setDois] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -40,7 +43,7 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
       })
       .catch((err) => {
         if (cancelled) return;
-        setError(err?.message || '加载失败');
+        setError(err?.message || t('missingDois.loadFailed'));
         setDois([]);
         setTotal(0);
       })
@@ -48,7 +51,7 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [open, journal, year]);
+  }, [open, journal, year, t]);
 
   const filtered = useMemo(() => {
     if (!deferredQuery) return dois;
@@ -68,36 +71,38 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      toast.success(`已复制 ${formatCount(deferredQuery ? filtered.length : dois.length)} 条 DOI`);
+      toast.success(t('missingDois.copiedCount', {
+        count: formatCount(deferredQuery ? filtered.length : dois.length, lng),
+      }));
       setTimeout(() => setCopied(false), 1800);
     } catch {
-      toast.error('复制失败');
+      toast.error(t('common:copyFailed'));
     }
   }
 
   async function copyOne(doi) {
     try {
       await navigator.clipboard.writeText(doi);
-      toast.success('已复制 DOI');
+      toast.success(t('missingDois.copiedOne'));
     } catch {
-      toast.error('复制失败');
+      toast.error(t('common:copyFailed'));
     }
   }
 
   const filterBits = [
     journal || null,
-    year != null ? `${year} 年` : null,
+    year != null ? t('missingDois.year', { year }) : null,
   ].filter(Boolean);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col gap-0 p-0">
         <DialogHeader className="border-b px-6 pb-3 pt-6">
-          <DialogTitle>目标未收录 DOI</DialogTitle>
+          <DialogTitle>{t('missingDois.title')}</DialogTitle>
           <DialogDescription>
-            AIS Basket 目标清单中有、文库尚未收录的篇目
+            {t('missingDois.desc')}
             {filterBits.length ? ` · ${filterBits.join(' · ')}` : null}
-            {!loading && !error ? ` · 共 ${formatCount(total)} 条` : null}
+            {!loading && !error ? t('missingDois.total', { count: formatCount(total, lng) }) : null}
           </DialogDescription>
         </DialogHeader>
 
@@ -107,7 +112,7 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="筛选 DOI…"
+              placeholder={t('missingDois.filterPlaceholder')}
               className="pl-9 font-mono text-sm"
               disabled={loading || !!error}
             />
@@ -120,20 +125,20 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
             disabled={loading || !!error || filtered.length === 0}
           >
             {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            {deferredQuery ? '复制筛选结果' : '复制全部'}
+            {deferredQuery ? t('missingDois.copyFiltered') : t('missingDois.copyAll')}
           </Button>
         </div>
 
         <div className="min-h-0 flex-1 px-2 pb-4 pt-2">
           {loading ? (
             <div className="flex h-72 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> 加载中…
+              <Loader2 className="size-4 animate-spin" /> {t('loading')}
             </div>
           ) : error ? (
             <div className="flex h-72 items-center justify-center text-sm text-destructive">{error}</div>
           ) : filtered.length === 0 ? (
             <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-              {dois.length === 0 ? '暂无缺失 DOI' : '无匹配结果'}
+              {dois.length === 0 ? t('missingDois.empty') : t('missingDois.noMatch')}
             </div>
           ) : (
             <div ref={scrollRef} className="h-72 overflow-auto rounded-md border">
@@ -152,7 +157,7 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
                         transform: `translateY(${row.start}px)`,
                       }}
                       onClick={() => copyOne(doi)}
-                      title="点击复制"
+                      title={t('missingDois.clickCopy')}
                     >
                       <span className="min-w-0 truncate">{doi}</span>
                       <Copy className="size-3 shrink-0 text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100" />
@@ -164,7 +169,10 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
           )}
           {!loading && !error && deferredQuery && filtered.length > 0 ? (
             <p className="mt-2 px-1 text-xs text-muted-foreground">
-              显示 {formatCount(filtered.length)} / {formatCount(total)} 条
+              {t('missingDois.showing', {
+                shown: formatCount(filtered.length, lng),
+                total: formatCount(total, lng),
+              })}
             </p>
           ) : null}
         </div>

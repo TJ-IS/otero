@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -10,18 +11,9 @@ import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { CATEGORICAL_COLORS, SINGLE_SERIES_COLOR } from '@/lib/chartColors';
 
-function formatCount(n) {
-  return Number(n || 0).toLocaleString('zh-CN');
+function formatCount(n, lng) {
+  return Number(n || 0).toLocaleString(lng || 'zh-CN');
 }
-
-const CREATOR_TYPE_LABELS = {
-  author: '作者',
-  editor: '编辑',
-  seriesEditor: '丛书编辑',
-  translator: '译者',
-  contributor: '贡献者',
-  reviewedAuthor: '被评论作者',
-};
 
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
@@ -54,20 +46,22 @@ const JOURNAL_SHORT = {
 
 export function AuthorAnalyticsPanel() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation('dashboard');
+  const lng = i18n.language;
   const { data, loading, error } = useAsync(() => api.getAuthorAnalytics({ topN: 25, coreN: 5 }), []);
 
   const typeData = useMemo(() => {
     if (!data?.creatorTypes) return [];
-    return data.creatorTypes.map((t) => ({
-      ...t,
-      label: CREATOR_TYPE_LABELS[t.type] || t.type,
+    return data.creatorTypes.map((row) => ({
+      ...row,
+      label: t(`authors.role.${row.type}`, { defaultValue: row.type }),
     }));
-  }, [data]);
+  }, [data, t]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> 加载学者统计…
+        <Loader2 className="size-4 animate-spin" /> {t('authors.loadingStats')}
       </div>
     );
   }
@@ -76,7 +70,7 @@ export function AuthorAnalyticsPanel() {
     return (
       <div className="flex flex-col items-center gap-2 py-10 text-sm text-destructive">
         <AlertCircle className="size-6" />
-        <p>加载失败: {error.message}</p>
+        <p>{t('loadFailed', { message: error.message })}</p>
       </div>
     );
   }
@@ -87,9 +81,9 @@ export function AuthorAnalyticsPanel() {
     <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-4 sm:px-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">学者统计</h2>
+          <h2 className="text-base font-semibold tracking-tight">{t('authors.statsTitle')}</h2>
           <p className="text-xs text-muted-foreground">
-            共 {formatCount(data.authorTotal)} 位作者（author 角色）
+            {t('authors.authorTotal', { count: formatCount(data.authorTotal, lng) })}
           </p>
         </div>
       </div>
@@ -97,8 +91,8 @@ export function AuthorAnalyticsPanel() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">高产作者 Top 25</CardTitle>
-            <CardDescription>按署名论文数排序，点击进入作者页</CardDescription>
+            <CardTitle className="text-sm">{t('authors.topAuthors')}</CardTitle>
+            <CardDescription>{t('authors.topAuthorsDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="max-h-72 overflow-auto rounded-md border">
@@ -106,8 +100,8 @@ export function AuthorAnalyticsPanel() {
                 <thead className="sticky top-0 border-b bg-background text-left text-xs text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-medium w-10">#</th>
-                    <th className="px-3 py-2 font-medium">学者</th>
-                    <th className="px-3 py-2 text-right font-medium">论文</th>
+                    <th className="px-3 py-2 font-medium">{t('authors.colScholar')}</th>
+                    <th className="px-3 py-2 text-right font-medium">{t('authors.colPapers')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -120,7 +114,7 @@ export function AuthorAnalyticsPanel() {
                           className="text-left hover:underline"
                           onClick={() => navigate(`/authors/${a.id}`)}
                         >
-                          {a.name || '(未命名)'}
+                          {a.name || t('authors.unnamed')}
                         </button>
                       </td>
                       <td className="px-3 py-1.5 text-right tabular-nums font-medium">{a.paperCount}</td>
@@ -135,8 +129,8 @@ export function AuthorAnalyticsPanel() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">创作者角色</CardTitle>
-              <CardDescription>itemCreators 角色分布</CardDescription>
+              <CardTitle className="text-sm">{t('authors.rolesTitle')}</CardTitle>
+              <CardDescription>{t('authors.rolesDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
@@ -160,16 +154,16 @@ export function AuthorAnalyticsPanel() {
                 </PieChart>
               </ResponsiveContainer>
               <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
-                {typeData.map((t, i) => (
-                  <li key={t.type} className="flex items-center justify-between gap-2">
+                {typeData.map((row, i) => (
+                  <li key={row.type} className="flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-1.5">
                       <span
                         className="size-2 rounded-full"
                         style={{ background: CATEGORICAL_COLORS[i % CATEGORICAL_COLORS.length] }}
                       />
-                      {t.label}
+                      {row.label}
                     </span>
-                    <span className="tabular-nums">{formatCount(t.count)}</span>
+                    <span className="tabular-nums">{formatCount(row.count, lng)}</span>
                   </li>
                 ))}
               </ul>
@@ -178,8 +172,8 @@ export function AuthorAnalyticsPanel() {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">发文量分布</CardTitle>
-              <CardDescription>每位作者的论文数区间</CardDescription>
+              <CardTitle className="text-sm">{t('authors.productivityTitle')}</CardTitle>
+              <CardDescription>{t('authors.productivityDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
@@ -188,7 +182,7 @@ export function AuthorAnalyticsPanel() {
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                   <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} width={32} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" name="作者数" fill={SINGLE_SERIES_COLOR} radius={[4, 4, 0, 0]} barSize={22} />
+                  <Bar dataKey="count" name={t('authors.authorCount')} fill={SINGLE_SERIES_COLOR} radius={[4, 4, 0, 0]} barSize={22} />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -198,8 +192,8 @@ export function AuthorAnalyticsPanel() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">合作规模分布</CardTitle>
-          <CardDescription>每篇论文的作者人数（独著 → 大团队合作）</CardDescription>
+          <CardTitle className="text-sm">{t('authors.collabTitle')}</CardTitle>
+          <CardDescription>{t('authors.collabDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={220}>
@@ -208,7 +202,7 @@ export function AuthorAnalyticsPanel() {
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
               <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} width={40} />
               <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="count" name="论文数" fill={CATEGORICAL_COLORS[2]} radius={[4, 4, 0, 0]} barSize={28} />
+              <Bar dataKey="count" name={t('authors.paperCountSeries')} fill={CATEGORICAL_COLORS[2]} radius={[4, 4, 0, 0]} barSize={28} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -216,8 +210,8 @@ export function AuthorAnalyticsPanel() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">各刊核心作者</CardTitle>
-          <CardDescription>Basket 11 刊各自发文最多的 5 位作者</CardDescription>
+          <CardTitle className="text-sm">{t('authors.coreAuthorsTitle')}</CardTitle>
+          <CardDescription>{t('authors.coreAuthorsDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -228,7 +222,7 @@ export function AuthorAnalyticsPanel() {
                   <span className="hidden sm:inline">{jc.journal}</span>
                 </p>
                 {jc.authors.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">暂无数据</p>
+                  <p className="text-xs text-muted-foreground">{t('noData')}</p>
                 ) : (
                   <ol className="space-y-1">
                     {jc.authors.map((a, i) => (
@@ -239,7 +233,7 @@ export function AuthorAnalyticsPanel() {
                           onClick={() => navigate(`/authors/${a.id}`)}
                         >
                           <span className="mr-1 text-muted-foreground tabular-nums">{i + 1}.</span>
-                          {a.name || '(未命名)'}
+                          {a.name || t('authors.unnamed')}
                         </button>
                         <span className="shrink-0 tabular-nums text-muted-foreground">{a.paperCount}</span>
                       </li>

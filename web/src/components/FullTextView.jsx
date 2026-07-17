@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FileText, RefreshCw, Trash2, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
@@ -11,21 +12,12 @@ import { FulltextMarkdown } from './FulltextMarkdown';
 const POLL_INTERVAL_MS = 3000;
 const ACTIVE_STATES = new Set(['submitting', 'pending', 'running', 'converting']);
 
-const STATE_LABELS = {
-  idle: '未解析',
-  submitting: '待提交',
-  pending: '排队中',
-  running: '解析中',
-  converting: '格式转换中',
-  done: '已完成',
-  failed: '解析失败',
-};
-
 function ProgressInfo({ row }) {
+  const { t } = useTranslation('item');
   if (row.state === 'running' && row.totalPages) {
     return (
       <span className="text-xs text-muted-foreground">
-        {row.extractedPages ?? 0} / {row.totalPages} 页
+        {t('fulltext.pages', { extracted: row.extractedPages ?? 0, total: row.totalPages })}
       </span>
     );
   }
@@ -33,6 +25,7 @@ function ProgressInfo({ row }) {
 }
 
 function StateBadge({ state }) {
+  const { t } = useTranslation('item');
   const map = {
     idle: 'secondary',
     pending: 'secondary',
@@ -41,10 +34,11 @@ function StateBadge({ state }) {
     done: 'default',
     failed: 'destructive',
   };
-  return <Badge variant={map[state] || 'secondary'}>{STATE_LABELS[state] || state}</Badge>;
+  return <Badge variant={map[state] || 'secondary'}>{t(`fulltextStatus.${state}`, { defaultValue: state })}</Badge>;
 }
 
 export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
+  const { t } = useTranslation(['item', 'common']);
   const { canEdit } = useAuth();
   const { data: row, error, loading, refresh } = useAsync((signal) => api.getFulltext(itemKey, { signal }), [itemKey]);
   const { data: structure } = useAsync((signal) => api.getFulltextStructure(itemKey, { signal }), [itemKey]);
@@ -63,49 +57,49 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
 
   const triggerParse = useCallback(async ({ force = false } = {}) => {
     if (!canEdit) {
-      toast.error('请先连接白名单钱包');
+      toast.error(t('common:connectWhitelistFirst'));
       return;
     }
     setBusy(true);
     try {
       await api.parseFulltext(itemKey, { force });
-      toast.success('已提交解析任务');
+      toast.success(t('fulltext.submitted'));
       refresh();
     } catch (err) {
-      toast.error(`提交失败: ${err.message}`);
+      toast.error(t('fulltext.submitFailed', { message: err.message }));
     } finally {
       setBusy(false);
     }
-  }, [itemKey, refresh, canEdit]);
+  }, [itemKey, refresh, canEdit, t]);
 
   const removeFulltext = useCallback(async () => {
     if (!canEdit) {
-      toast.error('请先连接白名单钱包');
+      toast.error(t('common:connectWhitelistFirst'));
       return;
     }
     setBusy(true);
     try {
       await api.deleteFulltext(itemKey);
-      toast.success('已删除全文');
+      toast.success(t('fulltext.deleted'));
       refresh();
     } catch (err) {
-      toast.error(`删除失败: ${err.message}`);
+      toast.error(t('fulltext.deleteFailed', { message: err.message }));
     } finally {
       setBusy(false);
     }
-  }, [itemKey, refresh, canEdit]);
+  }, [itemKey, refresh, canEdit, t]);
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">加载中...</div>;
+    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t('common:loadingDots')}</div>;
   }
   if (error) {
-    return <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">加载失败: {error.message}</div>;
+    return <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">{t('common:loadFailed', { message: error.message })}</div>;
   }
   if (!hasPdf) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
         <FileText className="size-8 opacity-40" />
-        <p>该条目没有 PDF 附件，无法解析全文。</p>
+        <p>{t('fulltext.noPdf')}</p>
       </div>
     );
   }
@@ -124,16 +118,16 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
                 variant="outline"
                 onClick={() => triggerParse({ force: true })}
                 disabled={busy}
-                title="重新解析"
+                title={t('fulltext.reparse')}
               >
-                <RefreshCw className="size-3.5" /> 重新解析
+                <RefreshCw className="size-3.5" /> {t('fulltext.reparse')}
               </Button>
               <Button
                 size="sm"
                 variant="outline"
                 onClick={removeFulltext}
                 disabled={busy}
-                title="删除全文"
+                title={t('fulltext.delete')}
               >
                 <Trash2 className="size-3.5" />
               </Button>
@@ -141,17 +135,17 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
           )}
           {canEdit && state === 'idle' && (
             <Button size="sm" onClick={() => triggerParse()} disabled={busy}>
-              <FileText className="size-3.5" /> 解析全文
+              <FileText className="size-3.5" /> {t('fulltext.parse')}
             </Button>
           )}
           {canEdit && state === 'failed' && (
             <Button size="sm" onClick={() => triggerParse({ force: true })} disabled={busy}>
-              <RefreshCw className="size-3.5" /> 重试
+              <RefreshCw className="size-3.5" /> {t('common:retry')}
             </Button>
           )}
           {isActive && (
             <Button size="sm" variant="outline" disabled>
-              <Loader2 className="size-3.5 animate-spin" /> 处理中
+              <Loader2 className="size-3.5 animate-spin" /> {t('fulltext.processing')}
             </Button>
           )}
         </div>
@@ -162,29 +156,29 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
         {state === 'idle' && (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
             <FileText className="size-8 opacity-40" />
-            <p>将 PDF 解析为 Markdown 全文，便于阅读与检索。</p>
-            <p className="text-xs">解析约需 1–5 分钟，由 MinerU 在云端完成。</p>
+            <p>{t('fulltext.idleHint')}</p>
+            <p className="text-xs">{t('fulltext.idleHint2')}</p>
           </div>
         )}
 
         {isActive && (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
             <Loader2 className="size-8 animate-spin opacity-60" />
-            <p>{STATE_LABELS[state]}…</p>
+            <p>{t(`fulltextStatus.${state}`)}…</p>
             {row?.totalPages && (
-              <p className="text-xs">{row.extractedPages ?? 0} / {row.totalPages} 页</p>
+              <p className="text-xs">{t('fulltext.pages', { extracted: row.extractedPages ?? 0, total: row.totalPages })}</p>
             )}
-            <p className="text-xs">页面会自动刷新，也可稍后回来查看。</p>
+            <p className="text-xs">{t('fulltext.autoRefresh')}</p>
           </div>
         )}
 
         {state === 'failed' && (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-destructive">
             <AlertCircle className="size-8" />
-            <p>解析失败</p>
-            <p className="text-xs text-muted-foreground max-w-md">{row?.errMsg || '未知错误'}</p>
+            <p>{t('fulltext.parseFailed')}</p>
+            <p className="text-xs text-muted-foreground max-w-md">{row?.errMsg || t('common:unknownError')}</p>
             <Button size="sm" variant="outline" onClick={() => triggerParse({ force: true })} disabled={busy} className="mt-2">
-              <RefreshCw className="size-3.5" /> 重新解析
+              <RefreshCw className="size-3.5" /> {t('fulltext.reparse')}
             </Button>
           </div>
         )}
@@ -203,7 +197,7 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
         {state === 'done' && !row?.markdown && (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-muted-foreground">
             <CheckCircle2 className="size-8 opacity-40" />
-            <p>已解析，但未找到 Markdown 文件。</p>
+            <p>{t('fulltext.mdMissing')}</p>
           </div>
         )}
       </div>

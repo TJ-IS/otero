@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { verifyDoiProofPath } from '@/lib/merkle';
@@ -19,6 +20,7 @@ function shortHash(hash) {
 }
 
 export function MerkleTreeView() {
+  const { t } = useTranslation(['dashboard', 'common']);
   const { canEdit } = useAuth();
   const { data: rootInfo, refresh: refreshRoot } = useAsync(() => api.getMerkleRoot(), []);
   const [doiInput, setDoiInput] = useState('');
@@ -41,11 +43,11 @@ export function MerkleTreeView() {
         setClientVerification(verification);
       }
     } catch (err) {
-      toast.error(`查询失败: ${err.message}`);
+      toast.error(t('merkle.queryFailed', { message: err.message }));
     } finally {
       setVerifying(false);
     }
-  }, [doiInput]);
+  }, [doiInput, t]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleVerify();
@@ -53,15 +55,15 @@ export function MerkleTreeView() {
 
   const handleRebuild = async () => {
     if (!canEdit) {
-      toast.error('请先连接白名单钱包');
+      toast.error(t('common:connectWhitelistFirst'));
       return;
     }
     try {
       await api.rebuildMerkleTree();
       refreshRoot();
-      toast.success('Merkle Tree 已重建');
+      toast.success(t('merkle.rebuilt'));
     } catch (err) {
-      toast.error(`重建失败: ${err.message}`);
+      toast.error(t('merkle.rebuildFailed', { message: err.message }));
     }
   };
 
@@ -78,7 +80,7 @@ export function MerkleTreeView() {
         <div className="relative flex h-8 flex-1 max-w-md min-w-[160px] items-center">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="输入 DOI，例如 10.1016/j.is.2023.01.001"
+            placeholder={t('merkle.doiPlaceholder')}
             value={doiInput}
             onChange={(e) => setDoiInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -90,7 +92,7 @@ export function MerkleTreeView() {
               type="button"
               onClick={clearQuery}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              title="清除"
+              title={t('common:clear')}
             >
               <X className="size-3.5" />
             </button>
@@ -108,7 +110,7 @@ export function MerkleTreeView() {
             variant="outline"
             onClick={handleRebuild}
             disabled={!canEdit}
-            title={canEdit ? '重建 Merkle Tree' : '请先连接白名单钱包'}
+            title={canEdit ? t('merkle.rebuildTitle') : t('merkle.rebuildNeedWallet')}
           >
             <RefreshCw className="size-4" />
           </Button>
@@ -121,22 +123,22 @@ export function MerkleTreeView() {
           {!result && !verifying && (
             <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground">
               <GitBranch className="size-8 opacity-30" />
-              <p className="mt-3 text-sm">输入 DOI 验证存在性证明</p>
-              <p className="mt-1 text-xs">证明路径从叶子节点逐步哈希到根，可独立验证</p>
+              <p className="mt-3 text-sm">{t('merkle.emptyHint')}</p>
+              <p className="mt-1 text-xs">{t('merkle.emptyHint2')}</p>
             </div>
           )}
 
           {verifying && (
             <div className="flex flex-col items-center justify-center gap-3 py-24 text-muted-foreground">
               <RefreshCw className="size-6 animate-spin opacity-60" />
-              <p className="text-sm">正在查询链上证明…</p>
+              <p className="text-sm">{t('merkle.querying')}</p>
             </div>
           )}
 
           {result && !result.exists && (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-10 text-center">
               <ShieldX className="mx-auto mb-3 size-10 text-destructive" />
-              <p className="font-medium text-destructive">DOI 不在数据库中</p>
+              <p className="font-medium text-destructive">{t('merkle.notInDb')}</p>
               <code className="mt-1 block break-all text-xs text-muted-foreground">{result.doi}</code>
             </div>
           )}
@@ -155,6 +157,7 @@ export function MerkleTreeView() {
 }
 
 function ProofResult({ doi, proof, clientVerification }) {
+  const { t } = useTranslation('dashboard');
   const allStepsVerified = clientVerification?.steps.every((s) => s.verified) ?? false;
   const rootVerified = clientVerification?.rootVerified ?? false;
   const fullyVerified = allStepsVerified && rootVerified;
@@ -175,10 +178,10 @@ function ProofResult({ doi, proof, clientVerification }) {
           )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">
-              {fullyVerified ? '存在性证明验证通过' : '证明验证中…'}
+              {fullyVerified ? t('merkle.verified') : t('merkle.verifying')}
             </p>
             <p className="text-xs text-muted-foreground">
-              {proof.siblings.length} 步哈希路径 · 叶子到根
+              {t('merkle.pathSteps', { count: proof.siblings.length })}
             </p>
           </div>
         </div>
@@ -207,17 +210,21 @@ function ProofResult({ doi, proof, clientVerification }) {
             ) : (
               <ShieldX className="size-4 text-destructive" />
             )}
-            客户端独立验证
+            {t('merkle.clientVerify')}
           </div>
           <ul className="mt-2 space-y-1">
             <li className="flex items-center gap-2 text-muted-foreground">
               <StepStatus verified={allStepsVerified} />
-              每一步中间哈希: {allStepsVerified ? '全部匹配' : '存在不匹配'}
-              <span className="text-xs">({clientVerification.steps.length} 步)</span>
+              {t('merkle.stepHash', {
+                status: allStepsVerified ? t('merkle.stepsMatch') : t('merkle.stepsMismatch'),
+              })}
+              <span className="text-xs">{t('merkle.stepsCount', { count: clientVerification.steps.length })}</span>
             </li>
             <li className="flex items-center gap-2 text-muted-foreground">
               <StepStatus verified={rootVerified} />
-              最终哈希 = Root: {rootVerified ? '匹配' : '不匹配'}
+              {t('merkle.rootEquals', {
+                status: rootVerified ? t('merkle.rootMatch') : t('merkle.rootMismatch'),
+              })}
             </li>
           </ul>
         </div>
@@ -227,7 +234,7 @@ function ProofResult({ doi, proof, clientVerification }) {
       <div className="rounded-md border bg-background px-4 py-3">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Hash className="size-4" />
-          证明路径（叶子 → 根）
+          {t('merkle.proofPath')}
         </h2>
 
         <div className="space-y-1">
@@ -283,6 +290,7 @@ function StepStatus({ verified }) {
 }
 
 function PathStep({ label, subtitle, hash, highlight, isRoot, siblingHash, siblingSide, clientVerified }) {
+  const { t } = useTranslation('dashboard');
   return (
     <div className={`rounded-md border p-3 ${highlight ? (isRoot ? 'border-primary bg-primary/5' : 'border-accent bg-accent/5') : 'border-border bg-muted/30'}`}>
       <div className="flex items-center justify-between">
@@ -299,7 +307,7 @@ function PathStep({ label, subtitle, hash, highlight, isRoot, siblingHash, sibli
         <div className="mt-2 border-t pt-2">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className={`rounded px-1.5 py-0.5 font-medium ${siblingSide === 'left' ? 'bg-blue-500/10 text-blue-600' : 'bg-orange-500/10 text-orange-600'}`}>
-              {siblingSide === 'left' ? '← 左兄弟' : '右兄弟 →'}
+              {siblingSide === 'left' ? t('merkle.leftSibling') : t('merkle.rightSibling')}
             </span>
           </div>
           <code className="mt-1 block break-all font-mono text-xs text-muted-foreground">{siblingHash}</code>

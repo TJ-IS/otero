@@ -1,6 +1,7 @@
 import { memo, useRef, useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Upload, RefreshCw, Search, X, Moon, Sun, PanelLeft, ListChecks, LayoutDashboard, MoreHorizontal, BookOpen, ShieldCheck } from 'lucide-react';
@@ -10,6 +11,7 @@ import { ITEM_TYPE_LABELS } from '@/lib/items';
 import { useAsync } from '@/hooks/useAsync';
 import { MineruTaskLog } from './MineruTaskLog';
 import { WalletButton } from './WalletButton';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { useAuth } from '../contexts/AuthContext';
 import {
   DropdownMenu,
@@ -20,6 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, onSearch, sidebarOpen = false, onToggleSidebar, fileInputRef: externalRef, onSelectItem }) {
+  const { t } = useTranslation(['library', 'common']);
   const internalRef = useRef(null);
   const fileInput = externalRef || internalRef;
   const searchRef = useRef(null);
@@ -63,16 +66,16 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
 
   const handleFiles = async (files) => {
     for (const file of files) {
-      const tid = toast.loading(`正在导入 ${file.name}...`);
+      const tid = toast.loading(t('import.loading', { name: file.name }));
       try {
         const result = await api.uploadPdf(file);
-        toast.success(`已导入: ${result.parent?.fields?.title || '(未识别)'}`, {
+        toast.success(t('import.success', { title: result.parent?.fields?.title || t('import.unrecognized') }), {
           id: tid,
-          description: `类型: ${ITEM_TYPE_LABELS[result.parent?.itemType] || result.parent?.itemType || '—'}`,
+          description: t('import.type', { type: ITEM_TYPE_LABELS[result.parent?.itemType] || result.parent?.itemType || '—' }),
         });
         onImported(result);
       } catch (err) {
-        toast.error(`导入失败: ${err.message}`, { id: tid });
+        toast.error(t('import.failed', { message: err.message }), { id: tid });
       }
     }
   };
@@ -100,7 +103,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
           variant="ghost"
           size="sm"
           onClick={onToggleSidebar}
-          title={sidebarOpen ? '折叠侧栏' : '展开侧栏'}
+          title={sidebarOpen ? t('common:collapseSidebar') : t('common:expandSidebar')}
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
           <PanelLeft className="size-4" />
@@ -110,7 +113,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
         <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={searchRef}
-          placeholder="搜索标题、作者、DOI、全文..."
+          placeholder={t('search.placeholder')}
           value={searchValue}
           onChange={e => setSearchValue(e.target.value)}
           onKeyDown={e => {
@@ -127,7 +130,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
           <button
             onClick={clearSearch}
             className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            title="清除搜索"
+            title={t('search.clear')}
           >
             <X className="size-3.5" />
           </button>
@@ -140,36 +143,36 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
             variant="ghost"
             size="sm"
             asChild
-            title="打开搜索页"
+            title={t('search.openPage')}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
             <Link to="/search">
               <Search className="size-4" />
-              <span>搜索</span>
+              <span>{t('search.label')}</span>
             </Link>
           </Button>
           <Button
             variant="ghost"
             size="sm"
             asChild
-            title="数据仪表盘"
+            title={t('nav.dashboardTitle')}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
             <Link to="/dashboard">
               <LayoutDashboard className="size-4" />
-              <span>仪表盘</span>
+              <span>{t('nav.dashboard')}</span>
             </Link>
           </Button>
           <Button
             variant="ghost"
             size="sm"
             asChild
-            title="开放 API 文档"
+            title={t('nav.openApiTitle')}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
             <Link to="/docs">
               <BookOpen className="size-4" />
-              <span>开放 API</span>
+              <span>{t('nav.openApi')}</span>
             </Link>
           </Button>
           {canEdit && (
@@ -177,7 +180,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               variant="ghost"
               size="sm"
               onClick={() => setLogOpen(true)}
-              title="MinerU 解析任务日志"
+              title={t('nav.mineruLog')}
               className="shrink-0 text-muted-foreground hover:text-foreground"
             >
               <ListChecks className="size-4" />
@@ -188,7 +191,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               variant="ghost"
               size="sm"
               asChild
-              title="后台管理"
+              title={t('nav.admin')}
               className="shrink-0 text-muted-foreground hover:text-foreground"
             >
               <Link to="/admin">
@@ -200,11 +203,12 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
             variant="ghost"
             size="sm"
             onClick={toggleTheme}
-            title={resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            title={resolvedTheme === 'dark' ? t('common:themeToLight') : t('common:themeToDark')}
           >
             {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </Button>
-          <Button variant="outline" size="sm" onClick={refreshItems} title="刷新列表">
+          <LanguageSwitcher />
+          <Button variant="outline" size="sm" onClick={refreshItems} title={t('common:refreshList')}>
             <RefreshCw className="size-4" />
           </Button>
         </div>
@@ -216,7 +220,7 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
               <Button
                 variant="ghost"
                 size="sm"
-                title="更多操作"
+                title={t('common:moreActions')}
                 className="shrink-0 text-muted-foreground hover:text-foreground"
               >
                 <MoreHorizontal className="size-4" />
@@ -225,48 +229,51 @@ export const TopBar = memo(function TopBar({ filter, onImported, refreshItems, o
             <DropdownMenuContent align="end">
               <DropdownMenuItem asChild>
                 <Link to="/search" className="flex items-center gap-2">
-                  <Search className="size-4" /> 搜索页
+                  <Search className="size-4" /> {t('search.page')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/dashboard" className="flex items-center gap-2">
-                  <LayoutDashboard className="size-4" /> 数据仪表盘
+                  <LayoutDashboard className="size-4" /> {t('nav.dashboardTitle')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/docs" className="flex items-center gap-2">
-                  <BookOpen className="size-4" /> 开放 API
+                  <BookOpen className="size-4" /> {t('nav.openApi')}
                 </Link>
               </DropdownMenuItem>
               {canEdit && (
                 <DropdownMenuItem onClick={() => setLogOpen(true)} className="gap-2">
-                  <ListChecks className="size-4" /> MinerU 解析任务日志
+                  <ListChecks className="size-4" /> {t('nav.mineruLog')}
                 </DropdownMenuItem>
               )}
               {canEdit && (
                 <DropdownMenuItem asChild>
                   <Link to="/admin" className="flex items-center gap-2">
-                    <ShieldCheck className="size-4" /> 后台管理
+                    <ShieldCheck className="size-4" /> {t('nav.admin')}
                   </Link>
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={toggleTheme} className="gap-2">
                 {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                {resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+                {resolvedTheme === 'dark' ? t('common:themeToLight') : t('common:themeToDark')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={refreshItems} className="gap-2">
-                <RefreshCw className="size-4" /> 刷新列表
+                <RefreshCw className="size-4" /> {t('common:refreshList')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+        <div className="md:hidden">
+          <LanguageSwitcher />
         </div>
         <WalletButton />
         {canEdit && (
           <>
             <Button size="sm" onClick={() => fileInput.current?.click()}>
               <Upload className="size-4" />
-              <span className="hidden sm:inline">导入 PDF</span>
+              <span className="hidden sm:inline">{t('importPdf')}</span>
             </Button>
             <input
               ref={fileInput}

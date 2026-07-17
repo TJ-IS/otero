@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -62,17 +63,18 @@ function ChartTooltip({ active, payload, label, formatter }) {
 }
 
 export function DashboardOverview() {
+  const { t } = useTranslation('dashboard');
   const { data: overview, error: overviewError, loading: overviewLoading } = useAsync(() => api.getStatsOverview(), []);
   const { data: itemTypes, loading: itemTypesLoading } = useAsync(() => api.getStatsItemTypes(), []);
   const { data: fulltext, loading: fulltextLoading } = useAsync(() => api.getStatsFulltext(), []);
   const { data: coverage, loading: coverageLoading } = useAsync(() => api.getStatsDoiCoverage(), []);
   const { data: merkleRoot } = useAsync(() => api.getMerkleRoot(), []);
 
-  const itemTypeData = useMemo(() => (itemTypes || []).map(t => ({
-    itemType: t.itemType,
-    label: ITEM_TYPE_LABELS[t.itemType] || t.itemType,
-    count: t.count,
-    color: colorForItemType(t.itemType),
+  const itemTypeData = useMemo(() => (itemTypes || []).map(row => ({
+    itemType: row.itemType,
+    label: ITEM_TYPE_LABELS[row.itemType] || row.itemType,
+    count: row.count,
+    color: colorForItemType(row.itemType),
   })), [itemTypes]);
 
   const fulltextData = useMemo(() => {
@@ -98,39 +100,39 @@ export function DashboardOverview() {
     <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6">
       {overviewLoading && (
         <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" /> 加载中…
+          <Loader2 className="size-5 animate-spin" /> {t('loading')}
         </div>
       )}
       {overviewError && (
         <div className="flex flex-col items-center gap-2 py-16 text-sm text-destructive">
           <AlertCircle className="size-8" />
-          <p>加载失败: {overviewError.message}</p>
+          <p>{t('loadFailed', { message: overviewError.message })}</p>
         </div>
       )}
 
       {overview && (
         <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatCard icon={<FileText className="size-4" />} label="文献总数" value={overview.totalItems} />
-          <StatCard icon={<BookMarked className="size-4" />} label="收录期刊数" value={overview.journalCount} />
-          <StatCard icon={<Users className="size-4" />} label="学者/创作者数" value={overview.totalCreators} />
+          <StatCard icon={<FileText className="size-4" />} label={t('overview.totalItems')} value={overview.totalItems} />
+          <StatCard icon={<BookMarked className="size-4" />} label={t('overview.journalCount')} value={overview.journalCount} />
+          <StatCard icon={<Users className="size-4" />} label={t('overview.totalCreators')} value={overview.totalCreators} />
           <StatCard
             icon={<Link2 className="size-4" />}
-            label="含 DOI"
+            label={t('overview.withDoi')}
             value={overview.withDoi}
             sub={`${Math.round((overview.withDoi / Math.max(1, overview.totalItems)) * 100)}%`}
           />
           <StatCard
             icon={<Paperclip className="size-4" />}
-            label="含全文附件"
+            label={t('overview.withFulltext')}
             value={overview.withAttachment}
-            sub={fulltextDoneRatio != null ? `解析完成 ${fulltextDoneRatio}%` : undefined}
+            sub={fulltextDoneRatio != null ? t('overview.parseDonePct', { pct: fulltextDoneRatio }) : undefined}
           />
           <StatCard
             icon={<Hash className="size-4" />}
             label="Merkle Root"
             value={merkleRoot ? shortHash(merkleRoot.root) : '—'}
             valueTitle={merkleRoot?.root}
-            sub={merkleRoot ? `${merkleRoot.leafCount} 个 DOI 叶子` : undefined}
+            sub={merkleRoot ? t('overview.merkleLeaves', { count: merkleRoot.leafCount }) : undefined}
             mono
           />
         </div>
@@ -138,18 +140,18 @@ export function DashboardOverview() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">AIS Basket 收录进度</CardTitle>
+          <CardTitle className="text-base">{t('overview.coverageTitle')}</CardTitle>
           <CardDescription>
-            左侧为 target_dois.txt 目标清单，右侧为文库已有 DOI；重叠区域为已收录篇目。点击「目标未收录」可查看缺失 DOI 列表。
+            {t('overview.coverageDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {coverageLoading ? (
             <div className="flex h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> 加载中…
+              <Loader2 className="size-4 animate-spin" /> {t('loading')}
             </div>
           ) : !coverage ? (
-            <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">暂无数据</div>
+            <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('noData')}</div>
           ) : (
             <DoiCoverageVenn data={coverage} />
           )}
@@ -159,14 +161,14 @@ export function DashboardOverview() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">条目类型分布</CardTitle>
-            <CardDescription>按文献类型统计的条目数量</CardDescription>
+            <CardTitle className="text-base">{t('overview.typeDistTitle')}</CardTitle>
+            <CardDescription>{t('overview.typeDistDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             {itemTypesLoading ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">加载中…</div>
+              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('loading')}</div>
             ) : itemTypeData.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">暂无数据</div>
+              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('noData')}</div>
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={260}>
@@ -218,17 +220,17 @@ export function DashboardOverview() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">全文解析状态</CardTitle>
+            <CardTitle className="text-base">{t('overview.fulltextTitle')}</CardTitle>
             <CardDescription>
-              MinerU 全文解析管线各状态的条目数
-              {failedCount > 0 && <span className="ml-1">· {failedCount} 条失败均为限流(429)</span>}
+              {t('overview.fulltextDesc')}
+              {failedCount > 0 && <span className="ml-1">{t('overview.fulltextFailed429', { count: failedCount })}</span>}
             </CardDescription>
           </CardHeader>
           <CardContent>
             {fulltextLoading ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">加载中…</div>
+              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('loading')}</div>
             ) : fulltextData.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">暂无数据</div>
+              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('noData')}</div>
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={fulltextData} layout="vertical" margin={{ left: 16, right: 16 }}>
@@ -241,7 +243,7 @@ export function DashboardOverview() {
                     tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                   />
                   <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" name="条目数" radius={[0, 4, 4, 0]} barSize={18}>
+                  <Bar dataKey="count" name={t('itemCount')} radius={[0, 4, 4, 0]} barSize={18}>
                     {fulltextData.map((d) => (
                       <Cell key={d.state} fill={d.color} />
                     ))}

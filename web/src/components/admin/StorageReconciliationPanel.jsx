@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -46,15 +47,17 @@ function StatTile({ icon, label, value, sub, tone }) {
 }
 
 function TruncatedNote({ truncated, listCap, total }) {
+  const { t } = useTranslation('admin');
   if (!truncated) return null;
   return (
     <p className="px-1 text-xs text-muted-foreground">
-      仅显示前 {listCap} 条，共 {total} 条。
+      {t('reconcile.listCap', { cap: listCap, total })}
     </p>
   );
 }
 
 function VirtualMissingList({ items }) {
+  const { t } = useTranslation('admin');
   const parentRef = useRef(null);
   const rows = useVirtualizer({
     count: items.length,
@@ -87,7 +90,7 @@ function VirtualMissingList({ items }) {
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <Badge variant="outline" className="text-xs">{item.type || 'attachment'}</Badge>
-                {item.deleted ? <Badge variant="secondary">已删除条目</Badge> : null}
+                {item.deleted ? <Badge variant="secondary">{t('reconcile.deletedItem')}</Badge> : null}
               </div>
             </div>
           );
@@ -98,6 +101,7 @@ function VirtualMissingList({ items }) {
 }
 
 function VirtualOrphanList({ items, selected, onToggle }) {
+  const { t } = useTranslation('admin');
   const parentRef = useRef(null);
   const rows = useVirtualizer({
     count: items.length,
@@ -122,7 +126,7 @@ function VirtualOrphanList({ items, selected, onToggle }) {
               <Checkbox checked={selected.has(item.name)} onCheckedChange={() => onToggle(item.name)} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-mono text-xs">{item.name}</p>
-                {item.key ? <p className="truncate text-xs text-muted-foreground">关联条目：{item.key}</p> : null}
+                {item.key ? <p className="truncate text-xs text-muted-foreground">{t('reconcile.linkedItem', { key: item.key })}</p> : null}
               </div>
               <Badge variant="outline" className="shrink-0 text-xs">{item.type || 'unknown'}</Badge>
               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{item.sizeFormatted}</span>
@@ -135,6 +139,7 @@ function VirtualOrphanList({ items, selected, onToggle }) {
 }
 
 export function StorageReconciliationPanel() {
+  const { t } = useTranslation(['admin', 'common']);
   const forceNextRefresh = useRef(false);
   const {
     data, error, loading, refresh: runRefresh,
@@ -189,8 +194,6 @@ export function StorageReconciliationPanel() {
       const result = await api.deleteAdminOrphanObjects(names);
       setDeleteResult(result);
       setSelected(new Set());
-      // The backend updates its reconciliation cache after a successful bulk
-      // delete, so reload that result without forcing another full R2 scan.
       runRefresh();
     } catch (e) {
       setDeleteResult({ error: e.message });
@@ -204,9 +207,9 @@ export function StorageReconciliationPanel() {
     return (
       <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
         <div className="flex items-center text-sm">
-          <Loader2 className="mr-2 size-5 animate-spin" /> 正在分区扫描 R2...
+          <Loader2 className="mr-2 size-5 animate-spin" /> {t('reconcile.scanning')}
         </div>
-        <p className="text-xs">大型存储桶需要读取全部对象索引，首次扫描可能持续几十秒。</p>
+        <p className="text-xs">{t('reconcile.scanningHint')}</p>
       </div>
     );
   }
@@ -216,7 +219,7 @@ export function StorageReconciliationPanel() {
       <div className="mx-auto max-w-2xl p-6">
         <Card className="border-red-500/40">
           <CardContent className="flex items-center gap-3 p-4 text-red-600 dark:text-red-400">
-            <AlertCircle className="size-5" /> 加载失败：{error.message}
+            <AlertCircle className="size-5" /> {t('reconcile.loadFailed', { message: error.message })}
           </CardContent>
         </Card>
       </div>
@@ -239,33 +242,33 @@ export function StorageReconciliationPanel() {
     <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <ScaleIcon className="size-5" /> 存储对账（PostgreSQL ↔ R2）
+          <ScaleIcon className="size-5" /> {t('reconcile.title')}
         </h2>
         <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} /> 重新对账
+          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('reconcile.rescan')}
         </Button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           icon={<Database className="size-4" />}
-          label="PostgreSQL 存储引用"
+          label={t('reconcile.dbRefs')}
           value={summary?.dbReferences ?? '—'}
-          sub={summary ? `${summary.dbExactObjects} 个对象，${summary.dbPrefixes} 个目录` : undefined}
+          sub={summary ? t('reconcile.dbRefsSub', { objects: summary.dbExactObjects, prefixes: summary.dbPrefixes }) : undefined}
         />
-        <StatTile icon={<HardDrive className="size-4" />} label="R2 对象总数" value={summary?.r2Objects ?? '—'} />
+        <StatTile icon={<HardDrive className="size-4" />} label={t('reconcile.r2Total')} value={summary?.r2Objects ?? '—'} />
         <StatTile
           icon={<AlertCircle className="size-4" />}
-          label="R2 中缺失"
+          label={t('reconcile.r2Missing')}
           value={summary?.missingInR2 ?? '—'}
-          sub="PostgreSQL 有记录，R2 无对象"
+          sub={t('reconcile.r2MissingSub')}
           tone={summary?.missingInR2 ? 'warning' : undefined}
         />
         <StatTile
           icon={<Trash2 className="size-4" />}
-          label="R2 孤立对象"
+          label={t('reconcile.r2Orphans')}
           value={summary?.orphanInR2 ?? '—'}
-          sub={summary?.orphanBytesFormatted ? `占用 ${summary.orphanBytesFormatted}` : undefined}
+          sub={summary?.orphanBytesFormatted ? t('reconcile.orphanBytes', { size: summary.orphanBytesFormatted }) : undefined}
           tone={summary?.orphanInR2 ? 'warning' : undefined}
         />
       </div>
@@ -274,12 +277,12 @@ export function StorageReconciliationPanel() {
         <Card className={deleteResult.error ? 'border-red-500/40' : 'border-emerald-500/40'}>
           <CardContent className="p-4 text-sm">
             {deleteResult.error ? (
-              <span className="text-red-600 dark:text-red-400">删除失败：{deleteResult.error}</span>
+              <span className="text-red-600 dark:text-red-400">{t('reconcile.deleteFailed', { error: deleteResult.error })}</span>
             ) : (
               <div className="space-y-1">
                 <p>
-                  已删除 <strong>{deleteResult.deleted.length}</strong> 个对象
-                  {deleteResult.skipped.length > 0 && `，跳过 ${deleteResult.skipped.length} 个`}
+                  {t('reconcile.deletedObjects', { count: deleteResult.deleted.length })}
+                  {deleteResult.skipped.length > 0 && t('reconcile.skippedObjects', { count: deleteResult.skipped.length })}
                 </p>
                 {deleteResult.skipped.length > 0 && (
                   <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
@@ -296,15 +299,14 @@ export function StorageReconciliationPanel() {
         </Card>
       )}
 
-      {/* Missing in R2 — read only */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">PostgreSQL 存在但 R2 缺失（只读）</CardTitle>
-          <CardDescription>数据库中记录了附件或全文资产，但对应对象在 R2 中不存在。此列表仅供排查，不提供删除操作。</CardDescription>
+          <CardTitle className="text-sm">{t('reconcile.missingTitle')}</CardTitle>
+          <CardDescription>{t('reconcile.missingDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           {missingInR2.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">未发现缺失对象 🎉</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">{t('reconcile.noMissing')}</p>
           ) : (
             <>
               <VirtualMissingList items={missingInR2} />
@@ -314,13 +316,12 @@ export function StorageReconciliationPanel() {
         </CardContent>
       </Card>
 
-      {/* Orphan in R2 — selectable + deletable */}
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-sm">R2 存在但 PostgreSQL 无引用（可删除）</CardTitle>
-              <CardDescription>这些对象在数据库中没有任何附件或全文记录指向它们，可以安全清理。</CardDescription>
+              <CardTitle className="text-sm">{t('reconcile.orphanTitle')}</CardTitle>
+              <CardDescription>{t('reconcile.orphanDesc')}</CardDescription>
             </div>
             {orphanInR2.length > 0 && (
               <Button
@@ -329,19 +330,19 @@ export function StorageReconciliationPanel() {
                 disabled={selectedCount === 0}
                 onClick={() => setConfirmOpen(true)}
               >
-                <Trash2 className="mr-1.5 size-3.5" /> 删除选中（{selectedCount}）
+                <Trash2 className="mr-1.5 size-3.5" /> {t('reconcile.deleteSelected', { count: selectedCount })}
               </Button>
             )}
           </div>
         </CardHeader>
         <CardContent>
           {orphanInR2.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">未发现孤立对象 🎉</p>
+            <p className="py-6 text-center text-sm text-muted-foreground">{t('reconcile.noOrphans')}</p>
           ) : (
             <>
               <div className="mb-2 flex items-center gap-2 border-b pb-2 text-xs text-muted-foreground">
                 <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
-                <span>全选本页</span>
+                <span>{t('reconcile.selectPage')}</span>
               </div>
               <VirtualOrphanList items={orphanInR2} selected={selected} onToggle={toggle} />
               <TruncatedNote truncated={data?.truncated?.orphanInR2} listCap={data?.listCap} total={summary?.orphanInR2} />
@@ -352,22 +353,24 @@ export function StorageReconciliationPanel() {
 
       {data?.timestamp && (
         <p className="text-center text-xs text-muted-foreground">
-          {data.cached ? '缓存结果' : '实时扫描'} · 采集于 {new Date(data.timestamp).toLocaleString()}
-          {Number.isFinite(data.durationMs) ? ` · 扫描耗时 ${(data.durationMs / 1000).toFixed(1)} 秒` : ''}
+          {data.cached ? t('reconcile.cached') : t('reconcile.live')} · {t('reconcile.collectedAt', { time: new Date(data.timestamp).toLocaleString() })}
+          {Number.isFinite(data.durationMs) ? t('reconcile.duration', { seconds: (data.durationMs / 1000).toFixed(1) }) : ''}
         </p>
       )}
 
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除孤立对象</AlertDialogTitle>
+            <AlertDialogTitle>{t('reconcile.confirmTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              即将从 R2 永久删除 {selectedCount} 个对象（约 {(selectedBytes / 1024 / 1024).toFixed(2)} MB）。
-              删除前会重新校验数据库引用，若期间有对象被引用将自动跳过。此操作不可撤销。
+              {t('reconcile.confirmDesc', {
+                count: selectedCount,
+                mb: (selectedBytes / 1024 / 1024).toFixed(2),
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('common:cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={(e) => {
                 e.preventDefault();
@@ -377,7 +380,7 @@ export function StorageReconciliationPanel() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Trash2 className="mr-1.5 size-3.5" />}
-              确认删除
+              {t('reconcile.confirmDelete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

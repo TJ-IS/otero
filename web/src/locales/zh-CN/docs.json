@@ -1,0 +1,61 @@
+{
+  "title": "开放 API 文档",
+  "toggleTheme": "切换主题",
+  "nav": {
+    "api": "API",
+    "agents": "AGENTS.md"
+  },
+  "api": {
+    "intro": "Otero 开放只读 API，面向 AIS Senior Scholars' Basket 文献库。支持从检索结果继续读取条目、结构化全文和引用导出，也提供聚合与时间线统计。所有接口均为 GET，不会修改数据库。",
+    "baseUrl": "Base URL：",
+    "queryLabel": "Query：",
+    "ruleWhitelist": "仅暴露白名单 11 刊内、未删除的顶层条目",
+    "ruleKey": "搜索结果中的 key 可直接用于条目、全文和导出接口",
+    "rulePaging": "分页：page（默认 1）、pageSize（默认 20，最大 100）",
+    "listResponse": "列表响应：",
+    "filterTitle": "Filter 参数",
+    "filterApplies": "适用于 /articles、/authors、/search、/export/articles、/facets 和 /stats/timeline。",
+    "colParam": "参数",
+    "colDesc": "说明",
+    "filterJournal": "单刊精确名（须为 Basket 白名单）",
+    "filterJournals": "多刊，逗号分隔；与 journal 互斥",
+    "filterYear": "精确年份",
+    "filterYearRange": "年份区间（含端点）",
+    "filterType": "条目类型，如 journalArticle",
+    "endpointsTitle": "接口一览",
+    "copyCurl": "复制 curl",
+    "copiedCurl": "已复制 curl",
+    "copyFailed": "复制失败",
+    "endpoints": {
+      "journals": "本站 Basket 期刊列表（含 itemCount，不含待归档）",
+      "articles": "关键词搜文章；q 可选，可纯 filter 浏览",
+      "exportArticles": "按文章检索条件批量导出 BibTeX 或 RIS",
+      "facets": "返回当前查询的期刊、年份、类型和资源可用性聚合",
+      "authors": "关键词搜作者；q 必填；filter 收窄发文范围与 paperCount",
+      "authorItems": "某作者文章分页（可 filter）",
+      "search": "统一搜索：同页返回 articles + authors 两桶",
+      "doiItem": "DOI 精确查询条目元数据",
+      "doiMarkdown": "按 DOI 获取全文 Markdown（需已解析完成）",
+      "doiPdf": "按 DOI 获取 PDF 下载地址（url / absoluteUrl）",
+      "item": "按搜索结果中的 item key 获取完整元数据",
+      "itemMarkdown": "按 item key 获取已解析的全文 Markdown",
+      "itemPdf": "按 item key 获取 PDF 相对地址与绝对地址",
+      "itemStructure": "获取目录、图表、公式、参考文献和脚注等结构化全文",
+      "itemExport": "导出单篇 BibTeX 或 RIS",
+      "statsOverview": "Basket 范围内的文章、作者、DOI、PDF 和全文覆盖概览",
+      "statsTimeline": "按出版年份统计文章数，可附带查询和共享筛选条件",
+      "skill": "Agent Skill 原文（可直接 curl / 复制安装）"
+    }
+  },
+  "agents": {
+    "hint": "复制下方内容保存为 AGENTS.md 或 SKILL.md，供其他 Agent 访问本站开放数据。",
+    "copy": "复制",
+    "copied": "已复制",
+    "copiedMd": "已复制 AGENTS.md",
+    "copyFailed": "复制失败",
+    "rawFile": "原始文件",
+    "loading": "加载中…",
+    "empty": "（空）",
+    "loadFailed": "加载 AGENTS.md 失败: {{message}}"
+  }
+}

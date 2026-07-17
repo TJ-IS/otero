@@ -1,4 +1,5 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
@@ -17,30 +18,38 @@ const PAGE_SIZE = 50;
 const ACTIVE_STATES = ['submitting', 'pending', 'running', 'converting'];
 const ACTIVE = new Set(ACTIVE_STATES);
 
-const FILTERS = [
-  { id: 'all',    label: '全部' },
-  { id: 'active', label: '进行中' },
-  { id: 'done',   label: '已完成' },
-  { id: 'failed', label: '失败' },
-];
+const FILTER_IDS = ['all', 'active', 'done', 'failed'];
 
-const STATE_META = {
-  idle:        { label: '未解析',   variant: 'secondary', icon: Clock,        pulse: false },
-  submitting:  { label: '待提交',   variant: 'secondary', icon: Loader2,      pulse: true  },
-  pending:     { label: '排队中',   variant: 'secondary', icon: Loader2,      pulse: true  },
-  running:     { label: '解析中',   variant: 'secondary', icon: Loader2,      pulse: true  },
-  converting:  { label: '转换中',   variant: 'secondary', icon: Loader2,      pulse: true  },
-  done:        { label: '已完成',   variant: 'default',   icon: CheckCircle2, pulse: false },
-  failed:      { label: '失败',     variant: 'destructive', icon: AlertCircle, pulse: false },
+const STATE_ICONS = {
+  idle: Clock,
+  submitting: Loader2,
+  pending: Loader2,
+  running: Loader2,
+  converting: Loader2,
+  done: CheckCircle2,
+  failed: AlertCircle,
 };
 
+const STATE_VARIANTS = {
+  idle: 'secondary',
+  submitting: 'secondary',
+  pending: 'secondary',
+  running: 'secondary',
+  converting: 'secondary',
+  done: 'default',
+  failed: 'destructive',
+};
+
+const STATE_PULSE = new Set(['submitting', 'pending', 'running', 'converting']);
+
 function StateBadge({ state }) {
-  const m = STATE_META[state] || STATE_META.idle;
-  const Icon = m.icon;
+  const { t } = useTranslation('item');
+  const Icon = STATE_ICONS[state] || STATE_ICONS.idle;
+  const pulse = STATE_PULSE.has(state);
   return (
-    <Badge variant={m.variant} className="inline-flex items-center gap-1 font-normal">
-      <Icon className={`size-3 ${m.pulse ? 'animate-spin' : ''}`} />
-      {m.label}
+    <Badge variant={STATE_VARIANTS[state] || 'secondary'} className="inline-flex items-center gap-1 font-normal">
+      <Icon className={`size-3 ${pulse ? 'animate-spin' : ''}`} />
+      {t(`fulltextStatus.${state}`, { defaultValue: state })}
     </Badge>
   );
 }
@@ -51,6 +60,7 @@ function fmtTime(s) {
 }
 
 export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, onSelectItem }) {
+  const { t } = useTranslation(['library', 'item', 'common']);
   const { canEdit } = useAuth();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -62,10 +72,13 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
   const [totalPages, setTotalPages] = useState(1);
   const [counts, setCounts] = useState({});
   const timerRef = useRef(null);
-  // Latest filter/page captured in a ref so the polling interval always
-  // fetches the currently viewed page without re-subscribing each refresh.
   const viewRef = useRef({ filter, page });
   viewRef.current = { filter, page };
+
+  const filters = useMemo(() => FILTER_IDS.map((id) => ({
+    id,
+    label: t(`mineru.filter${id.charAt(0).toUpperCase()}${id.slice(1)}`),
+  })), [t]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -77,19 +90,17 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
       setTotalPages(r?.totalPages ?? 1);
       setCounts(r?.counts ?? {});
     } catch (err) {
-      toast.error(`加载任务列表失败: ${err.message}`);
+      toast.error(t('mineru.loadListFailed', { message: err.message }));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
-  // Fetch whenever the dialog opens or the filter/page changes.
   useEffect(() => {
     if (!open) return;
     refresh();
   }, [open, filter, page, refresh]);
 
-  // Auto-poll while there are active tasks anywhere (not just current page).
   const activeCount = ACTIVE_STATES.reduce((n, s) => n + (counts[s] || 0), 0);
   useEffect(() => {
     if (!open) return;
@@ -103,24 +114,24 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
 
   const retry = useCallback(async (key) => {
     if (!canEdit) {
-      toast.error('请先连接白名单钱包');
+      toast.error(t('common:connectWhitelistFirst'));
       return;
     }
     setBusyKey(key);
     try {
       await api.parseFulltext(key, { force: true });
-      toast.success(`已重新提交: ${key}`);
+      toast.success(t('mineru.resubmitted', { key }));
       refresh();
     } catch (err) {
-      toast.error(`重试失败: ${err.message}`);
+      toast.error(t('mineru.retryFailed', { message: err.message }));
     } finally {
       setBusyKey(null);
     }
-  }, [refresh, canEdit]);
+  }, [refresh, canEdit, t]);
 
   const retryAllFailed = useCallback(async () => {
     if (!canEdit) {
-      toast.error('请先连接白名单钱包');
+      toast.error(t('common:connectWhitelistFirst'));
       return;
     }
     setBulkRetrying(true);
@@ -128,17 +139,17 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
       const r = await api.retryFailedFulltext();
       const s = r?.summary;
       if (!s || s.queued === 0) {
-        toast.info('没有可重试的失败任务');
+        toast.info(t('mineru.noRetryable'));
       } else {
-        toast.success(`已重新入队 ${s.queued} 个失败任务（将按节流速率提交）`);
+        toast.success(t('mineru.bulkRequeued', { count: s.queued }));
       }
       refresh();
     } catch (err) {
-      toast.error(`批量重试失败: ${err.message}`);
+      toast.error(t('mineru.bulkRetryFailed', { message: err.message }));
     } finally {
       setBulkRetrying(false);
     }
-  }, [refresh]);
+  }, [refresh, canEdit, t]);
 
   const viewItem = useCallback((key) => {
     onSelectItem?.(key);
@@ -154,7 +165,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
   const goNext = useCallback(() => setPage(p => Math.min(totalPages, p + 1)), [totalPages]);
 
   const filterCount = (id) => {
-    if (id === 'all')    return total;
+    if (id === 'all') return total;
     if (id === 'active') return activeCount;
     return counts[id] || 0;
   };
@@ -165,20 +176,19 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
         <DialogHeader className="px-6 pt-6 pb-3 border-b">
           <DialogTitle className="flex items-center gap-2">
             <ListChecks className="size-5" />
-            MinerU 解析任务
+            {t('mineru.title')}
           </DialogTitle>
           <DialogDescription>
-            共 {total} 个任务
-            {activeCount > 0 && <span className="text-blue-600"> · {activeCount} 个进行中</span>}
-            {counts.done > 0 && <span className="text-green-600"> · {counts.done} 已完成</span>}
-            {counts.failed > 0 && <span className="text-red-600"> · {counts.failed} 失败</span>}
-            {activeCount > 0 && <span className="ml-2 text-xs">（每 {POLL_MS / 1000}s 自动刷新）</span>}
+            {t('mineru.totalTasks', { total })}
+            {activeCount > 0 && <span className="text-blue-600">{t('mineru.activeCount', { count: activeCount })}</span>}
+            {counts.done > 0 && <span className="text-green-600">{t('mineru.doneCount', { count: counts.done })}</span>}
+            {counts.failed > 0 && <span className="text-red-600">{t('mineru.failedCount', { count: counts.failed })}</span>}
+            {activeCount > 0 && <span className="ml-2 text-xs">{t('mineru.autoRefresh', { seconds: POLL_MS / 1000 })}</span>}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Filter tabs */}
         <div className="flex items-center gap-1 px-6 py-2 border-b">
-          {FILTERS.map(f => (
+          {filters.map(f => (
             <Button
               key={f.id}
               size="sm"
@@ -194,7 +204,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
 
         <div className="flex items-center justify-between px-6 py-2 border-b">
           <span className="text-xs text-muted-foreground">
-            {loading ? '加载中…' : `最近更新于 ${new Date().toLocaleTimeString()}`}
+            {loading ? t('common:loading') : t('mineru.updatedAt', { time: new Date().toLocaleTimeString() })}
           </span>
           <div className="flex items-center gap-2">
             {canEdit && counts.failed > 0 && (
@@ -203,17 +213,17 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                 variant="outline"
                 onClick={retryAllFailed}
                 disabled={bulkRetrying || loading}
-                title={`重试全部 ${counts.failed} 个失败任务`}
+                title={t('mineru.retryAllTitle', { count: counts.failed })}
               >
                 {bulkRetrying
                   ? <Loader2 className="size-3.5 animate-spin" />
                   : <RotateCcw className="size-3.5" />}
-                重试全部失败（{counts.failed}）
+                {t('mineru.retryAll', { count: counts.failed })}
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={refresh} disabled={loading} title="手动刷新">
+            <Button size="sm" variant="outline" onClick={refresh} disabled={loading} title={t('common:refresh')}>
               <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
-              刷新
+              {t('common:refresh')}
             </Button>
           </div>
         </div>
@@ -221,22 +231,20 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
         <div className="flex-1 overflow-auto">
           {rows.length === 0 ? (
             <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-              {total === 0
-                ? '暂无解析任务。在条目详情页点击"解析全文"或在列表点"批量解析全文"即可创建。'
-                : '当前筛选下没有任务。'}
+              {total === 0 ? t('mineru.emptyAll') : t('mineru.emptyFiltered')}
             </div>
           ) : (
             <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10 bg-background text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
                 <tr>
-                  <th className="px-4 py-2 font-medium">状态</th>
-                  <th className="px-4 py-2 font-medium">标题 / Key</th>
-                  <th className="px-4 py-2 font-medium w-20">模型</th>
-                  <th className="px-4 py-2 font-medium w-28">进度</th>
-                  <th className="px-4 py-2 font-medium w-40">提交时间</th>
-                  <th className="px-4 py-2 font-medium w-40">完成时间</th>
-                  <th className="px-4 py-2 font-medium w-24">操作</th>
+                  <th className="px-4 py-2 font-medium">{t('mineru.colStatus')}</th>
+                  <th className="px-4 py-2 font-medium">{t('mineru.colTitle')}</th>
+                  <th className="px-4 py-2 font-medium w-20">{t('mineru.colModel')}</th>
+                  <th className="px-4 py-2 font-medium w-28">{t('mineru.colProgress')}</th>
+                  <th className="px-4 py-2 font-medium w-40">{t('mineru.colSubmitted')}</th>
+                  <th className="px-4 py-2 font-medium w-40">{t('mineru.colFinished')}</th>
+                  <th className="px-4 py-2 font-medium w-24">{t('mineru.colActions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -246,7 +254,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                     <tr key={r.itemKey} className="border-b last:border-0 hover:bg-accent/40 align-top">
                       <td className="px-4 py-2"><StateBadge state={r.state} /></td>
                       <td className="px-4 py-2 max-w-[260px]">
-                        <div className="truncate font-medium" title={r.title || '(无标题)'}>{r.title || '(无标题)'}</div>
+                        <div className="truncate font-medium" title={r.title || t('item:untitled')}>{r.title || t('item:untitled')}</div>
                         <div className="text-xs text-muted-foreground font-mono">{r.itemKey}</div>
                         {r.state === 'failed' && r.errMsg && (
                           <div className="mt-1 text-xs text-destructive line-clamp-2" title={r.errMsg}>{r.errMsg}</div>
@@ -265,7 +273,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                             variant="ghost"
                             className="h-7 px-2 text-xs"
                             onClick={() => viewItem(r.itemKey)}
-                            title="在详情面板打开"
+                            title={t('mineru.openDetail')}
                           >
                             <ExternalLink className="size-3" />
                           </Button>
@@ -276,7 +284,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                               className="h-7 px-2 text-xs"
                               onClick={() => retry(r.itemKey)}
                               disabled={busyKey === r.itemKey}
-                              title="重试"
+                              title={t('mineru.retry')}
                             >
                               {busyKey === r.itemKey
                                 ? <Loader2 className="size-3 animate-spin" />
@@ -294,10 +302,9 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
           )}
         </div>
 
-        {/* Pagination footer */}
         {total > 0 && (
           <div className="flex items-center justify-between px-6 py-2 border-t text-xs text-muted-foreground">
-            <span>第 {page} / {totalPages} 页 · 每页 {PAGE_SIZE} 条</span>
+            <span>{t('mineru.pageInfo', { page, totalPages, pageSize: PAGE_SIZE })}</span>
             <div className="flex items-center gap-1">
               <Button
                 size="sm"
@@ -305,7 +312,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                 className="h-7 px-2"
                 onClick={goPrev}
                 disabled={page <= 1 || loading}
-                title="上一页"
+                title={t('common:prevPage')}
               >
                 <ChevronLeft className="size-3.5" />
               </Button>
@@ -315,7 +322,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                 className="h-7 px-2"
                 onClick={goNext}
                 disabled={page >= totalPages || loading}
-                title="下一页"
+                title={t('common:nextPage')}
               >
                 <ChevronRight className="size-3.5" />
               </Button>

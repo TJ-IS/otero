@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useChat } from '@ai-sdk/react';
 import { TextStreamChatTransport } from 'ai';
 import ReactMarkdown from 'react-markdown';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/useMediaQuery';
-import { CHAT_PRESETS, clearChatHistory, loadChatHistory, saveChatHistory } from '@/lib/chat';
+import { getChatPresets, clearChatHistory, loadChatHistory, saveChatHistory } from '@/lib/chat';
 
 function messageText(message) {
   return message.parts
@@ -68,12 +69,14 @@ function ChatBubble({ role, text, streaming }) {
 }
 
 export const ChatPanel = memo(function ChatPanel({ itemKey }) {
+  const { t } = useTranslation(['item', 'common']);
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [panelPresent, setPanelPresent] = useState(false);
   const [panelState, setPanelState] = useState('closed');
   const [input, setInput] = useState('');
   const scrollRef = useRef(null);
+  const presets = getChatPresets();
 
   const transport = useRef(null);
   if (!transport.current || transport.current.itemKey !== itemKey) {
@@ -157,7 +160,7 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
         variant={open ? 'outline' : 'default'}
         onClick={() => setOpen(v => !v)}
         className="fixed bottom-5 right-5 z-40 size-12 rounded-full shadow-lg"
-        title="与论文助手对话"
+        title={t('chat.title')}
       >
         {open ? <X className="size-5" /> : <Sparkles className="size-5" />}
       </Button>
@@ -167,7 +170,7 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
           {isMobile && (
             <button
               type="button"
-              aria-label="关闭对话"
+              aria-label={t('chat.close')}
               tabIndex={-1}
               onClick={() => setOpen(false)}
               data-state={panelState}
@@ -186,13 +189,13 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
             <div className="flex items-center justify-between gap-2 border-b bg-background px-4 py-3 shrink-0">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <Sparkles className="size-4 text-muted-foreground" />
-                论文助手
+                {t('chat.assistant')}
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={handleClear} title="清空对话">
+                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={handleClear} title={t('chat.clear')}>
                   <Trash2 className="size-3.5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)} title="关闭">
+                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)} title={t('common:close')}>
                   <X className="size-3.5" />
                 </Button>
               </div>
@@ -201,7 +204,7 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
             <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
               {messages.length === 0 && (
                 <div className="text-xs text-muted-foreground text-center py-8">
-                  针对这篇论文提问，或选择下面的快捷问题开始。
+                  {t('chat.hint')}
                 </div>
               )}
               {messages.map((m, i) => (
@@ -216,7 +219,7 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
 
             <div className="border-t px-3 py-2 space-y-2 shrink-0">
               <div className="flex flex-wrap gap-1.5">
-                {CHAT_PRESETS.map((p) => (
+                {presets.map((p) => (
                   <Button
                     key={p.label}
                     type="button"
@@ -235,7 +238,7 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="输入问题，Enter 发送，Shift+Enter 换行…"
+                  placeholder={t('chat.placeholder')}
                   className="min-h-[40px] max-h-28 text-sm resize-none py-2"
                   disabled={sending}
                 />

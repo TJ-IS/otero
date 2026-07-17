@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
@@ -10,8 +11,10 @@ import { api } from '@/api/client';
 import { CATEGORICAL_COLORS, STATUS_COLORS } from '@/lib/chartColors';
 import { MissingDoisModal } from '@/components/dashboard/MissingDoisModal';
 
-function formatCount(n) {
-  return Number(n || 0).toLocaleString('zh-CN');
+const UNRECOGNIZED = '未识别';
+
+function formatCount(n, lng) {
+  return Number(n || 0).toLocaleString(lng || 'zh-CN');
 }
 
 const JOURNAL_SHORT = {
@@ -26,10 +29,14 @@ const JOURNAL_SHORT = {
   'Journal of Information Technology': 'JIT',
   'The Journal of Strategic Information Systems': 'JSIS',
   'Information & Management': 'I&M',
-  '未识别': '未识别',
 };
 
-function shortName(name) {
+function displayJournalName(name, t) {
+  return name === UNRECOGNIZED ? t('basket.unrecognized') : name;
+}
+
+function shortName(name, t) {
+  if (name === UNRECOGNIZED) return t('basket.unrecognized');
   return JOURNAL_SHORT[name] || name;
 }
 
@@ -50,6 +57,8 @@ function CoverageTooltip({ active, payload, label }) {
 }
 
 export function BasketCoveragePanel() {
+  const { t, i18n } = useTranslation('dashboard');
+  const lng = i18n.language;
   const { data, loading, error } = useAsync(() => api.getStatsDoiCoverageBreakdown(), []);
   const [missingFilter, setMissingFilter] = useState(null); // { journal, year } | null
   const [selectedJournal, setSelectedJournal] = useState(null);
@@ -78,20 +87,19 @@ export function BasketCoveragePanel() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">AIS Basket 按刊覆盖率</CardTitle>
+          <CardTitle className="text-base">{t('basket.title')}</CardTitle>
           <CardDescription>
-            目标清单按期刊归因后的收录进度。点击期刊行可查看逐年缺口，点击「缺失」打开 DOI 列表。
-            缺失 DOI 的期刊/年份由 DOI 启发式推断；无法识别的归入「未识别」。
+            {t('basket.desc')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {loading ? (
             <div className="flex h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> 加载中…
+              <Loader2 className="size-4 animate-spin" /> {t('loading')}
             </div>
           ) : error ? (
             <div className="flex h-48 items-center justify-center text-sm text-destructive">
-              加载失败: {error.message}
+              {t('loadFailed', { message: error.message })}
             </div>
           ) : (
             <>
@@ -99,11 +107,11 @@ export function BasketCoveragePanel() {
                 <table className="w-full text-sm">
                   <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
                     <tr>
-                      <th className="px-3 py-2 font-medium">期刊</th>
-                      <th className="px-3 py-2 text-right font-medium">目标</th>
-                      <th className="px-3 py-2 text-right font-medium">已收录</th>
-                      <th className="px-3 py-2 text-right font-medium">缺失</th>
-                      <th className="px-3 py-2 text-right font-medium">覆盖率</th>
+                      <th className="px-3 py-2 font-medium">{t('basket.colJournal')}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t('basket.colTarget')}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t('basket.colCollected')}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t('basket.colMissing')}</th>
+                      <th className="px-3 py-2 text-right font-medium">{t('basket.colCoverage')}</th>
                       <th className="px-3 py-2 font-medium" />
                     </tr>
                   </thead>
@@ -123,13 +131,13 @@ export function BasketCoveragePanel() {
                               className="text-left font-medium hover:underline"
                               onClick={() => setSelectedJournal(active ? null : r.name)}
                             >
-                              <span className="hidden sm:inline">{r.name}</span>
-                              <span className="sm:hidden">{shortName(r.name)}</span>
+                              <span className="hidden sm:inline">{displayJournalName(r.name, t)}</span>
+                              <span className="sm:hidden">{shortName(r.name, t)}</span>
                             </button>
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{formatCount(r.target)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{formatCount(r.target, lng)}</td>
                           <td className="px-3 py-2 text-right tabular-nums text-[hsl(var(--chart-good))]">
-                            {formatCount(r.collected)}
+                            {formatCount(r.collected, lng)}
                           </td>
                           <td className="px-3 py-2 text-right">
                             <button
@@ -138,7 +146,7 @@ export function BasketCoveragePanel() {
                               disabled={!r.missing}
                               onClick={() => setMissingFilter({ journal: r.name, year: null })}
                             >
-                              {formatCount(r.missing)}
+                              {formatCount(r.missing, lng)}
                             </button>
                           </td>
                           <td className="px-3 py-2 text-right">
@@ -161,7 +169,7 @@ export function BasketCoveragePanel() {
                                 className="h-7 px-2 text-xs"
                                 onClick={() => setMissingFilter({ journal: r.name, year: null })}
                               >
-                                查看
+                                {t('basket.view')}
                                 <ExternalLink className="size-3" />
                               </Button>
                             ) : null}
@@ -176,7 +184,7 @@ export function BasketCoveragePanel() {
               <ResponsiveContainer width="100%" height={barHeight}>
                 <BarChart
                   data={rows.map((r) => ({
-                    name: shortName(r.name),
+                    name: shortName(r.name, t),
                     fullName: r.name,
                     collected: r.collected,
                     missing: r.missing,
@@ -196,7 +204,7 @@ export function BasketCoveragePanel() {
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                   <Bar
                     dataKey="collected"
-                    name="已收录"
+                    name={t('basket.colCollected')}
                     stackId="a"
                     fill={STATUS_COLORS.good}
                     radius={[0, 0, 0, 0]}
@@ -204,14 +212,14 @@ export function BasketCoveragePanel() {
                   />
                   <Bar
                     dataKey="missing"
-                    name="缺失"
+                    name={t('basket.colMissing')}
                     stackId="a"
                     fill={CATEGORICAL_COLORS[0]}
                     radius={[0, 4, 4, 0]}
                     barSize={16}
                     cursor="pointer"
-                    onClick={(data) => {
-                      const row = data?.payload || data;
+                    onClick={(barData) => {
+                      const row = barData?.payload || barData;
                       if (row?.fullName && row.missing > 0) {
                         setMissingFilter({ journal: row.fullName, year: null });
                       }
@@ -224,9 +232,9 @@ export function BasketCoveragePanel() {
                 <div className="space-y-3 rounded-lg border p-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div>
-                      <p className="text-sm font-medium">{selected.name}</p>
+                      <p className="text-sm font-medium">{displayJournalName(selected.name, t)}</p>
                       <p className="text-xs text-muted-foreground">
-                        逐年目标 / 已收录 / 缺失（仅展示能推断出年份的 DOI；点击缺失柱可下钻）
+                        {t('basket.yearBreakdown')}
                       </p>
                     </div>
                     <Button
@@ -236,11 +244,11 @@ export function BasketCoveragePanel() {
                       disabled={!selected.missing}
                       onClick={() => setMissingFilter({ journal: selected.name, year: null })}
                     >
-                      全部缺失 {formatCount(selected.missing)}
+                      {t('basket.allMissing', { count: formatCount(selected.missing, lng) })}
                     </Button>
                   </div>
                   {yearChartData.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">该刊暂无可用的年份拆分</p>
+                    <p className="py-8 text-center text-sm text-muted-foreground">{t('basket.noYearSplit')}</p>
                   ) : (
                     <ResponsiveContainer width="100%" height={280}>
                       <BarChart data={yearChartData} margin={{ left: 0, right: 8, top: 8 }}>
@@ -258,16 +266,16 @@ export function BasketCoveragePanel() {
                         />
                         <Tooltip content={<CoverageTooltip />} />
                         <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="collected" name="已收录" stackId="y" fill={STATUS_COLORS.good} barSize={14} />
+                        <Bar dataKey="collected" name={t('basket.colCollected')} stackId="y" fill={STATUS_COLORS.good} barSize={14} />
                         <Bar
                           dataKey="missing"
-                          name="缺失"
+                          name={t('basket.colMissing')}
                           stackId="y"
                           fill={CATEGORICAL_COLORS[0]}
                           barSize={14}
                           cursor="pointer"
-                          onClick={(data) => {
-                            const row = data?.payload || data;
+                          onClick={(barData) => {
+                            const row = barData?.payload || barData;
                             if (row?.year != null && row.missing > 0) {
                               setMissingFilter({ journal: selected.name, year: row.year });
                             }
@@ -278,7 +286,7 @@ export function BasketCoveragePanel() {
                   )}
                 </div>
               ) : (
-                <p className="text-center text-xs text-muted-foreground">点击上方期刊名称查看逐年覆盖</p>
+                <p className="text-center text-xs text-muted-foreground">{t('basket.clickJournal')}</p>
               )}
             </>
           )}

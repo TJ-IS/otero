@@ -1,5 +1,7 @@
 // Shared helpers for displaying items.
 
+import i18n from '../i18n';
+
 export const ITEM_TYPES = [
   'journalArticle',
   'preprint',
@@ -11,16 +13,22 @@ export const ITEM_TYPES = [
   'document',
 ];
 
-export const ITEM_TYPE_LABELS = {
-  journalArticle: '期刊论文',
-  preprint: '预印本',
-  book: '书籍',
-  bookSection: '书籍章节',
-  conferencePaper: '会议论文',
-  thesis: '学位论文',
-  report: '报告',
-  document: '文档',
-};
+export function getItemTypeLabel(type) {
+  if (!type) return '';
+  const key = `item:type.${type}`;
+  const translated = i18n.t(key);
+  return translated === key ? type : translated;
+}
+
+// Backward-compatible map: ITEM_TYPE_LABELS[type] resolves via i18n.
+export const ITEM_TYPE_LABELS = new Proxy(
+  {},
+  {
+    get(_, type) {
+      return getItemTypeLabel(type);
+    },
+  },
+);
 
 /**
  * AIS Senior Scholars' Basket of Journals — the 11 journals this system
@@ -32,6 +40,8 @@ export const ITEM_TYPE_LABELS = {
  * `src/services/journalWhitelist.js` and is imported by calibrateService.
  * The two lists MUST stay identical — a test (test/journalWhitelist.test.js)
  * asserts that they match.
+ *
+ * Canonical stored value stays Chinese "待归档"; display via common:unfiled.
  */
 export const AIS_BASKET_JOURNALS = [
   'MIS Quarterly',
@@ -69,7 +79,7 @@ export function yearOf(dateStr) {
 }
 
 export function itemTitle(item) {
-  return item?.fields?.title || '(无标题)';
+  return item?.fields?.title || i18n.t('item:untitled');
 }
 
 // Compact citation-style locator: "卷(期): 页码", e.g. "12(3): 45-67".
@@ -87,12 +97,16 @@ export function volumeIssuePages(fields) {
 
 // Human-readable label for the active list filter.
 export function filterTitle(filter, collections) {
-  if (!filter) return '全部条目';
-  if (filter.search) return `搜索: "${filter.search}"`;
-  if (filter.journal) return filter.journal;
+  if (!filter) return i18n.t('item:filterLabel.all');
+  if (filter.search) {
+    return i18n.t('item:filterLabel.search', { query: filter.search });
+  }
+  if (filter.journal) {
+    return filter.journal === UNFILED ? i18n.t('common:unfiled') : filter.journal;
+  }
   if (filter.collection) {
     const c = collections?.find(c => c.key === filter.collection);
-    return c?.name || '集合视图';
+    return c?.name || i18n.t('item:filterLabel.collection');
   }
-  return '全部条目';
+  return i18n.t('item:filterLabel.all');
 }

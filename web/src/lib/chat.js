@@ -1,14 +1,27 @@
 // Client-side chat history persistence (localStorage only — no server DB).
 // Keyed per item so each paper has its own independent conversation.
 
+import i18n from '../i18n';
+
 const STORAGE_PREFIX = 'otero.chat.';
 
-export const CHAT_PRESETS = [
-  { label: '总结全文', prompt: '请用中文总结这篇论文的核心内容，包括研究问题、方法和主要结论。' },
-  { label: '研究方法', prompt: '这篇论文使用了什么研究方法？请详细说明数据来源、变量设计和分析方法。' },
-  { label: '主要贡献', prompt: '这篇论文的主要理论贡献和实践贡献分别是什么？' },
-  { label: '局限性', prompt: '这篇论文提到了哪些局限性？未来研究方向是什么？' },
-];
+const PRESET_IDS = ['summary', 'method', 'contribution', 'limitation'];
+
+export function getChatPresets() {
+  return PRESET_IDS.map((id) => ({
+    label: i18n.t(`item:chat.presets.${id}.label`),
+    prompt: i18n.t(`item:chat.presets.${id}.prompt`),
+  }));
+}
+
+// Live array-like export so CHAT_PRESETS.map(...) always reads current locale.
+export const CHAT_PRESETS = new Proxy([], {
+  get(_target, prop) {
+    const presets = getChatPresets();
+    const value = presets[prop];
+    return typeof value === 'function' ? value.bind(presets) : value;
+  },
+});
 
 function storageKey(itemKey) {
   return `${STORAGE_PREFIX}${itemKey}`;

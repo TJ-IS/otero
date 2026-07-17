@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -18,7 +19,7 @@ import { toast } from 'sonner';
 import DOMPurify from 'dompurify';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
-import { ITEM_TYPE_LABELS, itemTitle } from '@/lib/items';
+import { ITEM_TYPE_LABELS, itemTitle, UNFILED } from '@/lib/items';
 import { AuthorLinks } from './AuthorLinks';
 import { headingId } from '@/lib/fulltext';
 import { cn } from '@/lib/utils';
@@ -28,16 +29,6 @@ const FulltextMarkdown = lazy(() => import('./FulltextMarkdown').then(m => ({ de
 
 const POLL_INTERVAL_MS = 3000;
 const ACTIVE_STATES = new Set(['submitting', 'pending', 'running', 'converting']);
-
-const STATE_LABELS = {
-  idle: '未解析',
-  submitting: '待提交',
-  pending: '排队中',
-  running: '解析中',
-  converting: '格式转换中',
-  done: '已完成',
-  failed: '解析失败',
-};
 
 /** Drop OCR noise from publisher stamp (single letters, JSTOR boilerplate fragments). */
 function cleanStampLines(lines = []) {
@@ -58,6 +49,7 @@ function cleanStampLines(lines = []) {
 }
 
 function StateBadge({ state }) {
+  const { t } = useTranslation('item');
   const map = {
     idle: 'secondary',
     pending: 'secondary',
@@ -66,14 +58,15 @@ function StateBadge({ state }) {
     done: 'default',
     failed: 'destructive',
   };
-  return <Badge variant={map[state] || 'secondary'}>{STATE_LABELS[state] || state}</Badge>;
+  return <Badge variant={map[state] || 'secondary'}>{t(`fulltextStatus.${state}`, { defaultValue: state })}</Badge>;
 }
 
 function Lightbox({ src, alt, open, onOpenChange }) {
+  const { t } = useTranslation('item');
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[92vw] max-h-[92vh] p-2 overflow-hidden flex flex-col items-center justify-center">
-        <DialogTitle className="sr-only">{alt || '预览'}</DialogTitle>
+        <DialogTitle className="sr-only">{alt || t('page.preview')}</DialogTitle>
         <img src={src} alt={alt || ''} className="max-w-full max-h-[85vh] object-contain rounded" />
         {alt && <p className="mt-2 text-xs text-muted-foreground text-center px-4">{alt}</p>}
       </DialogContent>
@@ -82,6 +75,7 @@ function Lightbox({ src, alt, open, onOpenChange }) {
 }
 
 function AssetCard({ imgUrl, caption, pageIdx, onPreview, children }) {
+  const { t } = useTranslation('item');
   return (
     <figure className="border rounded-lg overflow-hidden bg-background flex flex-col">
       {imgUrl ? (
@@ -101,7 +95,7 @@ function AssetCard({ imgUrl, caption, pageIdx, onPreview, children }) {
       {children}
       <figcaption className="px-3 py-2 text-xs text-muted-foreground border-t space-y-0.5">
         {caption ? <p className="text-foreground/90 leading-snug">{caption}</p> : null}
-        <p className="opacity-70">第 {pageIdx + 1} 页</p>
+        <p className="opacity-70">{t('fulltext.pageN', { n: pageIdx + 1 })}</p>
       </figcaption>
     </figure>
   );
@@ -128,8 +122,8 @@ function MetaRow({ label, children }) {
 }
 
 export const ItemPage = memo(function ItemPage() {
+  const { t } = useTranslation(['item', 'common']);
   const { key } = useParams();
-  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const [tocOpen, setTocOpen] = useState(true);
   const [assetTab, setAssetTab] = useState('figures');
@@ -153,10 +147,10 @@ export const ItemPage = memo(function ItemPage() {
   const copyLink = useCallback(() => {
     navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true);
-      toast.success('已复制链接');
+      toast.success(t('page.linkCopied'));
       setTimeout(() => setCopied(false), 1500);
     });
-  }, []);
+  }, [t]);
 
   const scrollToHeading = useCallback((text) => {
     const id = headingId(text);
@@ -194,17 +188,17 @@ export const ItemPage = memo(function ItemPage() {
 
   const assetTabs = useMemo(() => {
     const tabs = [];
-    if (figures.length) tabs.push({ id: 'figures', label: '图', count: figures.length, icon: ImageIcon });
+    if (figures.length) tabs.push({ id: 'figures', label: t('page.figures'), count: figures.length, icon: ImageIcon });
     if (charts.length) tabs.push({ id: 'charts', label: 'Chart', count: charts.length, icon: BarChart3 });
-    if (tables.length) tabs.push({ id: 'tables', label: '表', count: tables.length, icon: Table2 });
-    if (equations.length) tabs.push({ id: 'equations', label: '公式', count: equations.length, icon: Sigma });
-    if (references.length) tabs.push({ id: 'references', label: '文献', count: references.length, icon: Quote });
-    if (footnotes.length) tabs.push({ id: 'footnotes', label: '脚注', count: footnotes.length, icon: List });
+    if (tables.length) tabs.push({ id: 'tables', label: t('page.tables'), count: tables.length, icon: Table2 });
+    if (equations.length) tabs.push({ id: 'equations', label: t('page.equations'), count: equations.length, icon: Sigma });
+    if (references.length) tabs.push({ id: 'references', label: t('page.references'), count: references.length, icon: Quote });
+    if (footnotes.length) tabs.push({ id: 'footnotes', label: t('page.footnotes'), count: footnotes.length, icon: List });
     return tabs;
-  }, [figures, charts, tables, equations, references, footnotes]);
+  }, [figures, charts, tables, equations, references, footnotes, t]);
 
   useEffect(() => {
-    if (assetTabs.length && !assetTabs.some(t => t.id === assetTab)) {
+    if (assetTabs.length && !assetTabs.some(tab => tab.id === assetTab)) {
       setAssetTab(assetTabs[0].id);
     }
   }, [assetTabs, assetTab]);
@@ -212,7 +206,7 @@ export const ItemPage = memo(function ItemPage() {
   if (itemLoading) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center text-sm text-muted-foreground">
-        <Loader2 className="size-5 animate-spin mr-2" /> 加载中…
+        <Loader2 className="size-5 animate-spin mr-2" /> {t('common:loading')}
       </div>
     );
   }
@@ -221,10 +215,10 @@ export const ItemPage = memo(function ItemPage() {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 text-sm text-destructive">
         <AlertCircle className="size-8" />
-        <p>加载失败: {itemError.message}</p>
+        <p>{t('common:loadFailed', { message: itemError.message })}</p>
         <Button variant="outline" size="sm" asChild>
           <a href="/">
-            <ArrowLeft className="size-4 mr-1" /> 返回文库
+            <ArrowLeft className="size-4 mr-1" /> {t('common:backToLibrary')}
           </a>
         </Button>
       </div>
@@ -235,9 +229,9 @@ export const ItemPage = memo(function ItemPage() {
     return (
       <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
         <FileText className="size-8 opacity-40" />
-        <p>条目不存在</p>
+        <p>{t('page.notFound')}</p>
         <Button variant="outline" size="sm" asChild>
-          <Link to="/">返回文库</Link>
+          <Link to="/">{t('common:backToLibrary')}</Link>
         </Button>
       </div>
     );
@@ -255,10 +249,10 @@ export const ItemPage = memo(function ItemPage() {
       {/* Compact toolbar — no truncated title */}
       <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="flex items-center gap-2 px-3 sm:px-4 h-12">
-          <Button variant="ghost" size="icon" className="shrink-0" asChild title="返回文库">
+          <Button variant="ghost" size="icon" className="shrink-0" asChild title={t('common:backToLibrary')}>
             <a href="/">
               <ArrowLeft className="size-4" />
-              <span className="sr-only">返回文库</span>
+              <span className="sr-only">{t('common:backToLibrary')}</span>
             </a>
           </Button>
           <Button
@@ -266,14 +260,14 @@ export const ItemPage = memo(function ItemPage() {
             size="icon"
             className="shrink-0 hidden md:inline-flex"
             onClick={() => setTocOpen(v => !v)}
-            title={tocOpen ? '隐藏目录' : '显示目录'}
+            title={tocOpen ? t('page.hideToc') : t('page.showToc')}
           >
             {tocOpen ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
           </Button>
           <Badge variant="outline" className="shrink-0 text-[11px] font-normal">{typeLabel}</Badge>
           {state !== 'loading' && <StateBadge state={state} />}
           {structure?.pageCount > 0 && (
-            <span className="hidden sm:inline text-xs text-muted-foreground">{structure.pageCount} 页</span>
+            <span className="hidden sm:inline text-xs text-muted-foreground">{t('fulltext.pagesShort', { count: structure.pageCount })}</span>
           )}
           <div className="flex-1" />
           <div className="flex items-center gap-1.5 shrink-0">
@@ -292,7 +286,7 @@ export const ItemPage = memo(function ItemPage() {
                 </a>
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={copyLink} title="复制本页链接">
+            <Button size="sm" variant="outline" onClick={copyLink} title={t('page.copyLink')}>
               {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
             </Button>
           </div>
@@ -307,12 +301,12 @@ export const ItemPage = memo(function ItemPage() {
             tocOpen ? 'w-56 xl:w-64' : 'w-0 border-r-0 overflow-hidden',
           )}
         >
-          <div className="px-3 py-2.5 text-xs font-medium text-muted-foreground border-b shrink-0">目录</div>
+          <div className="px-3 py-2.5 text-xs font-medium text-muted-foreground border-b shrink-0">{t('page.toc')}</div>
           <ScrollArea className="flex-1">
             <nav className="p-2 space-y-0.5">
               {structureLoading ? (
                 <p className="text-xs text-muted-foreground px-2 py-3 flex items-center gap-1.5">
-                  <Loader2 className="size-3 animate-spin" /> 加载中…
+                  <Loader2 className="size-3 animate-spin" /> {t('common:loading')}
                 </p>
               ) : outline.length > 0 ? outline.map((o) => (
                 <button
@@ -326,7 +320,7 @@ export const ItemPage = memo(function ItemPage() {
                   <span className="line-clamp-3">{o.text}</span>
                 </button>
               )) : (
-                <p className="text-xs text-muted-foreground px-2 py-3">暂无目录（需先完成全文解析）</p>
+                <p className="text-xs text-muted-foreground px-2 py-3">{t('page.tocEmpty')}</p>
               )}
             </nav>
           </ScrollArea>
@@ -353,43 +347,45 @@ export const ItemPage = memo(function ItemPage() {
 
             {/* Bibliographic metadata — dense but readable */}
             <section className="space-y-2.5 border-y py-4">
-              <MetaRow label="期刊">
-                {f.publicationTitle === '待归档' && stampLines[0]
+              <MetaRow label={t('field.publicationTitle')}>
+                {f.publicationTitle === UNFILED && stampLines[0]
                   ? (
                     <span>
-                      <span className="text-muted-foreground">待归档</span>
+                      <span className="text-muted-foreground">{t('common:unfiled')}</span>
                       <span className="mx-1.5 text-muted-foreground/50">·</span>
-                      <span title="来自 MinerU 印记">{stampLines[0]}</span>
+                      <span title={t('detail.stampFromMineru')}>{stampLines[0]}</span>
                     </span>
                   )
-                  : f.publicationTitle}
+                  : f.publicationTitle === UNFILED
+                    ? t('common:unfiled')
+                    : f.publicationTitle}
               </MetaRow>
-              <MetaRow label="卷 / 期 / 页">
+              <MetaRow label={t('detail.volumeIssuePages')}>
                 {[
                   f.volume && `Vol. ${f.volume}`,
                   f.issue && `No. ${f.issue}`,
                   f.pages && `pp. ${f.pages}`,
                 ].filter(Boolean).join(' · ') || null}
               </MetaRow>
-              <MetaRow label="日期">{f.date}</MetaRow>
-              <MetaRow label="DOI">
+              <MetaRow label={t('field.date')}>{f.date}</MetaRow>
+              <MetaRow label={t('field.DOI')}>
                 {doi ? (
                   <a href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all">
                     {doi}
                   </a>
                 ) : null}
               </MetaRow>
-              <MetaRow label="URL">
+              <MetaRow label={t('field.url')}>
                 {url ? (
                   <a href={url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all inline-flex items-center gap-1">
                     {url} <ExternalLink className="size-3 shrink-0" />
                   </a>
                 ) : null}
               </MetaRow>
-              <MetaRow label="ISSN">{f.ISSN}</MetaRow>
-              <MetaRow label="语言">{f.language}</MetaRow>
-              {stampLines.length > 0 && f.publicationTitle !== '待归档' && (
-                <MetaRow label="印记">
+              <MetaRow label={t('field.ISSN')}>{f.ISSN}</MetaRow>
+              <MetaRow label={t('field.language')}>{f.language}</MetaRow>
+              {stampLines.length > 0 && f.publicationTitle !== UNFILED && (
+                <MetaRow label={t('detail.stamp')}>
                   <ul className="space-y-1 text-muted-foreground">
                     {stampLines.map((line, i) => (
                       <li key={i}>{line}</li>
@@ -401,7 +397,7 @@ export const ItemPage = memo(function ItemPage() {
 
             {f.abstractNote && (
               <section>
-                <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">摘要</h2>
+                <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">{t('detail.abstract')}</h2>
                 <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{f.abstractNote}</p>
               </section>
             )}
@@ -409,7 +405,7 @@ export const ItemPage = memo(function ItemPage() {
             {/* MinerU assets — tabbed gallery in main flow */}
             {structureLoading && (
               <div className="text-xs text-muted-foreground flex items-center gap-2">
-                <Loader2 className="size-3.5 animate-spin" /> 加载 MinerU 结构…
+                <Loader2 className="size-3.5 animate-spin" /> {t('page.loadingStructure')}
               </div>
             )}
 
@@ -417,24 +413,24 @@ export const ItemPage = memo(function ItemPage() {
               <section className="space-y-3">
                 <div className="flex items-baseline justify-between gap-2">
                   <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    MinerU 提取资产
+                    {t('page.assets')}
                   </h2>
                   <span className="text-[11px] text-muted-foreground">
                     {[
-                      figures.length && `${figures.length} 图`,
-                      tables.length && `${tables.length} 表`,
-                      equations.length && `${equations.length} 公式`,
-                      references.length && `${references.length} 文献`,
+                      figures.length && t('page.nFigures', { count: figures.length }),
+                      tables.length && t('page.nTables', { count: tables.length }),
+                      equations.length && t('page.nEquations', { count: equations.length }),
+                      references.length && t('page.nReferences', { count: references.length }),
                     ].filter(Boolean).join(' · ')}
                   </span>
                 </div>
                 <Tabs value={assetTab} onValueChange={setAssetTab}>
                   <TabsList className="h-auto flex-wrap justify-start gap-1">
-                    {assetTabs.map(t => (
-                      <TabsTrigger key={t.id} value={t.id} className="text-xs gap-1.5">
-                        <t.icon className="size-3.5" />
-                        {t.label}
-                        <span className="opacity-60">{t.count}</span>
+                    {assetTabs.map(tab => (
+                      <TabsTrigger key={tab.id} value={tab.id} className="text-xs gap-1.5">
+                        <tab.icon className="size-3.5" />
+                        {tab.label}
+                        <span className="opacity-60">{tab.count}</span>
                       </TabsTrigger>
                     ))}
                   </TabsList>
@@ -468,15 +464,15 @@ export const ItemPage = memo(function ItemPage() {
                   </TabsContent>
 
                   <TabsContent value="tables" className="mt-3 space-y-3">
-                    {tables.map(t => (
+                    {tables.map(tbl => (
                       <AssetCard
-                        key={t.id}
-                        imgUrl={t.imgUrl}
-                        caption={t.caption}
-                        pageIdx={t.pageIdx}
+                        key={tbl.id}
+                        imgUrl={tbl.imgUrl}
+                        caption={tbl.caption}
+                        pageIdx={tbl.pageIdx}
                         onPreview={openPreview}
                       >
-                        {t.html && <SafeExtractedTable html={t.html} />}
+                        {tbl.html && <SafeExtractedTable html={tbl.html} />}
                       </AssetCard>
                     ))}
                   </TabsContent>
@@ -530,11 +526,11 @@ export const ItemPage = memo(function ItemPage() {
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
-                  <FileText className="size-3.5" /> 全文
+                  <FileText className="size-3.5" /> {t('detail.tabFulltext')}
                 </h2>
                 {isActive && fulltext?.totalPages && (
                   <span className="text-xs text-muted-foreground">
-                    {fulltext.extractedPages ?? 0} / {fulltext.totalPages} 页
+                    {t('fulltext.pages', { extracted: fulltext.extractedPages ?? 0, total: fulltext.totalPages })}
                   </span>
                 )}
               </div>
@@ -542,36 +538,36 @@ export const ItemPage = memo(function ItemPage() {
               {(fulltextLoading || state === 'loading') && (
                 <div className="rounded-lg border px-6 py-10 text-center text-sm text-muted-foreground">
                   <Loader2 className="size-7 animate-spin mx-auto mb-2 opacity-60" />
-                  <p>加载全文…</p>
+                  <p>{t('fulltext.loadingMd')}</p>
                 </div>
               )}
 
               {!fulltextLoading && state === 'idle' && (
                 <div className="rounded-lg border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
                   <FileText className="size-7 opacity-40 mx-auto mb-2" />
-                  <p>PDF 尚未解析为全文。</p>
-                  <p className="text-xs mt-1">在文库浮窗中点击「解析全文」后即可在此阅读。</p>
+                  <p>{t('fulltext.notParsed')}</p>
+                  <p className="text-xs mt-1">{t('fulltext.notParsedHint')}</p>
                 </div>
               )}
 
               {!fulltextLoading && isActive && (
                 <div className="rounded-lg border px-6 py-10 text-center text-sm text-muted-foreground">
                   <Loader2 className="size-7 animate-spin mx-auto mb-2 opacity-60" />
-                  <p>{STATE_LABELS[state]}…</p>
-                  <p className="text-xs mt-1">页面会自动刷新。</p>
+                  <p>{t(`fulltextStatus.${state}`)}…</p>
+                  <p className="text-xs mt-1">{t('fulltext.autoRefreshShort')}</p>
                 </div>
               )}
 
               {!fulltextLoading && state === 'failed' && (
                 <div className="rounded-lg border px-6 py-10 text-center text-sm text-destructive">
                   <AlertCircle className="size-7 mx-auto mb-2" />
-                  <p>解析失败</p>
-                  <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">{fulltext?.errMsg || '未知错误'}</p>
+                  <p>{t('fulltext.parseFailed')}</p>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">{fulltext?.errMsg || t('common:unknownError')}</p>
                 </div>
               )}
 
               {!fulltextLoading && state === 'done' && fulltext?.markdown && (
-                <Suspense fallback={<div className="text-sm text-muted-foreground py-6">加载渲染器…</div>}>
+                <Suspense fallback={<div className="text-sm text-muted-foreground py-6">{t('fulltext.loadingRenderer')}</div>}>
                   <FulltextMarkdown
                     markdown={fulltext.markdown}
                     imagesBaseUrl={fulltext.imagesBaseUrl}
@@ -582,7 +578,7 @@ export const ItemPage = memo(function ItemPage() {
 
               {!fulltextLoading && state === 'done' && !fulltext?.markdown && (
                 <div className="rounded-lg border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
-                  已解析，但未找到 Markdown 文件。
+                  {t('fulltext.mdMissing')}
                 </div>
               )}
             </section>

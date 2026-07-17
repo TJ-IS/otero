@@ -1,12 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from 'next-themes';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Search as SearchIcon, X, FileText, Moon, Sun, Loader2 } from 'lucide-react';
-import { api } from '@/api/client';
 import { useInfiniteItems } from '@/hooks/useInfiniteItems';
 import {
   ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle,
@@ -55,11 +55,13 @@ function matchInfo(item, q) {
 }
 
 function ResultCard({ item, query, onSelect }) {
+  const { t } = useTranslation(['library', 'common']);
   const m = useMemo(() => matchInfo(item, query), [item, query]);
   const title = itemTitle(item);
   const authors = creatorsList(item.creators) || '';
   const year = yearOf(item.fields?.date) || '';
   const jBadge = journalBadgeProps(item.fields?.publicationTitle);
+  const journalLabel = jBadge.label === UNFILED ? t('common:unfiled') : jBadge.label;
   const doi = item.fields?.DOI || '';
 
   // Prefer MinerU body snippet when the hit is from full text; otherwise
@@ -87,7 +89,7 @@ function ResultCard({ item, query, onSelect }) {
           </button>
         </h3>
         {snippetFromFulltext ? (
-          <Badge variant="outline" className="shrink-0 font-normal text-[10px]">正文</Badge>
+          <Badge variant="outline" className="shrink-0 font-normal text-[10px]">{t('search.fulltextBadge')}</Badge>
         ) : null}
       </div>
 
@@ -99,7 +101,7 @@ function ResultCard({ item, query, onSelect }) {
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {year && <span className="tabular-nums">{year}</span>}
-        <Badge variant={jBadge.variant} className="font-normal">{jBadge.label}</Badge>
+        <Badge variant={jBadge.variant} className="font-normal">{journalLabel}</Badge>
         {doi && (
           <span className={cn('truncate', m?.doiHit && 'text-foreground')}>
             {m?.doiHit ? highlight(doi, query) : doi}
@@ -132,6 +134,7 @@ function ResultsSkeleton({ count = 8 }) {
 }
 
 export const SearchPage = memo(function SearchPage() {
+  const { t } = useTranslation(['library', 'common']);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQ = searchParams.get('q') || '';
@@ -182,28 +185,28 @@ export const SearchPage = memo(function SearchPage() {
   const onSelect = useCallback((key) => {
     if (key === selectedKey) return;
     if (detailDirty) {
-      toast.message('当前条目有未保存的修改', { description: '请先保存或放弃修改后再切换。' });
+      toast.message(t('common:unsavedChangesToast'), { description: t('common:unsavedSwitchToastDesc') });
       return;
     }
     setSelectedKey(key);
     setDetailOpen(true);
-  }, [selectedKey, detailDirty]);
+  }, [selectedKey, detailDirty, t]);
 
   const onItemDeleted = useCallback(() => {
     setSelectedKey(null);
     setDetailDirty(false);
     setDetailOpen(false);
-    toast.success('条目已删除');
-  }, []);
+    toast.success(t('itemDeleted'));
+  }, [t]);
 
   const closeDetail = useCallback(() => {
     if (detailDirty) {
-      toast.message('当前条目有未保存的修改', { description: '请先保存或放弃修改后再关闭。' });
+      toast.message(t('common:unsavedChangesToast'), { description: t('common:unsavedCloseDesc') });
       return;
     }
     setDetailOpen(false);
     setSelectedKey(null);
-  }, [detailDirty]);
+  }, [detailDirty, t]);
 
   const resultCount = total || 0;
   const hasQuery = Boolean(submitted);
@@ -223,7 +226,7 @@ export const SearchPage = memo(function SearchPage() {
           variant="ghost"
           size="sm"
           onClick={() => navigate('/')}
-          title="返回文库"
+          title={t('common:backToLibrary')}
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
@@ -235,7 +238,7 @@ export const SearchPage = memo(function SearchPage() {
           <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={inputRef}
-            placeholder="搜索标题、作者、DOI、全文..."
+            placeholder={t('search.placeholder')}
             value={input}
             onChange={e => setInput(e.target.value)}
             className="h-8 w-full pl-8 pr-8"
@@ -245,7 +248,7 @@ export const SearchPage = memo(function SearchPage() {
               type="button"
               onClick={clearQuery}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              title="清除搜索"
+              title={t('search.clear')}
             >
               <X className="size-3.5" />
             </button>
@@ -257,7 +260,7 @@ export const SearchPage = memo(function SearchPage() {
             variant="ghost"
             size="sm"
             onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            title={resolvedTheme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+            title={resolvedTheme === 'dark' ? t('common:themeToLight') : t('common:themeToDark')}
             className="shrink-0 text-muted-foreground hover:text-foreground"
           >
             {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -270,24 +273,24 @@ export const SearchPage = memo(function SearchPage() {
         <div className="mx-auto max-w-2xl">
           {error ? (
             <div className="py-16 text-center text-sm text-destructive">
-              搜索失败：{error.message}
+              {t('search.failed', { message: error.message })}
             </div>
           ) : !hasQuery ? (
             <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground">
               <FileText className="size-8 opacity-30" />
-              <p className="mt-3 text-sm">输入关键词搜索文献</p>
-              <p className="mt-1 text-xs">匹配标题、摘要、期刊、DOI、作者与已解析全文</p>
+              <p className="mt-3 text-sm">{t('search.emptyPrompt')}</p>
+              <p className="mt-1 text-xs">{t('search.emptyHint')}</p>
             </div>
           ) : loading && items.length === 0 ? (
             <ResultsSkeleton />
           ) : resultCount === 0 ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
-              没有找到与「{submitted}」相关的条目
+              {t('search.noResults', { query: submitted })}
             </div>
           ) : (
             <>
               <div className="mb-3 text-xs text-muted-foreground tabular-nums">
-                找到约 <span className="text-foreground font-medium">{resultCount}</span> 条结果
+                {t('search.foundApprox')} <span className="text-foreground font-medium">{resultCount}</span> {t('search.results')}
               </div>
               <div className="space-y-2">
                 {items.map(it => (
@@ -296,7 +299,7 @@ export const SearchPage = memo(function SearchPage() {
               </div>
               {loadingMore && (
                 <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" /> 加载更多...
+                  <Loader2 className="size-3 animate-spin" /> {t('search.loadMore')}
                 </div>
               )}
             </>

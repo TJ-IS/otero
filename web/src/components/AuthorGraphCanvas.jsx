@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowUpRight, LocateFixed, Minus, Network, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CATEGORICAL_COLORS } from '@/lib/chartColors';
@@ -55,13 +56,13 @@ function communityColor(community) {
   return CATEGORICAL_COLORS[community];
 }
 
-function formatMetric(value, metric) {
+function formatMetric(value, metric, lng) {
   if (metric === 'betweenness') return `${((Number(value) || 0) * 100).toFixed(1)}%`;
-  return Number(value || 0).toLocaleString('zh-CN');
+  return Number(value || 0).toLocaleString(lng || 'zh-CN');
 }
 
-function graphLabel(name) {
-  const value = name || '(未命名)';
+function graphLabel(name, unnamedLabel) {
+  const value = name || unnamedLabel;
   return value.length > 22 ? `${value.slice(0, 21)}…` : value;
 }
 
@@ -83,6 +84,9 @@ const GraphScene = memo(function GraphScene({
   onKeyboardMove,
   dragMovedRef,
 }) {
+  const { t } = useTranslation('dashboard');
+  const unnamedLabel = t('authors.unnamed');
+
   return (
     <>
       <g>
@@ -122,6 +126,8 @@ const GraphScene = memo(function GraphScene({
           const fill = communityColor(node.community);
           const mutedCommunity = node.community < 0 || node.community >= MAX_COLORED_COMMUNITIES;
           const showLabel = position.radius > 16 || isHovered || isSelected || isMatched;
+          const displayName = node.name || unnamedLabel;
+          const degree = node.metrics?.degree || 0;
           return (
             <g
               key={node.id}
@@ -129,7 +135,7 @@ const GraphScene = memo(function GraphScene({
               role="button"
               tabIndex={isKeyboardTarget ? 0 : -1}
               data-node-id={node.id}
-              aria-label={`${node.name}，${node.paperCount} 篇论文，${node.metrics?.degree || 0} 位显示合作者`}
+              aria-label={t('authors.nodeAria', { name: displayName, papers: node.paperCount, degree })}
               onMouseEnter={() => onHover(node.id)}
               onMouseLeave={() => onHover((current) => (current === node.id ? null : current))}
               onFocus={() => {
@@ -208,10 +214,10 @@ const GraphScene = memo(function GraphScene({
                   opacity={dimmed ? 0.18 : 1}
                   style={{ pointerEvents: 'none' }}
                 >
-                  {graphLabel(node.name)}
+                  {graphLabel(node.name, unnamedLabel)}
                 </text>
               ) : null}
-              <title>{`${node.name}：${node.paperCount} 篇论文`}</title>
+              <title>{t('authors.nodeTitle', { name: displayName, papers: node.paperCount })}</title>
             </g>
           );
         })}
@@ -221,6 +227,7 @@ const GraphScene = memo(function GraphScene({
 });
 
 function AuthorDetails({ node, neighbors, onClose, onOpenAuthor }) {
+  const { t, i18n } = useTranslation('dashboard');
   if (!node) return null;
   return (
     <aside className="absolute inset-x-3 bottom-3 max-h-[44%] overflow-auto rounded-lg border bg-background/95 p-4 shadow-lg backdrop-blur-md md:inset-x-auto md:bottom-auto md:right-3 md:top-3 md:max-h-[calc(100%-1.5rem)] md:w-80">
@@ -231,40 +238,42 @@ function AuthorDetails({ node, neighbors, onClose, onOpenAuthor }) {
               className="size-2 rounded-full"
               style={{ background: communityColor(node.community) }}
             />
-            {node.community >= 0 ? `合作社区 ${node.community + 1}` : '当前网络中未连接'}
+            {node.community >= 0
+              ? t('authors.communityN', { n: node.community + 1 })
+              : t('authors.unconnected')}
           </div>
           <h2 className="truncate text-sm font-semibold" title={node.name}>{node.name}</h2>
-          <p className="mt-1 text-xs text-muted-foreground">指标均基于当前筛选后的显示网络</p>
+          <p className="mt-1 text-xs text-muted-foreground">{t('authors.metricsNote')}</p>
         </div>
-        <Button variant="ghost" size="icon" className="size-9 shrink-0" onClick={onClose} title="关闭详情">
+        <Button variant="ghost" size="icon" className="size-9 shrink-0" onClick={onClose} title={t('authors.closeDetail')}>
           <X className="size-4" />
         </Button>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 border-y py-3 text-xs">
         <div className="border-r pr-3">
-          <dt className="text-muted-foreground">筛选期内论文</dt>
+          <dt className="text-muted-foreground">{t('authors.metricPapers')}</dt>
           <dd className="mt-1 font-mono text-base font-semibold tabular-nums">{node.paperCount}</dd>
         </div>
         <div className="pl-3">
-          <dt className="text-muted-foreground">显示网络合作者</dt>
+          <dt className="text-muted-foreground">{t('authors.metricDegree')}</dt>
           <dd className="mt-1 font-mono text-base font-semibold tabular-nums">{node.metrics?.degree || 0}</dd>
         </div>
         <div className="mt-3 border-r pr-3">
-          <dt className="text-muted-foreground">合作强度</dt>
+          <dt className="text-muted-foreground">{t('authors.metricStrength')}</dt>
           <dd className="mt-1 font-mono text-base font-semibold tabular-nums">{node.metrics?.weightedDegree || 0}</dd>
         </div>
         <div className="mt-3 pl-3">
-          <dt className="text-muted-foreground">拓扑桥梁度</dt>
+          <dt className="text-muted-foreground">{t('authors.metricBetweenness')}</dt>
           <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
-            {formatMetric(node.metrics?.betweenness, 'betweenness')}
+            {formatMetric(node.metrics?.betweenness, 'betweenness', i18n.language)}
           </dd>
         </div>
       </dl>
 
       <div className="mt-3">
         <div className="mb-2 flex items-center justify-between text-xs">
-          <span className="font-medium">最强合作关系</span>
+          <span className="font-medium">{t('authors.strongestTies')}</span>
           <span className="text-muted-foreground">k-core {node.metrics?.core || 0}</span>
         </div>
         {neighbors.length ? (
@@ -280,18 +289,18 @@ function AuthorDetails({ node, neighbors, onClose, onOpenAuthor }) {
                   {entry.node.name}
                 </button>
                 <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
-                  {entry.weight} 篇
+                  {t('authors.nPapersUnit', { count: entry.weight })}
                 </span>
               </li>
             ))}
           </ol>
         ) : (
-          <p className="text-xs text-muted-foreground">当前阈值下没有显示合作关系</p>
+          <p className="text-xs text-muted-foreground">{t('authors.noTies')}</p>
         )}
       </div>
 
       <Button className="mt-4 w-full active:scale-[0.98]" size="sm" onClick={() => onOpenAuthor(node.id)}>
-        查看作者论文
+        {t('authors.viewAuthorPapers')}
         <ArrowUpRight className="size-4" />
       </Button>
     </aside>
@@ -311,6 +320,7 @@ export function AuthorGraphCanvas({
   resetToken,
   focusToken,
 }) {
+  const { t } = useTranslation('dashboard');
   const containerRef = useRef(null);
   const svgRef = useRef(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
@@ -603,7 +613,7 @@ export function AuthorGraphCanvas({
         height={size.height}
         className="select-none"
         role="group"
-        aria-label={`${meta.nodeCount} 位作者、${meta.edgeCount} 条合作关系的共著网络`}
+        aria-label={t('authors.graphAria', { nodes: meta.nodeCount, edges: meta.edgeCount })}
         {...bind}
         onDoubleClick={(event) => {
           if (event.target !== event.currentTarget) return;
@@ -640,7 +650,7 @@ export function AuthorGraphCanvas({
       {reducedMotion && positions.size !== nodes.length ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <span className="rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
-            正在整理网络布局…
+            {t('authors.layouting')}
           </span>
         </div>
       ) : null}
@@ -648,7 +658,7 @@ export function AuthorGraphCanvas({
       <div
         className={`absolute top-3 flex items-center overflow-hidden rounded-lg border bg-background/90 shadow-sm backdrop-blur-md ${selectedNode ? 'right-3 md:right-[21rem]' : 'right-3'}`}
         role="group"
-        aria-label="画布缩放"
+        aria-label={t('authors.zoomAria')}
       >
         <Button
           variant="ghost"
@@ -658,7 +668,7 @@ export function AuthorGraphCanvas({
             markUserInteraction();
             zoomAt({ x: size.width / 2, y: size.height / 2 }, 1 / 1.25, { animated: true });
           }}
-          title="缩小"
+          title={t('authors.zoomOut')}
         >
           <Minus className="size-4" />
         </Button>
@@ -670,7 +680,7 @@ export function AuthorGraphCanvas({
             userInteractedRef.current = false;
             animateTo(fittedView());
           }}
-          title="适应画布"
+          title={t('authors.fitCanvas')}
         >
           {Math.round(view.k * 100)}%
         </button>
@@ -682,7 +692,7 @@ export function AuthorGraphCanvas({
             markUserInteraction();
             zoomAt({ x: size.width / 2, y: size.height / 2 }, 1.25, { animated: true });
           }}
-          title="放大"
+          title={t('authors.zoomIn')}
         >
           <Plus className="size-4" />
         </Button>
@@ -695,7 +705,7 @@ export function AuthorGraphCanvas({
             userInteractedRef.current = false;
             animateTo(fittedView());
           }}
-          title="适应画布"
+          title={t('authors.fitCanvas')}
         >
           <LocateFixed className="size-4" />
         </Button>
@@ -703,9 +713,12 @@ export function AuthorGraphCanvas({
 
       {hoveredNode && hoveredId !== selectedId ? (
         <div className="pointer-events-none absolute left-3 top-3 rounded-md border bg-popover/95 px-3 py-2 text-sm shadow-md backdrop-blur-sm">
-          <div className="max-w-64 truncate font-medium">{hoveredNode.name || '(未命名)'}</div>
+          <div className="max-w-64 truncate font-medium">{hoveredNode.name || t('authors.unnamed')}</div>
           <div className="mt-0.5 text-xs text-muted-foreground">
-            {hoveredNode.paperCount} 篇论文 · {hoveredNode.metrics?.degree || 0} 位显示合作者
+            {t('authors.hoverPapers', {
+              papers: hoveredNode.paperCount,
+              degree: hoveredNode.metrics?.degree || 0,
+            })}
           </div>
         </div>
       ) : null}
@@ -714,17 +727,17 @@ export function AuthorGraphCanvas({
         <div className="pointer-events-none absolute bottom-3 left-3 hidden max-w-sm rounded-md border bg-background/90 px-3 py-2 backdrop-blur-sm sm:block">
           <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
             <Network className="size-3.5" />
-            主要合作社区
+            {t('authors.mainCommunities')}
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             {visibleCommunities.map((community) => (
               <span key={community.id} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                 <span className="size-2 rounded-full" style={{ background: communityColor(community.id) }} />
-                {community.id + 1} · {community.nodeCount} 人
+                {t('authors.communityPeople', { id: community.id + 1, count: community.nodeCount })}
               </span>
             ))}
             {communities.length > visibleCommunities.length ? (
-              <span className="text-[11px] text-muted-foreground">其余社区使用灰色</span>
+              <span className="text-[11px] text-muted-foreground">{t('authors.otherCommunitiesGray')}</span>
             ) : null}
           </div>
         </div>

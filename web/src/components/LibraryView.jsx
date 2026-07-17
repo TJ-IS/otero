@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -25,6 +26,7 @@ const MIN_DETAIL = 360;
 const MAX_DETAIL = 640;
 
 export function LibraryView() {
+  const { t } = useTranslation(['library', 'common']);
   const { canEdit } = useAuth();
   const isMobile = useIsMobile();
   const [filter, setFilter] = useState({ type: null, journal: null, collection: null, search: null });
@@ -64,8 +66,8 @@ export function LibraryView() {
   }, []);
 
   const onImported = useCallback((result) => {
-    toast.success(`已导入: ${result.parent?.fields?.title || '(未识别)'}`, {
-      description: `类型: ${ITEM_TYPE_LABELS[result.parent?.itemType] || result.parent?.itemType || '—'}`,
+    toast.success(t('import.success', { title: result.parent?.fields?.title || t('import.unrecognized') }), {
+      description: t('import.type', { type: ITEM_TYPE_LABELS[result.parent?.itemType] || result.parent?.itemType || '—' }),
     });
     refreshItems();
     refreshSidebar();
@@ -73,7 +75,7 @@ export function LibraryView() {
       setSelectedKey(result.parent.key);
       setDetailOpen(true);
     }
-  }, [refreshItems, refreshSidebar]);
+  }, [refreshItems, refreshSidebar, t]);
 
   const onItemDeleted = useCallback(() => {
     setSelectedKey(null);
@@ -81,8 +83,8 @@ export function LibraryView() {
     setDetailOpen(false);
     refreshItems();
     refreshSidebar();
-    toast.success('条目已删除');
-  }, [refreshItems, refreshSidebar]);
+    toast.success(t('itemDeleted'));
+  }, [refreshItems, refreshSidebar, t]);
 
   const onSelect = useCallback((key) => {
     if (key === selectedKey) return;
@@ -112,7 +114,7 @@ export function LibraryView() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
         e.preventDefault();
         if (!canEdit) {
-          toast.error('请先连接白名单钱包');
+          toast.error(t('common:connectWhitelistFirst'));
           return;
         }
         fileInputRef.current?.click();
@@ -130,7 +132,7 @@ export function LibraryView() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [detailOpen, detailDirty, canEdit]);
+  }, [detailOpen, detailDirty, canEdit, t]);
 
   // Sidebar drag resize
   useEffect(() => {
@@ -189,7 +191,7 @@ export function LibraryView() {
   return (
     <div className="relative flex h-[100dvh] w-full overflow-hidden bg-background">
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow">
-        跳到文献列表
+        {t('skipToList')}
       </a>
       {sidebarOpen && !isMobile && (
         <aside className="hidden h-full shrink-0 border-r bg-background md:flex" style={{ width: SIDEBAR_WIDTH }}>
@@ -205,7 +207,7 @@ export function LibraryView() {
       {isMobile && (
         <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
           <SheetContent side="left" className="w-[min(20rem,calc(100vw-2.5rem))] max-w-none p-0">
-            <SheetTitle className="sr-only">期刊分类</SheetTitle>
+            <SheetTitle className="sr-only">{t('journals.heading')}</SheetTitle>
             <Sidebar
               filter={filter}
               onFilterChange={onFilterChange}
@@ -246,7 +248,7 @@ export function LibraryView() {
         open={detailOpen}
         onClose={() => {
           if (detailDirty) {
-            toast.message('当前条目有未保存的修改', { description: '请先保存或放弃修改后再关闭。' });
+            toast.message(t('common:unsavedChangesToast'), { description: t('common:unsavedCloseDesc') });
             return;
           }
           setDetailOpen(false);
@@ -257,7 +259,7 @@ export function LibraryView() {
           <button
             type="button"
             onMouseDown={startDetailResize}
-            aria-label="调整详情面板宽度"
+            aria-label={t('adjustPanelWidth')}
             className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/40 active:bg-primary/60 transition-colors"
           />
         }
@@ -273,7 +275,7 @@ export function LibraryView() {
           </div>
         ) : (
           <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground text-sm">
-            请在左侧选择一个条目
+            {t('selectItem')}
           </div>
         )}
       </FloatingDetailPanel>
@@ -282,14 +284,14 @@ export function LibraryView() {
       <AlertDialog open={!!confirmSwitchTarget} onOpenChange={(open) => { if (!open) setConfirmSwitchTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>放弃未保存的修改？</AlertDialogTitle>
+            <AlertDialogTitle>{t('common:unsavedSwitchTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              当前条目有未保存的修改，切换后将丢失这些改动。
+              {t('common:unsavedSwitchDesc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>继续编辑</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSwitch}>放弃并切换</AlertDialogAction>
+            <AlertDialogCancel>{t('common:continueEditing')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSwitch}>{t('common:discardAndSwitch')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

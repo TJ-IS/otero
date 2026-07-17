@@ -1,10 +1,12 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { AuthorAnalyticsPanel } from '@/components/dashboard/AuthorAnalyticsPanel';
 
 export function DashboardAuthorStats() {
   const navigate = useNavigate();
+  const { t } = useTranslation('dashboard');
 
   return (
     <div className="pb-8">
@@ -18,10 +20,10 @@ export function DashboardAuthorStats() {
             onClick={() => navigate('/dashboard/authors')}
           >
             <ArrowLeft className="size-4" />
-            返回关系网络
+            {t('authors.backToGraph')}
           </Button>
           <span className="text-sm text-muted-foreground">/</span>
-          <span className="text-sm font-medium">学者统计</span>
+          <span className="text-sm font-medium">{t('authors.statsTitle')}</span>
         </div>
       </div>
       <AuthorAnalyticsPanel />
