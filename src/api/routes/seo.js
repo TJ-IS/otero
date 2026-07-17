@@ -16,10 +16,16 @@ seoRouter.get('/llms.txt', (_req, res) => {
   res.type('text/plain; charset=utf-8').send(buildLlmsTxt());
 });
 
+function sendSitemap(res, xml) {
+  res
+    .type('application/xml; charset=utf-8')
+    .set('Cache-Control', 'public, max-age=3600')
+    .send(xml);
+}
+
 seoRouter.get('/sitemap.xml', async (_req, res, next) => {
   try {
-    const xml = await buildSitemapXml('index');
-    res.type('application/xml; charset=utf-8').send(xml);
+    sendSitemap(res, await buildSitemapXml('index'));
   } catch (err) {
     next(err);
   }
@@ -27,8 +33,7 @@ seoRouter.get('/sitemap.xml', async (_req, res, next) => {
 
 seoRouter.get('/sitemap-static.xml', async (_req, res, next) => {
   try {
-    const xml = await buildSitemapXml('static');
-    res.type('application/xml; charset=utf-8').send(xml);
+    sendSitemap(res, await buildSitemapXml('static'));
   } catch (err) {
     next(err);
   }
@@ -36,8 +41,7 @@ seoRouter.get('/sitemap-static.xml', async (_req, res, next) => {
 
 seoRouter.get('/sitemap-items.xml', async (_req, res, next) => {
   try {
-    const xml = await buildSitemapXml('items');
-    res.type('application/xml; charset=utf-8').send(xml);
+    sendSitemap(res, await buildSitemapXml('items'));
   } catch (err) {
     next(err);
   }
@@ -45,8 +49,7 @@ seoRouter.get('/sitemap-items.xml', async (_req, res, next) => {
 
 seoRouter.get('/sitemap-authors.xml', async (_req, res, next) => {
   try {
-    const xml = await buildSitemapXml('authors');
-    res.type('application/xml; charset=utf-8').send(xml);
+    sendSitemap(res, await buildSitemapXml('authors'));
   } catch (err) {
     next(err);
   }

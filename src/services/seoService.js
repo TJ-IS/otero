@@ -14,6 +14,23 @@ const WEB_DIST = path.resolve(__dirname, '..', '..', 'web', 'dist');
 const WEB_INDEX_DEV = path.resolve(__dirname, '..', '..', 'web', 'index.html');
 
 const SITEMAP_URL_LIMIT = 45000;
+const SITEMAP_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const sitemapCache = new Map();
+
+function getCachedSitemap(key) {
+  const hit = sitemapCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > SITEMAP_CACHE_TTL_MS) {
+    sitemapCache.delete(key);
+    return null;
+  }
+  return hit.xml;
+}
+
+function setCachedSitemap(key, xml) {
+  sitemapCache.set(key, { at: Date.now(), xml });
+  return xml;
+}
 
 const STATIC_PAGES = [
   { path: '/', changefreq: 'daily', priority: '1.0' },
@@ -302,48 +319,56 @@ ${body}
 }
 
 /**
- * Build sitemap XML. When the corpus is large, return a sitemap index and
- * support /sitemap-static.xml, /sitemap-items.xml, /sitemap-authors.xml.
+ * Build sitemap XML. `/sitemap.xml` is always a lightweight sitemap index
+ * (no DB). Child sitemaps are cached in-memory to avoid regenerating multi-MB
+ * XML on every Googlebot hit.
  */
 export async function buildSitemapXml(which = 'index') {
+  // Index must be instant — never query the corpus here.
+  if (which === 'index') {
+    return buildSitemapIndex([
+      absoluteUrl('/sitemap-static.xml'),
+      absoluteUrl('/sitemap-items.xml'),
+      absoluteUrl('/sitemap-authors.xml'),
+    ]);
+  }
+
+  const cached = getCachedSitemap(which);
+  if (cached) return cached;
+
   const staticEntries = STATIC_PAGES.map((p) => urlEntry({
     loc: absoluteUrl(p.path),
     changefreq: p.changefreq,
     priority: p.priority,
   }));
 
-  if (which === 'static') return buildUrlset(staticEntries);
+  if (which === 'static') {
+    return setCachedSitemap(which, buildUrlset(staticEntries));
+  }
 
-  const [items, authors] = await Promise.all([
-    listSitemapItems(),
-    listSitemapAuthors(),
-  ]);
+  if (which === 'items') {
+    const items = await listSitemapItems();
+    const itemEntries = items.slice(0, SITEMAP_URL_LIMIT).map((row) => urlEntry({
+      loc: absoluteUrl(`/items/${row.key}`),
+      lastmod: formatW3cDate(row.dateModified),
+      changefreq: 'monthly',
+      priority: '0.7',
+    }));
+    return setCachedSitemap(which, buildUrlset(itemEntries));
+  }
 
-  const itemEntries = items.slice(0, SITEMAP_URL_LIMIT).map((row) => urlEntry({
-    loc: absoluteUrl(`/items/${row.key}`),
-    lastmod: formatW3cDate(row.dateModified),
-    changefreq: 'monthly',
-    priority: '0.7',
-  }));
+  if (which === 'authors') {
+    const authors = await listSitemapAuthors();
+    const authorEntries = authors.slice(0, SITEMAP_URL_LIMIT).map((row) => urlEntry({
+      loc: absoluteUrl(`/authors/${row.id}`),
+      lastmod: formatW3cDate(row.dateModified),
+      changefreq: 'monthly',
+      priority: '0.6',
+    }));
+    return setCachedSitemap(which, buildUrlset(authorEntries));
+  }
 
-  const authorEntries = authors.slice(0, SITEMAP_URL_LIMIT).map((row) => urlEntry({
-    loc: absoluteUrl(`/authors/${row.id}`),
-    lastmod: formatW3cDate(row.dateModified),
-    changefreq: 'monthly',
-    priority: '0.6',
-  }));
-
-  if (which === 'items') return buildUrlset(itemEntries);
-  if (which === 'authors') return buildUrlset(authorEntries);
-
-  // Always return a sitemap index for `/sitemap.xml`. A monolithic ~5MB urlset
-  // often makes Google Search Console report "Couldn't fetch" even when under
-  // the 50MB / 50k-URL hard limits; child sitemaps are smaller and more reliable.
-  return buildSitemapIndex([
-    absoluteUrl('/sitemap-static.xml'),
-    absoluteUrl('/sitemap-items.xml'),
-    absoluteUrl('/sitemap-authors.xml'),
-  ]);
+  throw new Error(`Unknown sitemap variant: ${which}`);
 }
 
 const DEFAULT_DESCRIPTION =
