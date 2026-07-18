@@ -7,6 +7,16 @@ import remarkGfm from 'remark-gfm';
 import { Sparkles, X, Send, Trash2, User, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 import { getChatPresets, clearChatHistory, loadChatHistory, saveChatHistory } from '@/lib/chat';
@@ -75,6 +85,7 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
   const [panelPresent, setPanelPresent] = useState(false);
   const [panelState, setPanelState] = useState('closed');
   const [input, setInput] = useState('');
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
   const scrollRef = useRef(null);
   const presets = getChatPresets();
 
@@ -192,7 +203,14 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
                 {t('chat.assistant')}
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={handleClear} title={t('chat.clear')}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 text-muted-foreground hover:text-foreground"
+                  onClick={() => setClearConfirmOpen(true)}
+                  disabled={messages.length === 0}
+                  title={t('chat.clear')}
+                >
                   <Trash2 className="size-3.5" />
                 </Button>
                 <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)} title={t('common:close')}>
@@ -250,6 +268,27 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
           </div>
         </>
       )}
+
+      <AlertDialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('chat.clearConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('chat.clearConfirmDesc')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                handleClear();
+                setClearConfirmOpen(false);
+              }}
+            >
+              {t('chat.clearConfirmAction')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 });

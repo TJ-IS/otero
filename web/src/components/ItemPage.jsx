@@ -320,33 +320,35 @@ export const ItemPage = memo(function ItemPage() {
         {/* Collapsible TOC */}
         <aside
           className={cn(
-            'hidden md:flex md:h-full flex-col border-r bg-muted/15 shrink-0',
-            tocOpen ? 'w-56 xl:w-64' : 'w-0 border-r-0 overflow-hidden',
+            'hidden md:flex md:h-full flex-col border-r bg-muted/15 shrink-0 overflow-hidden motion-toc',
+            tocOpen ? 'w-56 xl:w-64' : 'w-0 border-r-0',
           )}
         >
-          <div className="px-3 py-2.5 text-xs font-medium text-muted-foreground border-b shrink-0">{t('page.toc')}</div>
-          <ScrollArea className="flex-1">
-            <nav className="p-2 space-y-0.5">
-              {structureLoading ? (
-                <p className="text-xs text-muted-foreground px-2 py-3 flex items-center gap-1.5">
-                  <Loader2 className="size-3 animate-spin" /> {t('common:loading')}
-                </p>
-              ) : outline.length > 0 ? outline.map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  onClick={() => scrollToHeading(o.text)}
-                  className="w-full text-left text-[12px] leading-snug hover:bg-accent/70 rounded-md px-2 py-1.5 text-foreground/85"
-                  style={{ paddingLeft: `${0.5 + Math.min(o.level - 1, 3) * 0.65}rem` }}
-                  title={o.text}
-                >
-                  <span className="line-clamp-3">{o.text}</span>
-                </button>
-              )) : (
-                <p className="text-xs text-muted-foreground px-2 py-3">{t('page.tocEmpty')}</p>
-              )}
-            </nav>
-          </ScrollArea>
+          <div className="flex h-full w-56 xl:w-64 shrink-0 flex-col">
+            <div className="px-3 py-2.5 text-xs font-medium text-muted-foreground border-b shrink-0">{t('page.toc')}</div>
+            <ScrollArea className="flex-1">
+              <nav className="p-2 space-y-0.5">
+                {structureLoading ? (
+                  <p className="text-xs text-muted-foreground px-2 py-3 flex items-center gap-1.5">
+                    <Loader2 className="size-3 animate-spin" /> {t('common:loading')}
+                  </p>
+                ) : outline.length > 0 ? outline.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => scrollToHeading(o.text)}
+                    className="w-full text-left text-[12px] leading-snug hover:bg-accent/70 rounded-md px-2 py-1.5 text-foreground/85"
+                    style={{ paddingLeft: `${0.5 + Math.min(o.level - 1, 3) * 0.65}rem` }}
+                    title={o.text}
+                  >
+                    <span className="line-clamp-3">{o.text}</span>
+                  </button>
+                )) : (
+                  <p className="text-xs text-muted-foreground px-2 py-3">{t('page.tocEmpty')}</p>
+                )}
+              </nav>
+            </ScrollArea>
+          </div>
         </aside>
 
         {/* Reading column */}

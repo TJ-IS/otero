@@ -154,8 +154,8 @@ export function BasketCoveragePanel() {
                               <span className="tabular-nums font-medium">{r.coveragePct}%</span>
                               <span className="h-1 w-16 overflow-hidden rounded-full bg-muted">
                                 <span
-                                  className="block h-full rounded-full bg-[hsl(var(--chart-good))]"
-                                  style={{ width: `${Math.min(100, r.coveragePct)}%` }}
+                                  className="motion-progress block h-full w-full origin-left rounded-full bg-[hsl(var(--chart-good))]"
+                                  style={{ transform: `scaleX(${Math.min(100, r.coveragePct) / 100})` }}
                                 />
                               </span>
                             </div>

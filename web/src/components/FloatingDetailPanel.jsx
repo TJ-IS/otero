@@ -1,6 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { ArrowLeft } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -10,15 +10,40 @@ export function FloatingDetailPanel({ open, onClose, width, resizeHandle, childr
   const { t } = useTranslation(['library', 'common']);
   const isMobile = useIsMobile();
   const previouslyFocused = useRef(null);
+  const [panelPresent, setPanelPresent] = useState(false);
+  const [panelState, setPanelState] = useState('closed');
 
   useEffect(() => {
     if (open) previouslyFocused.current = document.activeElement;
   }, [open]);
 
+  useEffect(() => {
+    let frame;
+    let closeTimer;
+
+    if (open) {
+      setPanelPresent(true);
+      frame = requestAnimationFrame(() => setPanelState('open'));
+    } else {
+      setPanelState('closed');
+      closeTimer = setTimeout(() => setPanelPresent(false), 220);
+    }
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      if (closeTimer) clearTimeout(closeTimer);
+    };
+  }, [open]);
+
+  if (!panelPresent) return null;
+
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+    <DialogPrimitive.Root open={panelPresent} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="motion-panel fixed inset-0 z-20 bg-black/20 data-[state=open]:animate-in data-[state=open]:fade-in data-[state=closed]:animate-out data-[state=closed]:fade-out" />
+        <DialogPrimitive.Overlay
+          className="detail-panel-scrim fixed inset-0 z-20 bg-black/20"
+          data-state={panelState}
+        />
         <DialogPrimitive.Content
           aria-describedby={undefined}
           onCloseAutoFocus={(event) => {
@@ -26,11 +51,13 @@ export function FloatingDetailPanel({ open, onClose, width, resizeHandle, childr
             previouslyFocused.current?.focus?.();
           }}
           className={cn(
-            'motion-panel fixed z-30 flex outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 [animation-timing-function:var(--motion-ease-drawer)]',
+            'detail-panel fixed z-30 flex outline-none',
             isMobile
-              ? 'inset-x-0 bottom-0 top-0 data-[state=open]:slide-in-from-bottom-4 data-[state=closed]:slide-out-to-bottom-4'
-              : 'right-3 top-3 bottom-3 data-[state=open]:slide-in-from-right-full data-[state=closed]:slide-out-to-right-full',
+              ? 'inset-x-0 bottom-0 top-0'
+              : 'right-3 top-3 bottom-3',
           )}
+          data-mobile={isMobile ? 'true' : 'false'}
+          data-state={panelState}
           style={isMobile ? undefined : { width }}
         >
           <DialogPrimitive.Title className="sr-only">{t('itemDetail')}</DialogPrimitive.Title>

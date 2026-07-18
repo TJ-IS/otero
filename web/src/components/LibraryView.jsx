@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/useMediaQuery';
+import { cn } from '@/lib/utils';
 
 const SIDEBAR_WIDTH = 260;
 const MIN_DETAIL = 360;
@@ -202,15 +203,24 @@ export function LibraryView() {
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow">
         {t('skipToList')}
       </a>
-      {sidebarOpen && !isMobile && (
-        <aside className="hidden h-full shrink-0 border-r bg-background md:flex" style={{ width: SIDEBAR_WIDTH }}>
-          <Sidebar
-            filter={filter}
-            onFilterChange={onFilterChange}
-            version={sidebarVersion}
-            onRefresh={refreshSidebar}
-            onCollapse={() => setSidebarOpen(false)}
-          />
+      {!isMobile && (
+        <aside
+          className={cn(
+            'motion-library-sidebar hidden h-full shrink-0 border-r bg-background md:flex overflow-hidden',
+            !sidebarOpen && 'border-r-0 pointer-events-none',
+          )}
+          style={{ width: sidebarOpen ? SIDEBAR_WIDTH : 0 }}
+          aria-hidden={!sidebarOpen}
+        >
+          <div style={{ width: SIDEBAR_WIDTH }} className="flex h-full shrink-0">
+            <Sidebar
+              filter={filter}
+              onFilterChange={onFilterChange}
+              version={sidebarVersion}
+              onRefresh={refreshSidebar}
+              onCollapse={() => setSidebarOpen(false)}
+            />
+          </div>
         </aside>
       )}
       {isMobile && (

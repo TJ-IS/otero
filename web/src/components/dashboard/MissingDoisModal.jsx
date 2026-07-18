@@ -151,7 +151,7 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
                     <button
                       key={doi}
                       type="button"
-                      className="group absolute left-0 flex w-full items-center justify-between gap-3 px-3 text-left font-mono text-xs transition-colors hover:bg-muted/60 active:scale-[0.99]"
+                      className="group absolute left-0 flex w-full items-center justify-between gap-3 px-3 text-left font-mono text-xs transition-colors hover:bg-muted/60"
                       style={{
                         height: ROW_HEIGHT,
                         transform: `translateY(${row.start}px)`,

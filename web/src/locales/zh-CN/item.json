@@ -173,6 +173,9 @@
     "assistant": "论文助手",
     "close": "关闭对话",
     "clear": "清空对话",
+    "clearConfirmTitle": "清空对话？",
+    "clearConfirmDesc": "将删除本篇论文在此浏览器中的聊天记录。",
+    "clearConfirmAction": "清空",
     "hint": "针对这篇论文提问，或选择下面的快捷问题开始。",
     "placeholder": "输入问题，Enter 发送，Shift+Enter 换行…",
     "presets": {

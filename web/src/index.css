@@ -120,29 +120,66 @@
     opacity: 1;
   }
 
+  .detail-panel-scrim {
+    opacity: 0;
+    transition: opacity var(--motion-duration-popover) ease-out;
+  }
+
+  .detail-panel-scrim[data-state='open'] {
+    opacity: 1;
+  }
+
+  .detail-panel {
+    opacity: 0;
+    transition:
+      transform var(--motion-duration-panel) var(--motion-ease-drawer),
+      opacity 160ms ease-out;
+  }
+
+  .detail-panel[data-mobile='false'] {
+    transform: translateX(100%);
+  }
+
+  .detail-panel[data-mobile='true'] {
+    transform: translateY(100%);
+  }
+
+  .detail-panel[data-state='open'] {
+    opacity: 1;
+    transform: translateX(0) translateY(0);
+  }
+
+  .motion-toc {
+    transition: width var(--motion-duration-panel) var(--motion-ease-drawer);
+  }
+
+  .motion-library-sidebar {
+    transition: width 180ms var(--motion-ease-drawer);
+  }
+
   .motion-typing-dot {
     animation: typing-pulse 1.1s ease-in-out infinite;
   }
 
   .citation-tooltip {
-    transform: var(--citation-translate);
+    transform: var(--citation-translate) scale(1);
     transform-origin: var(--citation-origin);
-    animation: citation-tooltip-enter var(--motion-duration-popover) var(--motion-ease-out);
+    opacity: 1;
+    transition:
+      opacity var(--motion-duration-popover) var(--motion-ease-out),
+      transform var(--motion-duration-popover) var(--motion-ease-out);
+  }
+
+  @starting-style {
+    .citation-tooltip {
+      opacity: 0;
+      transform: var(--citation-translate) scale(0.97);
+    }
   }
 
   @keyframes typing-pulse {
     0%, 100% { opacity: 0.32; }
     50% { opacity: 0.8; }
-  }
-
-  @keyframes citation-tooltip-enter {
-    from { opacity: 0; transform: var(--citation-translate) scale(0.97); }
-    to { opacity: 1; transform: var(--citation-translate) scale(1); }
-  }
-
-  @keyframes citation-tooltip-fade {
-    from { opacity: 0; }
-    to { opacity: 1; }
   }
 
   @keyframes motion-fade-in {
@@ -170,9 +207,27 @@
       animation-name: motion-fade-out !important;
     }
 
+    .motion-popover[data-state='open'] {
+      animation-name: motion-fade-in !important;
+    }
+
+    .motion-popover[data-state='closed'] {
+      animation-name: motion-fade-out !important;
+    }
+
     .chat-panel {
       transform: none;
       transition: opacity var(--motion-duration-popover) ease-out;
+    }
+
+    .detail-panel {
+      transform: none;
+      transition: opacity var(--motion-duration-popover) ease-out;
+    }
+
+    .motion-toc,
+    .motion-library-sidebar {
+      transition: none;
     }
 
     .motion-progress {
@@ -188,7 +243,26 @@
     }
 
     .citation-tooltip {
-      animation: citation-tooltip-fade 120ms ease-out;
+      transition: opacity 120ms ease-out;
+      transform: var(--citation-translate);
+    }
+
+    @starting-style {
+      .citation-tooltip {
+        opacity: 0;
+        transform: var(--citation-translate);
+      }
+    }
+
+    [data-sonner-toaster] [data-sonner-toast],
+    [data-sonner-toaster] [data-sonner-toast][data-mounted],
+    [data-sonner-toaster] [data-sonner-toast][data-removed] {
+      animation: none !important;
+      transition-property: opacity !important;
+      transition-duration: 120ms !important;
+      transition-timing-function: ease-out !important;
+      transform: none !important;
+      height: auto !important;
     }
   }
 }

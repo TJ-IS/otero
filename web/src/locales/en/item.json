@@ -173,6 +173,9 @@
     "assistant": "Paper assistant",
     "close": "Close chat",
     "clear": "Clear conversation",
+    "clearConfirmTitle": "Clear conversation?",
+    "clearConfirmDesc": "This removes the chat history for this paper from this browser.",
+    "clearConfirmAction": "Clear",
     "hint": "Ask about this paper, or start with a preset question below.",
     "placeholder": "Type a question. Enter to send, Shift+Enter for newline…",
     "presets": {
