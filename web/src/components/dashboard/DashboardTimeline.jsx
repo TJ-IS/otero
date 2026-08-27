@@ -5,28 +5,16 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Loader2, AlertCircle } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { SINGLE_SERIES_COLOR } from '@/lib/chartColors';
-
-function ChartTooltip({ active, payload, label, formatter, yearLabel }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-lg">
-      {label != null && <div className="mb-1 font-medium text-popover-foreground">{yearLabel(label)}</div>}
-      {payload.map((p, i) => (
-        <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="inline-block size-2 rounded-full" style={{ background: p.color || p.fill }} />
-          <span>{p.name}: {formatter ? formatter(p.value) : p.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+import { StatTile } from '@/components/ui/stat-tile';
+import { ChartTooltip } from '@/components/ui/chart-tooltip';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
+import { PageHeader } from '@/components/PageHeader';
 
 export function DashboardTimeline() {
-  const { t } = useTranslation('dashboard');
+  const { t } = useTranslation(['dashboard', 'common']);
   const { data: years, error, loading } = useAsync(() => api.getStatsYears(), []);
 
   const total = useMemo(() => (years || []).reduce((sum, y) => sum + y.count, 0), [years]);
@@ -37,54 +25,31 @@ export function DashboardTimeline() {
   }, [years]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6">
-      {loading && (
-        <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" /> {t('loading')}
-        </div>
-      )}
+    <div className="mx-auto w-full max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader eyebrow={t('common:nav.dashboard')} title={t('nav.timeline')} />
+      {loading && <LoadingSkeleton variant="stats" className="py-8" />}
       {error && (
-        <div className="flex flex-col items-center gap-2 py-16 text-sm text-destructive">
-          <AlertCircle className="size-8" />
-          <p>{t('loadFailed', { message: error.message })}</p>
-        </div>
+        <ErrorState message={t('loadFailed', { message: error.message })} />
       )}
 
       {years && (
         <>
-          <div className="grid grid-cols-3 gap-3">
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">{t('timeline.totalPubs')}</p>
-                <p className="text-lg font-semibold tabular-nums leading-tight">{total}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">{t('timeline.yearSpan')}</p>
-                <p className="text-lg font-semibold tabular-nums leading-tight">{span || '—'}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">{t('timeline.peakYear')}</p>
-                <p className="text-lg font-semibold tabular-nums leading-tight">
-                  {peak ? `${peak.year} (${peak.count})` : '—'}
-                </p>
-              </CardContent>
-            </Card>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <StatTile label={t('timeline.totalPubs')} value={total} />
+            <StatTile label={t('timeline.yearSpan')} value={span || '—'} />
+            <StatTile label={t('timeline.peakYear')} value={peak ? `${peak.year} (${peak.count})` : '—'} />
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">{t('timeline.distTitle')}</CardTitle>
+              <CardTitle>{t('timeline.distTitle')}</CardTitle>
               <CardDescription>
                 {t('timeline.distDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {years.length === 0 ? (
-                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('noData')}</div>
+                <EmptyState className="h-64 py-0" title={t('noData')} />
               ) : (
                 <>
                   <ResponsiveContainer width="100%" height={320}>
@@ -103,9 +68,9 @@ export function DashboardTimeline() {
                   </ResponsiveContainer>
 
                   {/* Accessible table fallback */}
-                  <div className="mt-4 max-h-56 overflow-y-auto rounded-md border sm:hidden">
+                  <div className="mt-4 max-h-56 overflow-y-auto border border-border/80 sm:hidden">
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 z-10 bg-background text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
+                      <thead className="sticky top-0 z-10 border-b bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                         <tr>
                           <th className="px-4 py-2 font-medium">{t('timeline.colYear')}</th>
                           <th className="px-4 py-2 font-medium text-right">{t('timeline.colCount')}</th>

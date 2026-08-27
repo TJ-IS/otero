@@ -1,7 +1,7 @@
 // Client-side chat history persistence (localStorage only — no server DB).
 // Keyed per item so each paper has its own independent conversation.
 
-import i18n from '../i18n';
+import i18n from '../i18n/index.js';
 
 const STORAGE_PREFIX = 'otero.chat.';
 

@@ -4,26 +4,32 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --background: 40 14% 97%;
+    --foreground: 0 0% 4%;
+    --card: 40 14% 97%;
+    --card-foreground: 0 0% 4%;
+    --popover: 40 14% 98%;
+    --popover-foreground: 0 0% 4%;
+    --primary: 19 92% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 7% 94%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 40 7% 94%;
+    --muted-foreground: 0 0% 42%;
+    --accent: 40 13% 92%;
+    --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 10% 3.9%;
-    --radius: 0.5rem;
+    --success: 145 38% 32%;
+    --success-foreground: 0 0% 100%;
+    --warning: 36 70% 40%;
+    --warning-foreground: 0 0% 100%;
+    --border: 40 7% 88%;
+    --input: 40 7% 84%;
+    --ring: 19 92% 48%;
+    --brand: 19 92% 48%;
+    --brand-foreground: 0 0% 100%;
+    --radius: 0.25rem;
     --motion-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
     --motion-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
     --motion-duration-press: 120ms;
@@ -48,25 +54,31 @@
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --background: 30 8% 13%;
+    --foreground: 40 12% 94%;
+    --card: 30 8% 16%;
+    --card-foreground: 40 12% 94%;
+    --popover: 30 8% 16%;
+    --popover-foreground: 40 12% 94%;
+    --primary: 20 90% 54%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 7% 19%;
+    --secondary-foreground: 40 10% 92%;
+    --muted: 30 7% 19%;
+    --muted-foreground: 35 8% 72%;
+    --accent: 30 7% 21%;
+    --accent-foreground: 40 10% 92%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --success: 145 32% 52%;
+    --success-foreground: 150 20% 10%;
+    --warning: 36 65% 56%;
+    --warning-foreground: 30 20% 10%;
+    --border: 30 6% 25%;
+    --input: 30 6% 29%;
+    --ring: 20 90% 54%;
+    --brand: 20 90% 54%;
+    --brand-foreground: 0 0% 100%;
 
     /* Same 8 hues, stepped for the dark surface (#09090b) — validated
        separately, not an automatic flip of the light values. */
@@ -120,41 +132,28 @@
     opacity: 1;
   }
 
-  .detail-panel-scrim {
-    opacity: 0;
-    transition: opacity var(--motion-duration-popover) ease-out;
+  .detail-scrim[data-state='open'] {
+    animation: motion-fade-in 160ms ease-out;
   }
 
-  .detail-panel-scrim[data-state='open'] {
-    opacity: 1;
+  .detail-scrim[data-state='closed'] {
+    animation: motion-fade-out 140ms ease-out forwards;
   }
 
-  .detail-panel {
-    opacity: 0;
-    transition:
-      transform var(--motion-duration-panel) var(--motion-ease-drawer),
-      opacity 160ms ease-out;
+  .detail-dialog {
+    transform: translate(-50%, -50%);
   }
 
-  .detail-panel[data-mobile='false'] {
-    transform: translateX(100%);
+  .detail-dialog[data-state='open'] {
+    animation: detail-dialog-in 180ms var(--motion-ease-out);
   }
 
-  .detail-panel[data-mobile='true'] {
-    transform: translateY(100%);
-  }
-
-  .detail-panel[data-state='open'] {
-    opacity: 1;
-    transform: translateX(0) translateY(0);
+  .detail-dialog[data-state='closed'] {
+    animation: detail-dialog-out 140ms var(--motion-ease-out) forwards;
   }
 
   .motion-toc {
     transition: width var(--motion-duration-panel) var(--motion-ease-drawer);
-  }
-
-  .motion-library-sidebar {
-    transition: width 180ms var(--motion-ease-drawer);
   }
 
   .motion-typing-dot {
@@ -192,6 +191,18 @@
     to { opacity: 0; }
   }
 
+  /* Entry animates transform only: if the compositor never advances the
+     animation clock the dialog still renders fully opaque. */
+  @keyframes detail-dialog-in {
+    from { transform: translate(-50%, -50%) scale(0.97); }
+    to { transform: translate(-50%, -50%) scale(1); }
+  }
+
+  @keyframes detail-dialog-out {
+    from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    to { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .motion-panel,
     .motion-popover {
@@ -220,13 +231,15 @@
       transition: opacity var(--motion-duration-popover) ease-out;
     }
 
-    .detail-panel {
-      transform: none;
-      transition: opacity var(--motion-duration-popover) ease-out;
+    .detail-dialog[data-state='open'] {
+      animation-name: motion-fade-in;
     }
 
-    .motion-toc,
-    .motion-library-sidebar {
+    .detail-dialog[data-state='closed'] {
+      animation-name: motion-fade-out;
+    }
+
+    .motion-toc {
       transition: none;
     }
 
@@ -270,10 +283,24 @@
 @layer base {
   * {
     @apply border-border;
+    letter-spacing: 0;
+  }
+  html {
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground;
+    min-width: 320px;
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+  ::selection {
+    background: hsl(var(--brand) / 0.18);
+  }
+  mark {
+    background-color: hsl(var(--brand) / 0.15);
+    color: inherit;
+    border-radius: calc(var(--radius) - 2px);
   }
 }
 
@@ -320,7 +347,7 @@
     @apply my-3;
   }
   .fulltext-prose a {
-    @apply text-blue-600 hover:underline;
+    @apply text-brand hover:underline;
     overflow-wrap: anywhere;
   }
   .fulltext-prose ul {

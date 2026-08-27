@@ -1,6 +1,18 @@
 {
   "loadingPage": "正在加载页面",
   "language": "语言",
+  "skipToContent": "跳到主要内容",
+  "brandHome": "Otero 首页",
+  "primaryNavigation": "主导航",
+  "secondaryNavigation": "栏目导航",
+  "nav": {
+    "home": "首页",
+    "library": "文库",
+    "search": "检索",
+    "dashboard": "仪表盘",
+    "openApi": "开放 API",
+    "admin": "管理"
+  },
   "langZh": "中文",
   "langEn": "EN",
   "langEnFull": "English",
@@ -55,6 +67,10 @@
   "yes": "是",
   "no": "否",
   "seo": {
+    "portalTitle": "Otero | AIS Basket 研究门户",
+    "portalDescription": "通过 Otero 文献库、语料统计、解析全文与开放 API 检索和探索 AIS Senior Scholars' Basket 的 11 本期刊。",
+    "libraryTitle": "文献库 | Otero",
+    "libraryDescription": "在 Otero 中浏览、筛选和查阅 AIS Senior Scholars' Basket 文献语料。",
     "siteTitle": "Otero | AIS Basket 文献 API",
     "siteDescription": "Otero 是面向 AIS Senior Scholars' Basket 期刊的只读文献库与开放 API，支持检索文章与作者、查看语料统计。",
     "searchTitle": "检索 | Otero",

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { usePageMeta } from '@/hooks/usePageMeta';
+import { PageHeader } from '@/components/PageHeader';
 
 async function copyText(text) {
   await navigator.clipboard.writeText(text);
@@ -14,7 +15,7 @@ function CodeBlock({ children, className }) {
   return (
     <pre
       className={cn(
-        'overflow-x-auto rounded-md border bg-muted/40 px-3 py-2 text-[12px] leading-relaxed font-mono whitespace-pre-wrap break-all',
+        'overflow-x-auto rounded-sm border border-border/80 bg-muted/30 px-3 py-2 text-[12px] leading-relaxed font-mono whitespace-pre-wrap break-all',
         className,
       )}
     >
@@ -73,16 +74,17 @@ export function AgentsMdPage() {
   };
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 space-y-6">
+    <main className="mx-auto w-full max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader
+        eyebrow={t('common:nav.openApi')}
+        title={t('agents.answerHeading')}
+        description={t('agents.answer')}
+      />
       <section className="space-y-3">
-        <h2 className="text-base font-semibold tracking-tight">{t('agents.answerHeading')}</h2>
-        <p className="text-sm leading-relaxed text-foreground">
-          {t('agents.answer')}
-        </p>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <h3 className="text-sm font-semibold tracking-tight">AGENTS.md</h3>
-            <p className="text-sm text-muted-foreground">
+            <p className="max-w-measure text-sm text-muted-foreground">
               {t('agents.hint')}
             </p>
           </div>
@@ -106,7 +108,7 @@ export function AgentsMdPage() {
         </div>
 
         {loading ? (
-          <div className="rounded-md border px-3 py-8 text-center text-sm text-muted-foreground">
+          <div className="border border-border/80 px-3 py-8 text-center text-sm text-muted-foreground">
             {t('agents.loading')}
           </div>
         ) : (

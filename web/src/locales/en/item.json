@@ -13,7 +13,8 @@
   "filterLabel": {
     "all": "All items",
     "search": "Search: \"{{query}}\"",
-    "collection": "Collection view"
+    "collection": "Collection view",
+    "year": "{{year}}"
   },
   "field": {
     "title": "Title",

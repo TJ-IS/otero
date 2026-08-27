@@ -1,16 +1,12 @@
-import { Outlet, useNavigate, NavLink } from 'react-router-dom';
-import { useTheme } from 'next-themes';
+import { Link, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Moon, Sun, ShieldCheck } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { usePageMeta } from '@/hooks/usePageMeta';
+import { SiteHeader } from '@/components/SiteHeader';
 
 export function AdminLayout() {
-  const navigate = useNavigate();
-  const { resolvedTheme, setTheme } = useTheme();
   const { canEdit } = useAuth();
   const { t } = useTranslation(['admin', 'common']);
 
@@ -21,100 +17,25 @@ export function AdminLayout() {
     robots: 'noindex, nofollow',
   });
 
-  const tabs = [
-    { to: '/admin', label: t('nav.status'), end: true },
-    { to: '/admin/duplicates', label: t('nav.duplicates') },
-    { to: '/admin/reconcile', label: t('nav.reconcile') },
-    { to: '/admin/trash', label: t('nav.trash') },
-  ];
-
-  // Non-editors see a simple no-permission message
   if (!canEdit) {
     return (
-      <div className="flex h-[100dvh] flex-col items-center justify-center gap-3 bg-background text-muted-foreground">
-        <ShieldCheck className="size-10 opacity-40" />
-        <p className="text-sm">{t('forbidden')}</p>
-        <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-          {t('backToLibrary')}
-        </Button>
+      <div className="min-h-[100dvh] bg-background">
+        <SiteHeader />
+        <main id="main-content" tabIndex={-1} className="flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
+          <ShieldCheck className="size-10 text-brand/60" />
+          <p className="text-sm">{t('forbidden')}</p>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/library">{t('backToLibrary')}</Link>
+          </Button>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-background">
-      <header className="sticky top-0 z-40 flex h-12 shrink-0 items-center gap-2 border-b bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/')}
-          title={t('backToLibrary')}
-          className="shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
-
-        <ShieldCheck className="size-4 text-muted-foreground" />
-        <span className="text-sm font-medium">{t('title')}</span>
-
-        <nav className="ml-2 hidden items-center gap-1 rounded-lg bg-muted p-1 sm:flex">
-          {tabs.map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              end={tab.end}
-              className={({ isActive }) =>
-                cn(
-                  'inline-flex items-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-background text-foreground shadow'
-                    : 'text-muted-foreground hover:text-foreground'
-                )
-              }
-            >
-              {tab.label}
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="ml-auto flex items-center gap-1.5">
-          <LanguageSwitcher />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            title={resolvedTheme === 'dark' ? t('common:themeToLight') : t('common:themeToDark')}
-            className="shrink-0 text-muted-foreground hover:text-foreground"
-          >
-            {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </Button>
-        </div>
-      </header>
-
-      {/* Mobile tab row */}
-      <nav className="flex items-center gap-1 overflow-x-auto border-b bg-muted/40 p-1.5 sm:hidden">
-        {tabs.map((tab) => (
-          <NavLink
-            key={tab.to}
-            to={tab.to}
-            end={tab.end}
-            className={({ isActive }) =>
-              cn(
-                'inline-flex shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-background text-foreground shadow'
-                  : 'text-muted-foreground hover:text-foreground'
-              )
-            }
-          >
-            {tab.label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <main className="min-h-0 flex-1 overflow-auto">
-        <Outlet />
-      </main>
+    <div className="flex min-h-[100dvh] flex-col bg-background">
+      <SiteHeader />
+      <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-auto"><Outlet /></main>
     </div>
   );
 }

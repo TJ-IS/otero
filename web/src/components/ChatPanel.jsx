@@ -42,20 +42,12 @@ function ChatBubble({ role, text, streaming }) {
   const isUser = role === 'user';
   const isEmpty = !text;
   return (
-    <div className={cn('flex gap-2', isUser ? 'justify-end' : 'justify-start')}>
-      {!isUser && (
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary mt-0.5">
-          <Sparkles className="size-3.5 text-secondary-foreground" />
-        </div>
-      )}
-      <div
-        className={cn(
-          'max-w-[85%] rounded-lg px-3.5 py-2 text-sm leading-relaxed',
-          isUser
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-foreground border',
-        )}
-      >
+    <article className={cn('border-l-2 py-1 pl-3', isUser ? 'border-brand' : 'border-border')}>
+      <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase text-muted-foreground">
+        {isUser ? <User className="size-3" /> : <Sparkles className="size-3 text-brand" />}
+        {isUser ? 'You' : 'Otero'}
+      </div>
+      <div className="text-sm leading-relaxed text-foreground">
         {isEmpty ? (
           streaming ? <TypingDots /> : null
         ) : isUser ? (
@@ -69,12 +61,7 @@ function ChatBubble({ role, text, streaming }) {
           <span className="motion-status inline-block w-1.5 h-3.5 bg-current opacity-50 align-middle ml-0.5 animate-pulse" />
         )}
       </div>
-      {isUser && (
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary mt-0.5">
-          <User className="size-3.5 text-secondary-foreground" />
-        </div>
-      )}
-    </div>
+    </article>
   );
 }
 
@@ -165,16 +152,19 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
 
   return (
     <>
-      <Button
-        type="button"
-        size="icon"
-        variant={open ? 'outline' : 'default'}
-        onClick={() => setOpen(v => !v)}
-        className="fixed bottom-5 right-5 z-40 size-12 rounded-full shadow-lg"
-        title={t('chat.title')}
-      >
-        {open ? <X className="size-5" /> : <Sparkles className="size-5" />}
-      </Button>
+      {!open && (
+        <Button
+          type="button"
+          size="icon"
+          onClick={() => setOpen(true)}
+          className="fixed bottom-5 right-5 z-40 size-10 shadow-sm"
+          title={t('chat.title')}
+          aria-expanded="false"
+          aria-controls="item-assistant-panel"
+        >
+          <Sparkles className="size-4" />
+        </Button>
+      )}
 
       {panelPresent && (
         <>
@@ -189,17 +179,19 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
             />
           )}
           <div
+            id="item-assistant-panel"
             className={cn(
-              'chat-panel z-50 flex flex-col bg-background border shadow-2xl overflow-hidden',
+              'chat-panel z-50 flex flex-col overflow-hidden border-border bg-background shadow-md',
               isMobile
-                ? 'fixed inset-0'
-                : 'fixed bottom-[5.5rem] right-5 w-[400px] h-[600px] max-h-[calc(100vh-7rem)] rounded-2xl',
+                ? 'fixed inset-0 border-0'
+                : 'fixed inset-y-0 right-0 w-[420px] max-w-[calc(100vw-2rem)] border-l',
             )}
             data-state={panelState}
+            aria-label={t('chat.assistant')}
           >
-            <div className="flex items-center justify-between gap-2 border-b bg-background px-4 py-3 shrink-0">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Sparkles className="size-4 text-muted-foreground" />
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b bg-background px-4 py-3">
+              <div className="flex items-center gap-2 font-display text-base font-semibold">
+                <Sparkles className="size-4 text-brand" />
                 {t('chat.assistant')}
               </div>
               <div className="flex items-center gap-1">
@@ -219,9 +211,9 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
               </div>
             </div>
 
-            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-3">
+            <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
               {messages.length === 0 && (
-                <div className="text-xs text-muted-foreground text-center py-8">
+                <div className="border-y border-border/80 py-8 text-center text-xs leading-relaxed text-muted-foreground">
                   {t('chat.hint')}
                 </div>
               )}
@@ -235,7 +227,7 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
               ))}
             </div>
 
-            <div className="border-t px-3 py-2 space-y-2 shrink-0">
+            <div className="shrink-0 space-y-2 border-t px-4 py-3">
               <div className="flex flex-wrap gap-1.5">
                 {presets.map((p) => (
                   <Button

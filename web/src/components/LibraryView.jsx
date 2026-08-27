@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { websiteJsonLd } from '@/lib/seo';
 import {
@@ -13,64 +14,71 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import { Sidebar } from '@/components/Sidebar';
 import { ItemTable } from '@/components/ItemTable';
 import { ItemDetail } from '@/components/ItemDetail';
-import { TopBar } from '@/components/TopBar';
-import { FloatingDetailPanel } from '@/components/FloatingDetailPanel';
-import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { LibraryToolbar } from '@/components/LibraryToolbar';
+import { ItemDetailDialog } from '@/components/ItemDetailDialog';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
 import { useAuth } from '@/contexts/AuthContext';
-import { useIsMobile } from '@/hooks/useMediaQuery';
-import { cn } from '@/lib/utils';
+import { SiteHeader } from '@/components/SiteHeader';
 
-const SIDEBAR_WIDTH = 260;
-const MIN_DETAIL = 360;
-const MAX_DETAIL = 640;
+function parseYearParam(value) {
+  if (value == null || value === '') return null;
+  if (!/^\d+$/.test(String(value))) return null;
+  const year = Number(value);
+  if (!Number.isSafeInteger(year) || year < 1500 || year > 2099) return null;
+  return year;
+}
 
 export function LibraryView() {
   const { t } = useTranslation(['library', 'common']);
   const { canEdit } = useAuth();
-  const isMobile = useIsMobile();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   usePageMeta({
-    title: t('common:seo.siteTitle'),
-    description: t('common:seo.siteDescription'),
-    canonicalPath: '/',
+    title: t('common:seo.libraryTitle'),
+    description: t('common:seo.libraryDescription'),
+    canonicalPath: '/library',
     jsonLd: websiteJsonLd(),
   });
-  const [filter, setFilter] = useState({ type: null, journal: null, collection: null, search: null });
+  const [filter, setFilter] = useState(() => ({
+    type: null,
+    journal: searchParams.get('journal') || null,
+    collection: null,
+    search: null,
+    year: parseYearParam(searchParams.get('year')),
+  }));
   const [selectedKey, setSelectedKey] = useState(null);
   const [itemsVersion, setItemsVersion] = useState(0);
-  const [sidebarVersion, setSidebarVersion] = useState(0);
+  const [journalsVersion, setJournalsVersion] = useState(0);
+  const [tableStatus, setTableStatus] = useState({ total: 0, loading: true });
 
-  // Left sidebar
-  const [sidebarOpen, setSidebarOpen] = useState(
-    () => typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches,
-  );
-
-  // Right detail panel (persistent, not Sheet)
   const [detailOpen, setDetailOpen] = useState(false);
-  const [detailWidth, setDetailWidth] = useState(520);
   const [detailDirty, setDetailDirty] = useState(false);
-
-  // Confirm switch when dirty
   const [confirmSwitchTarget, setConfirmSwitchTarget] = useState(null);
 
-  // Drag state refs (detail panel only)
-  const detailResizing = useRef(false);
+  const refreshItems = useCallback(() => setItemsVersion((v) => v + 1), []);
+  const refreshSidebar = useCallback(() => setJournalsVersion((v) => v + 1), []);
 
-  const refreshItems = useCallback(() => setItemsVersion(v => v + 1), []);
-  const refreshSidebar = useCallback(() => setSidebarVersion(v => v + 1), []);
+  useEffect(() => {
+    const urlYear = parseYearParam(searchParams.get('year'));
+    setFilter((prev) => (prev.year === urlYear ? prev : { ...prev, year: urlYear }));
+  }, [searchParams]);
 
   const onFilterChange = useCallback((next) => {
-    setFilter(prev => ({ ...prev, ...next }));
+    setFilter((prev) => ({ ...prev, ...next }));
+    if ('year' in next) {
+      const nextParams = new URLSearchParams(searchParams);
+      if (next.year) nextParams.set('year', String(next.year));
+      else nextParams.delete('year');
+      setSearchParams(nextParams, { replace: true });
+    }
     setSelectedKey(null);
     setDetailOpen(false);
-  }, []);
+  }, [searchParams, setSearchParams]);
 
   const onSearch = useCallback((search) => {
-    setFilter(prev => ({ ...prev, search: search || null }));
+    setFilter((prev) => ({ ...prev, search: search || null }));
     setSelectedKey(null);
     setDetailOpen(false);
   }, []);
@@ -117,10 +125,8 @@ export function LibraryView() {
 
   const fileInputRef = useRef(null);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl/Cmd + I: Import PDF (editors only)
       if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
         e.preventDefault();
         if (!canEdit) {
@@ -129,12 +135,8 @@ export function LibraryView() {
         }
         fileInputRef.current?.click();
       }
-      // Escape: Close detail panel
       if (e.key === 'Escape' && detailOpen) {
-        if (detailDirty) {
-          // Let the dirty check handle it via confirmSwitchTarget
-          return;
-        }
+        if (detailDirty) return;
         setDetailOpen(false);
         setSelectedKey(null);
       }
@@ -144,127 +146,37 @@ export function LibraryView() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [detailOpen, detailDirty, canEdit, t]);
 
-  // Sidebar drag resize
-  useEffect(() => {
-    let rafId = null;
-    let pendingClientX = null;
-
-    const applyPending = () => {
-      rafId = null;
-      if (pendingClientX === null) return;
-      const clientX = pendingClientX;
-      pendingClientX = null;
-      if (detailResizing.current) {
-        const panelRight = window.innerWidth - clientX;
-        const w = Math.max(MIN_DETAIL, Math.min(MAX_DETAIL, panelRight));
-        setDetailWidth(w);
-      }
-    };
-
-    const handleMouseMove = (e) => {
-      if (!detailResizing.current) return;
-      // Coalesce rapid mousemove events into at most one state update per
-      // animation frame, so drag-resize doesn't schedule more re-renders
-      // than the browser can actually paint.
-      pendingClientX = e.clientX;
-      if (rafId === null) {
-        rafId = requestAnimationFrame(applyPending);
-      }
-    };
-    const handleMouseUp = () => {
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-      if (detailResizing.current) {
-        detailResizing.current = false;
-      }
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
-
-  const startDetailResize = useCallback((e) => {
-    e.preventDefault();
-    detailResizing.current = true;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
   return (
-    <div className="relative flex h-[100dvh] w-full overflow-hidden bg-background">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:shadow">
-        {t('skipToList')}
-      </a>
-      {!isMobile && (
-        <aside
-          className={cn(
-            'motion-library-sidebar hidden h-full shrink-0 border-r bg-background md:flex overflow-hidden',
-            !sidebarOpen && 'border-r-0 pointer-events-none',
-          )}
-          style={{ width: sidebarOpen ? SIDEBAR_WIDTH : 0 }}
-          aria-hidden={!sidebarOpen}
-        >
-          <div style={{ width: SIDEBAR_WIDTH }} className="flex h-full shrink-0">
-            <Sidebar
-              filter={filter}
-              onFilterChange={onFilterChange}
-              version={sidebarVersion}
-              onRefresh={refreshSidebar}
-              onCollapse={() => setSidebarOpen(false)}
-            />
-          </div>
-        </aside>
-      )}
-      {isMobile && (
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="left" className="w-[min(20rem,calc(100vw-2.5rem))] max-w-none p-0">
-            <SheetTitle className="sr-only">{t('journals.heading')}</SheetTitle>
-            <Sidebar
-              filter={filter}
-              onFilterChange={onFilterChange}
-              version={sidebarVersion}
-              onRefresh={refreshSidebar}
-              onCollapse={() => setSidebarOpen(false)}
-              onSelected={() => setSidebarOpen(false)}
-              showCollapse={false}
-            />
-          </SheetContent>
-        </Sheet>
-      )}
-
-      {/* Center: main content */}
-      <main id="main-content" className="relative flex flex-1 flex-col min-w-0 overflow-hidden" tabIndex={-1}>
-        <TopBar
+    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background">
+      <SiteHeader />
+      <main
+        id="main-content"
+        className="mx-auto flex min-h-0 w-full max-w-page flex-1 flex-col overflow-hidden px-4 sm:px-6 lg:px-8"
+        tabIndex={-1}
+      >
+        <LibraryToolbar
           filter={filter}
           onImported={onImported}
           refreshItems={refreshItems}
           onSearch={onSearch}
-          sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen(v => !v)}
+          onFilterChange={onFilterChange}
+          journalsVersion={journalsVersion}
           fileInputRef={fileInputRef}
           onSelectItem={onSelect}
+          total={tableStatus.total}
+          loading={tableStatus.loading}
         />
-        <div className="flex-1 overflow-hidden">
-          <ItemTable
-            filter={filter}
-            version={itemsVersion}
-            selectedKey={selectedKey}
-            onSelect={onSelect}
-          />
-        </div>
+        <ItemTable
+          filter={filter}
+          version={itemsVersion}
+          selectedKey={selectedKey}
+          onSelect={onSelect}
+          onStatusChange={setTableStatus}
+        />
       </main>
 
-      {/* Right detail panel — floats over the main content, does not affect layout */}
-      <FloatingDetailPanel
-        open={detailOpen}
+      <ItemDetailDialog
+        open={detailOpen && !!selectedKey}
         onClose={() => {
           if (detailDirty) {
             toast.message(t('common:unsavedChangesToast'), { description: t('common:unsavedCloseDesc') });
@@ -273,33 +185,15 @@ export function LibraryView() {
           setDetailOpen(false);
           setSelectedKey(null);
         }}
-        width={Math.max(MIN_DETAIL, detailWidth)}
-        resizeHandle={
-          <button
-            type="button"
-            onMouseDown={startDetailResize}
-            aria-label={t('adjustPanelWidth')}
-            className="w-1 shrink-0 cursor-col-resize bg-transparent hover:bg-primary/40 active:bg-primary/60 transition-colors"
-          />
-        }
       >
-        {selectedKey ? (
-          <div className="min-h-0 flex-1 overflow-hidden">
-            <ItemDetail
-              itemKey={selectedKey}
-              onDeleted={onItemDeleted}
-              onChanged={refreshItems}
-              onDirtyChange={setDetailDirty}
-            />
-          </div>
-        ) : (
-          <div className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground text-sm">
-            {t('selectItem')}
-          </div>
-        )}
-      </FloatingDetailPanel>
+        <ItemDetail
+          itemKey={selectedKey}
+          onDeleted={onItemDeleted}
+          onChanged={refreshItems}
+          onDirtyChange={setDetailDirty}
+        />
+      </ItemDetailDialog>
 
-      {/* Confirm switch away from dirty item */}
       <AlertDialog open={!!confirmSwitchTarget} onOpenChange={(open) => { if (!open) setConfirmSwitchTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

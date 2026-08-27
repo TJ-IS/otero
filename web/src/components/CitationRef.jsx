@@ -119,7 +119,7 @@ export const CitationRef = memo(function CitationRef({ refs, children }) {
             '--citation-translate': coords.placeAbove ? 'translateY(calc(-100% - 6px))' : 'translateY(6px)',
             '--citation-origin': coords.placeAbove ? 'bottom left' : 'top left',
           }}
-          className="citation-tooltip z-50 rounded-md border bg-popover text-popover-foreground shadow-lg p-3 text-xs leading-relaxed"
+          className="citation-tooltip z-50 rounded-sm border bg-popover p-3 text-xs leading-relaxed text-popover-foreground shadow-sm"
         >
           {refs.map((r, i) => (
             <div key={r.id} className={i > 0 ? 'mt-2 pt-2 border-t' : ''}>

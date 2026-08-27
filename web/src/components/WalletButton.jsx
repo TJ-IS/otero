@@ -51,7 +51,7 @@ export function WalletButton() {
           <Wallet className="h-4 w-4" />
           <span className="hidden sm:inline">{shortenAddress(address)}</span>
           {canEdit && (
-            <span className="ml-1 hidden rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 sm:inline">
+            <span className="ml-1 hidden rounded-sm bg-success/15 px-1.5 py-0.5 text-[10px] font-medium text-success sm:inline">
               {t('editAllowed')}
             </span>
           )}

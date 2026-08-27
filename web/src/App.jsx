@@ -1,8 +1,9 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Link, Navigate, Routes, Route } from 'react-router-dom';
 import { FileQuestion } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Toaster } from '@/components/ui/sonner';
+import { ResearchPortal } from '@/components/ResearchPortal';
 
 function lazyNamed(loader, name) {
   return lazy(() => loader().then(module => ({ default: module[name] })));
@@ -36,9 +37,9 @@ function RouteFallback() {
   return (
     <div className="min-h-[100dvh] bg-background p-6" aria-busy="true" aria-label={t('loadingPage')}>
       <div className="mx-auto max-w-5xl animate-pulse space-y-5">
-        <div className="h-8 w-48 rounded-md bg-muted" />
-        <div className="h-4 w-72 max-w-full rounded-md bg-muted" />
-        <div className="h-56 rounded-xl bg-muted/70" />
+        <div className="h-8 w-48 rounded-sm bg-muted" />
+        <div className="h-4 w-72 max-w-full rounded-sm bg-muted" />
+        <div className="h-56 rounded-sm bg-muted/70" />
       </div>
     </div>
   );
@@ -49,19 +50,36 @@ function NotFoundPage() {
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-background px-6 text-center">
       <FileQuestion className="size-9 text-muted-foreground" />
-      <h1 className="text-lg font-semibold">{t('notFound.title')}</h1>
+      <h1 className="font-display text-2xl font-semibold">{t('notFound.title')}</h1>
       <p className="max-w-md text-sm leading-relaxed text-muted-foreground">{t('notFound.body')}</p>
-      <Link to="/" className="rounded-md border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">{t('backToLibrary')}</Link>
+      <div className="flex items-center gap-3">
+        <Link to="/" className="text-sm font-medium text-brand hover:underline">{t('brandHome')}</Link>
+        <Link to="/library" className="rounded-sm border px-3 py-1.5 text-xs font-medium transition-colors hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">{t('backToLibrary')}</Link>
+      </div>
     </main>
   );
 }
 
+/** Fades out the pre-boot placeholder in index.html once React has painted. */
+function useHideBootSkeleton() {
+  useEffect(() => {
+    const el = document.getElementById('app-skeleton');
+    if (!el) return undefined;
+    el.style.opacity = '0';
+    const timer = setTimeout(() => el.remove(), 220);
+    return () => clearTimeout(timer);
+  }, []);
+}
+
 export default function App() {
+  useHideBootSkeleton();
+
   return (
     <>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/" element={<LibraryView />} />
+          <Route path="/" element={<ResearchPortal />} />
+          <Route path="/library" element={<LibraryView />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/docs" element={<DocsLayout />}>
             <Route index element={<Navigate to="api" replace />} />

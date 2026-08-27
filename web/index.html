@@ -16,9 +16,110 @@
     <meta name="twitter:description" content="Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics." />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>Otero | AIS Basket Literature API</title>
+    <style>
+      #app-skeleton {
+        --sk-bg: hsl(40 14% 97%);
+        --sk-muted: hsl(40 7% 94%);
+        --sk-border: hsl(40 7% 88%);
+        --sk-brand: hsl(19 92% 48%);
+        position: fixed;
+        inset: 0;
+        z-index: 60;
+        background: var(--sk-bg);
+        opacity: 1;
+        transition: opacity 200ms ease-out;
+      }
+      #app-skeleton[data-theme='dark'] {
+        --sk-bg: hsl(30 8% 13%);
+        --sk-muted: hsl(30 7% 19%);
+        --sk-border: hsl(30 6% 25%);
+        --sk-brand: hsl(20 90% 54%);
+      }
+      #app-skeleton .sk-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      #app-skeleton .sk-head {
+        height: 56px;
+        border-bottom: 1px solid var(--sk-border);
+      }
+      #app-skeleton .sk-wrap {
+        max-width: 1200px;
+        margin: 0 auto;
+        height: 100%;
+        padding: 0 32px;
+      }
+      #app-skeleton .sk-mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 2px;
+        background: var(--sk-brand);
+      }
+      #app-skeleton .sk-bar {
+        border-radius: 2px;
+        background: var(--sk-muted);
+        animation: sk-pulse 1.6s ease-in-out infinite;
+      }
+      #app-skeleton .sk-body {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 26px 32px;
+      }
+      #app-skeleton .sk-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 28px;
+      }
+      @keyframes sk-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.55; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #app-skeleton { transition: none; }
+        #app-skeleton .sk-bar { animation: none; }
+      }
+    </style>
   </head>
   <body class="bg-background text-foreground">
     <div id="root"></div>
+    <div id="app-skeleton" aria-hidden="true">
+      <div class="sk-head">
+        <div class="sk-wrap sk-row">
+          <div class="sk-mark"></div>
+          <div class="sk-bar" style="width: 62px; height: 16px"></div>
+          <div class="sk-row" style="margin-left: 20px; gap: 18px">
+            <div class="sk-bar" style="width: 44px; height: 11px"></div>
+            <div class="sk-bar" style="width: 44px; height: 11px"></div>
+            <div class="sk-bar" style="width: 44px; height: 11px"></div>
+            <div class="sk-bar" style="width: 58px; height: 11px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sk-body">
+        <div class="sk-bar" style="width: 68px; height: 10px"></div>
+        <div class="sk-bar" style="width: 256px; height: 30px; margin-top: 12px"></div>
+        <div class="sk-cards">
+          <div class="sk-bar" style="height: 92px"></div>
+          <div class="sk-bar" style="height: 92px"></div>
+          <div class="sk-bar" style="height: 92px"></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('theme');
+          var dark = stored === 'dark'
+            || ((!stored || stored === 'system')
+              && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) {
+            document.getElementById('app-skeleton').setAttribute('data-theme', 'dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -27,6 +27,8 @@
     "all": "All journals",
     "empty": "No journals"
   },
+  "yearChip": "{{year}}",
+  "clearYear": "Clear year filter",
   "skipToList": "Skip to item list",
   "selectItem": "Select an item on the left",
   "itemDeleted": "Item deleted",
@@ -46,6 +48,7 @@
     "vip": "Vol/Iss/Pages",
     "type": "Type",
     "authors": "Authors",
+    "journal": "Journal",
     "sortAsc": "Ascending",
     "sortDesc": "Descending",
     "itemCount": "{{count}} items",
@@ -64,7 +67,7 @@
     "batchInfo": "Batch parse: {{summary}}",
     "batchFailed": "Batch parse failed: {{message}}",
     "emptyFiltered": "No matching items. Try adjusting filters.",
-    "emptyImport": "No items yet. Click \"Import PDF\" in the top right to start."
+    "emptyImport": "No items yet. Import a PDF from the header to start."
   },
   "mineru": {
     "title": "MinerU parse tasks",

@@ -180,7 +180,7 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
           </DialogTitle>
           <DialogDescription>
             {t('mineru.totalTasks', { total })}
-            {activeCount > 0 && <span className="text-blue-600">{t('mineru.activeCount', { count: activeCount })}</span>}
+            {activeCount > 0 && <span className="text-brand">{t('mineru.activeCount', { count: activeCount })}</span>}
             {counts.done > 0 && <span className="text-green-600">{t('mineru.doneCount', { count: counts.done })}</span>}
             {counts.failed > 0 && <span className="text-red-600">{t('mineru.failedCount', { count: counts.failed })}</span>}
             {activeCount > 0 && <span className="ml-2 text-xs">{t('mineru.autoRefresh', { seconds: POLL_MS / 1000 })}</span>}

@@ -5,7 +5,9 @@ import {
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
+import { ChartTooltip } from '@/components/ui/chart-tooltip';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { CATEGORICAL_COLORS, STATUS_COLORS } from '@/lib/chartColors';
@@ -40,22 +42,6 @@ function shortName(name, t) {
   return JOURNAL_SHORT[name] || name;
 }
 
-function CoverageTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-lg">
-      <div className="mb-1 font-medium text-popover-foreground">{label}</div>
-      {payload.map((p, i) => (
-        <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="inline-block size-2 rounded-full" style={{ background: p.color || p.fill }} />
-          <span>{p.name}</span>
-          <span className="ml-auto tabular-nums">{formatCount(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function BasketCoveragePanel() {
   const { t, i18n } = useTranslation('dashboard');
   const lng = i18n.language;
@@ -87,23 +73,19 @@ export function BasketCoveragePanel() {
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t('basket.title')}</CardTitle>
+          <CardTitle>{t('basket.title')}</CardTitle>
           <CardDescription>
             {t('basket.desc')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {loading ? (
-            <div className="flex h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> {t('loading')}
-            </div>
+            <LoadingSkeleton variant="chart" />
           ) : error ? (
-            <div className="flex h-48 items-center justify-center text-sm text-destructive">
-              {t('loadFailed', { message: error.message })}
-            </div>
+            <ErrorState className="h-48 py-0" message={t('loadFailed', { message: error.message })} />
           ) : (
             <>
-              <div className="overflow-x-auto rounded-md border">
+              <div className="overflow-x-auto border border-border/80">
                 <table className="w-full text-sm">
                   <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
                     <tr>
@@ -122,7 +104,7 @@ export function BasketCoveragePanel() {
                         <tr
                           key={r.name}
                           className={`border-b last:border-0 transition-colors ${
-                            active ? 'bg-muted/50' : 'hover:bg-muted/30'
+                            active ? 'bg-muted/50' : 'hover:bg-accent/40'
                           }`}
                         >
                           <td className="px-3 py-2">
@@ -200,7 +182,7 @@ export function BasketCoveragePanel() {
                     width={56}
                     tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                   />
-                  <Tooltip content={<CoverageTooltip />} />
+                  <Tooltip content={<ChartTooltip formatter={(v) => formatCount(v, lng)} />} />
                   <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                   <Bar
                     dataKey="collected"
@@ -229,7 +211,7 @@ export function BasketCoveragePanel() {
               </ResponsiveContainer>
 
               {selected ? (
-                <div className="space-y-3 rounded-lg border p-4">
+                <div className="space-y-3 border border-border/80 p-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div>
                       <p className="text-sm font-medium">{displayJournalName(selected.name, t)}</p>
@@ -264,7 +246,7 @@ export function BasketCoveragePanel() {
                           allowDecimals={false}
                           width={36}
                         />
-                        <Tooltip content={<CoverageTooltip />} />
+                        <Tooltip content={<ChartTooltip formatter={(v) => formatCount(v, lng)} />} />
                         <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                         <Bar dataKey="collected" name={t('basket.colCollected')} stackId="y" fill={STATUS_COLORS.good} barSize={14} />
                         <Bar

@@ -13,7 +13,8 @@
   "filterLabel": {
     "all": "全部条目",
     "search": "搜索: \"{{query}}\"",
-    "collection": "集合视图"
+    "collection": "集合视图",
+    "year": "{{year}} 年"
   },
   "field": {
     "title": "标题",

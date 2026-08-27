@@ -1,6 +1,6 @@
 // Shared helpers for displaying items.
 
-import i18n from '../i18n';
+import i18n from '../i18n/index.js';
 
 export const ITEM_TYPES = [
   'journalArticle',
@@ -102,11 +102,15 @@ export function filterTitle(filter, collections) {
     return i18n.t('item:filterLabel.search', { query: filter.search });
   }
   if (filter.journal) {
-    return filter.journal === UNFILED ? i18n.t('common:unfiled') : filter.journal;
+    const name = filter.journal === UNFILED ? i18n.t('common:unfiled') : filter.journal;
+    return filter.year ? `${name} · ${filter.year}` : name;
   }
   if (filter.collection) {
     const c = collections?.find(c => c.key === filter.collection);
     return c?.name || i18n.t('item:filterLabel.collection');
+  }
+  if (filter.year) {
+    return i18n.t('item:filterLabel.year', { year: filter.year });
   }
   return i18n.t('item:filterLabel.all');
 }

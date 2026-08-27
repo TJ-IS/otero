@@ -27,7 +27,7 @@ export function useInfiniteItems({ filter = {}, sortField = 'dateModified', sort
   const reqIdRef = useRef(0);
   const abortRef = useRef(null);
 
-  const { type, journal, collection, search } = filter;
+  const { type, journal, collection, search, year, yearFrom, yearTo } = filter;
 
   const fetchPage = useCallback(async (pageNum, { append }) => {
     abortRef.current?.abort();
@@ -37,7 +37,7 @@ export function useInfiniteItems({ filter = {}, sortField = 'dateModified', sort
     if (append) setLoadingMore(true); else setLoading(true);
     try {
       const res = await api.listItems({
-        type, journal, collection, search,
+        type, journal, collection, search, year, yearFrom, yearTo,
         page: pageNum, pageSize, sortField, sortDir, signal: controller.signal,
       });
       if (reqId !== reqIdRef.current) return; // superseded by a newer request
@@ -55,7 +55,7 @@ export function useInfiniteItems({ filter = {}, sortField = 'dateModified', sort
         setLoadingMore(false);
       }
     }
-  }, [type, journal, collection, search, pageSize, sortField, sortDir]);
+  }, [type, journal, collection, search, year, yearFrom, yearTo, pageSize, sortField, sortDir]);
 
   // Reset to page 1 on any filter/sort/version change.
   useEffect(() => {
@@ -65,7 +65,7 @@ export function useInfiniteItems({ filter = {}, sortField = 'dateModified', sort
     }
     fetchPage(1, { append: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, journal, collection, search, sortField, sortDir, version, enabled]);
+  }, [type, journal, collection, search, year, yearFrom, yearTo, sortField, sortDir, version, enabled]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 

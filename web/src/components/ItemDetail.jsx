@@ -167,9 +167,9 @@ const Field = memo(function Field({ name, value, onChange, multiline, readOnly }
 
 const Section = memo(function Section({ title, action, children }) {
   return (
-    <section className="space-y-2">
+    <section className="space-y-3 border-t border-border/80 pt-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
+        <h3 className="font-display text-base font-semibold text-foreground">{title}</h3>
         {action}
       </div>
       {children}
@@ -198,7 +198,7 @@ function ExportModal({ open, onOpenChange, format, content }) {
         <DialogHeader>
           <DialogTitle>{t('detail.exportTitle', { format: format === 'bibtex' ? 'BibTeX' : 'RIS' })}</DialogTitle>
         </DialogHeader>
-        <div className="flex-1 overflow-auto rounded-md border bg-muted/30 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+        <div className="flex-1 overflow-auto rounded-sm border border-border/80 bg-muted/30 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
           {content || t('common:loadingDots')}
         </div>
         <div className="flex justify-end gap-2 pt-2">
@@ -531,16 +531,16 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     <div className="flex h-full flex-col">
       {/* Dirty indicator bar */}
       {dirty && (
-        <div className="bg-yellow-500/20 dark:bg-yellow-600/30 border-b border-yellow-500/40 px-3 py-1 text-xs text-yellow-900 dark:text-yellow-100 flex items-center gap-2">
+        <div className="flex items-center gap-2 border-b border-warning/40 bg-warning/15 px-3 py-1 text-xs text-foreground">
           <span className="font-medium">{t('common:unsavedChanges')}</span>
         </div>
       )}
 
       {/* Header with actions */}
-      <div className="flex flex-wrap items-start gap-2 border-b p-3">
+      <div className="flex flex-wrap items-start gap-3 border-b border-border/80 p-4 pr-14">
         <div className="min-w-0 flex-1">
-          <div className="truncate font-medium text-sm" title={itemTitle(item)}>{itemTitle(item)}</div>
-          <div className="text-xs text-muted-foreground">
+          <div className="truncate font-display text-base font-semibold" title={itemTitle(item)}>{itemTitle(item)}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">
             {ITEM_TYPE_LABELS[item.itemType] || item.itemType}
           </div>
         </div>
@@ -599,19 +599,19 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <TabsList className="mx-3 mt-2 w-fit">
-          <TabsTrigger value="detail">{t('detail.tabDetail')}</TabsTrigger>
+        <TabsList className="mx-4 mt-1 h-auto w-auto justify-start rounded-none border-b border-border/80 bg-transparent p-0">
+          <TabsTrigger value="detail" className="rounded-none border-b-2 border-transparent px-1 py-2 shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none">{t('detail.tabDetail')}</TabsTrigger>
           {pdfAttachments.length > 0 && (
-            <TabsTrigger value="pdf">{t('detail.tabPdf')}</TabsTrigger>
+            <TabsTrigger value="pdf" className="ml-5 rounded-none border-b-2 border-transparent px-1 py-2 shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none">{t('detail.tabPdf')}</TabsTrigger>
           )}
           {pdfAttachments.length > 0 && (
-            <TabsTrigger value="fulltext">{t('detail.tabFulltext')}</TabsTrigger>
+            <TabsTrigger value="fulltext" className="ml-5 rounded-none border-b-2 border-transparent px-1 py-2 shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none">{t('detail.tabFulltext')}</TabsTrigger>
           )}
         </TabsList>
 
         <TabsContent value="detail" className="min-h-0 flex-1 overflow-hidden mt-2">
           <ScrollArea className="h-full">
-            <div className="space-y-4 px-4 pb-6">
+            <div className="max-w-4xl space-y-5 px-4 pb-6 pt-2">
               {/* Basic info */}
               <Section title={t('detail.basic')}>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
@@ -662,7 +662,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                             </SelectContent>
                           </Select>
                           {doiMissing && (
-                            <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+                            <p className="mt-1 text-xs text-warning">
                               {t('detail.doiMissingUnfiled')}
                             </p>
                           )}
@@ -855,7 +855,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
               {/* Attachments */}
               <Section title={t('detail.attachments')}>
-                <div className="space-y-1">
+                <div className="divide-y divide-border border-y border-border">
                   {(attachments || []).map(a => {
                     const isPdf = (a.contentType || '').includes('pdf');
                     const filename = a.path ? a.path.split('/').pop() : a.key;
@@ -864,12 +864,12 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                         key={a.key}
                         onClick={() => isPdf ? openPreview(a.key) : undefined}
                         disabled={!isPdf}
-                        className="flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm transition-colors enabled:hover:bg-accent/60 disabled:cursor-default"
+                        className="flex w-full items-center gap-2 px-1 py-2 text-left text-sm transition-colors enabled:hover:bg-accent/50 disabled:cursor-default"
                         title={filename}
                       >
                         <FileText className="size-4 shrink-0 text-muted-foreground" />
                         <span className="flex-1 truncate text-xs">{filename}</span>
-                        <Badge variant="secondary" className="text-[10px]">{a.contentType || 'file'}</Badge>
+                        <Badge variant="secondary" className="font-normal">{a.contentType || 'file'}</Badge>
                         {isPdf && <ExternalLink className="size-3 text-muted-foreground" />}
                       </button>
                     );
@@ -916,7 +916,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                   key={previewUrl}
                   src={previewUrl}
                   title="PDF preview"
-                  className="flex-1 w-full rounded-md border bg-muted/30"
+                  className="w-full flex-1 rounded-sm border border-border/80 bg-muted/30"
                 />
               ) : (
                 <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">

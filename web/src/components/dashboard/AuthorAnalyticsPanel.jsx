@@ -6,28 +6,14 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Loader2, AlertCircle } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { CATEGORICAL_COLORS, SINGLE_SERIES_COLOR } from '@/lib/chartColors';
+import { ChartTooltip } from '@/components/ui/chart-tooltip';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
 
 function formatCount(n, lng) {
   return Number(n || 0).toLocaleString(lng || 'zh-CN');
-}
-
-function ChartTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-lg">
-      {label != null && <div className="mb-1 font-medium text-popover-foreground">{label}</div>}
-      {payload.map((p, i) => (
-        <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="inline-block size-2 rounded-full" style={{ background: p.color || p.fill }} />
-          <span>{p.name || p.payload?.label || p.dataKey}: {formatCount(p.value)}</span>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 const JOURNAL_SHORT = {
@@ -60,44 +46,44 @@ export function AuthorAnalyticsPanel() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" /> {t('authors.loadingStats')}
+      <div className="mx-auto w-full max-w-page px-4 py-8 sm:px-6 lg:px-8">
+        <LoadingSkeleton variant="chart" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center gap-2 py-10 text-sm text-destructive">
-        <AlertCircle className="size-6" />
-        <p>{t('loadFailed', { message: error.message })}</p>
+      <div className="mx-auto w-full max-w-page px-4 py-8 sm:px-6 lg:px-8">
+        <ErrorState message={t('loadFailed', { message: error.message })} />
       </div>
     );
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="mx-auto w-full max-w-page px-4 py-8 sm:px-6 lg:px-8">
+        <EmptyState title={t('noData')} />
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-4 px-4 py-4 sm:px-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight">{t('authors.statsTitle')}</h2>
-          <p className="text-xs text-muted-foreground">
-            {t('authors.authorTotal', { count: formatCount(data.authorTotal, lng) })}
-          </p>
-        </div>
+    <div className="mx-auto w-full max-w-page space-y-8 px-4 pb-8 sm:px-6 lg:px-8">
+      <div className="border-b border-border/80 pb-4 text-sm text-muted-foreground">
+        {t('authors.authorTotal', { count: formatCount(data.authorTotal, lng) })}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">{t('authors.topAuthors')}</CardTitle>
+          <CardHeader>
+            <CardTitle>{t('authors.topAuthors')}</CardTitle>
             <CardDescription>{t('authors.topAuthorsDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="max-h-72 overflow-auto rounded-md border">
+            <div className="max-h-72 overflow-auto border border-border/80">
               <table className="w-full text-sm">
-                <thead className="sticky top-0 border-b bg-background text-left text-xs text-muted-foreground">
+                <thead className="sticky top-0 border-b bg-muted/40 text-left text-xs text-muted-foreground">
                   <tr>
                     <th className="px-3 py-2 font-medium w-10">#</th>
                     <th className="px-3 py-2 font-medium">{t('authors.colScholar')}</th>
@@ -106,7 +92,7 @@ export function AuthorAnalyticsPanel() {
                 </thead>
                 <tbody>
                   {data.topAuthors.map((a, i) => (
-                    <tr key={a.id} className="border-b last:border-0 hover:bg-muted/40">
+                    <tr key={a.id} className="border-b last:border-0 hover:bg-accent/40">
                       <td className="px-3 py-1.5 tabular-nums text-muted-foreground">{i + 1}</td>
                       <td className="px-3 py-1.5">
                         <button
@@ -128,8 +114,8 @@ export function AuthorAnalyticsPanel() {
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{t('authors.rolesTitle')}</CardTitle>
+            <CardHeader>
+              <CardTitle>{t('authors.rolesTitle')}</CardTitle>
               <CardDescription>{t('authors.rolesDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -150,7 +136,7 @@ export function AuthorAnalyticsPanel() {
                       <Cell key={i} fill={CATEGORICAL_COLORS[i % CATEGORICAL_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip content={<ChartTooltip formatter={(v) => formatCount(v)} />} />
                 </PieChart>
               </ResponsiveContainer>
               <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
@@ -171,8 +157,8 @@ export function AuthorAnalyticsPanel() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm">{t('authors.productivityTitle')}</CardTitle>
+            <CardHeader>
+              <CardTitle>{t('authors.productivityTitle')}</CardTitle>
               <CardDescription>{t('authors.productivityDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -181,7 +167,7 @@ export function AuthorAnalyticsPanel() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                   <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} width={32} />
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip content={<ChartTooltip formatter={(v) => formatCount(v)} />} />
                   <Bar dataKey="count" name={t('authors.authorCount')} fill={SINGLE_SERIES_COLOR} radius={[4, 4, 0, 0]} barSize={22} />
                 </BarChart>
               </ResponsiveContainer>
@@ -191,8 +177,8 @@ export function AuthorAnalyticsPanel() {
       </div>
 
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">{t('authors.collabTitle')}</CardTitle>
+        <CardHeader>
+          <CardTitle>{t('authors.collabTitle')}</CardTitle>
           <CardDescription>{t('authors.collabDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -201,7 +187,7 @@ export function AuthorAnalyticsPanel() {
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
               <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} width={40} />
-              <Tooltip content={<ChartTooltip />} />
+              <Tooltip content={<ChartTooltip formatter={(v) => formatCount(v)} />} />
               <Bar dataKey="count" name={t('authors.paperCountSeries')} fill={CATEGORICAL_COLORS[2]} radius={[4, 4, 0, 0]} barSize={28} />
             </BarChart>
           </ResponsiveContainer>
@@ -209,14 +195,14 @@ export function AuthorAnalyticsPanel() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">{t('authors.coreAuthorsTitle')}</CardTitle>
+        <CardHeader>
+          <CardTitle>{t('authors.coreAuthorsTitle')}</CardTitle>
           <CardDescription>{t('authors.coreAuthorsDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {(data.journalCores || []).map((jc) => (
-              <div key={jc.journal} className="rounded-md border p-3">
+              <div key={jc.journal} className="border border-border/80 p-3">
                 <p className="mb-2 text-xs font-medium leading-snug" title={jc.journal}>
                   <span className="sm:hidden">{JOURNAL_SHORT[jc.journal] || jc.journal}</span>
                   <span className="hidden sm:inline">{jc.journal}</span>

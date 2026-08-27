@@ -1,12 +1,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useTheme } from 'next-themes';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Search as SearchIcon, X, FileText, Moon, Sun, Loader2 } from 'lucide-react';
+import { Search as SearchIcon, X, FileText } from 'lucide-react';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
 import { useInfiniteItems } from '@/hooks/useInfiniteItems';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import {
@@ -16,10 +15,10 @@ import {
 import { highlight, snippetAround } from '@/lib/highlight';
 import { cn } from '@/lib/utils';
 import { ItemDetail } from '@/components/ItemDetail';
-import { FloatingDetailPanel } from '@/components/FloatingDetailPanel';
+import { ItemDetailDialog } from '@/components/ItemDetailDialog';
 import { AuthorLinks } from '@/components/AuthorLinks';
 import { toast } from 'sonner';
-import { WalletButton } from '@/components/WalletButton';
+import { SiteHeader } from '@/components/SiteHeader';
 
 const BASKET_SET = new Set(AIS_BASKET_JOURNALS);
 
@@ -78,19 +77,19 @@ function ResultCard({ item, query, onSelect }) {
 
   return (
     <article
-      className="group rounded-md border bg-background px-4 py-3 transition-colors hover:bg-accent/40"
+      className="group border-b border-border/80 px-1 py-4 transition-colors hover:bg-accent/40 sm:px-2"
     >
       <div className="flex items-baseline gap-2">
         <span className="text-xs text-muted-foreground tabular-nums shrink-0">
           {ITEM_TYPE_LABELS[item.itemType] || item.itemType}
         </span>
-        <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-primary">
-          <button type="button" onClick={() => onSelect(item.key)} className="max-w-full truncate text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+        <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+          <button type="button" onClick={() => onSelect(item.key)} className="max-w-full truncate text-left transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
             {highlight(title, query)}
           </button>
         </h3>
         {snippetFromFulltext ? (
-          <Badge variant="outline" className="shrink-0 font-normal text-[10px]">{t('search.fulltextBadge')}</Badge>
+          <Badge variant="secondary" className="shrink-0 font-normal">{t('search.fulltextBadge')}</Badge>
         ) : null}
       </div>
 
@@ -123,7 +122,7 @@ function ResultsSkeleton({ count = 8 }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="rounded-md border px-4 py-3">
+        <div key={i} className="border-b border-border/80 px-2 py-4">
           <Skeleton className="h-3.5 w-24" />
           <Skeleton className="mt-2 h-4 w-[80%]" />
           <Skeleton className="mt-1.5 h-3 w-[55%]" />
@@ -136,13 +135,11 @@ function ResultsSkeleton({ count = 8 }) {
 
 export const SearchPage = memo(function SearchPage() {
   const { t } = useTranslation(['library', 'common']);
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQ = searchParams.get('q') || '';
   const [input, setInput] = useState(initialQ);
   const [submitted, setSubmitted] = useState(initialQ);
   const inputRef = useRef(null);
-  const { resolvedTheme, setTheme } = useTheme();
 
   const hasSearchParams = Boolean([...searchParams.keys()].length);
   usePageMeta({
@@ -229,108 +226,83 @@ export const SearchPage = memo(function SearchPage() {
 
   return (
     <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background">
-      {/* Search header — mirrors TopBar's styling for visual consistency. */}
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate('/')}
-          title={t('common:backToLibrary')}
-          className="shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
-        <form
-          onSubmit={onSubmit}
-          className="relative flex h-8 flex-1 max-w-md min-w-[160px] items-center"
-        >
-          <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            ref={inputRef}
-            placeholder={t('search.placeholder')}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            className="h-8 w-full pl-8 pr-8"
-          />
-          {input && (
-            <button
-              type="button"
-              onClick={clearQuery}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-              title={t('search.clear')}
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </form>
-        <div className="ml-auto flex items-center gap-1.5">
-          <WalletButton />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-            title={resolvedTheme === 'dark' ? t('common:themeToLight') : t('common:themeToDark')}
-            className="shrink-0 text-muted-foreground hover:text-foreground"
-          >
-            {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
-          </Button>
-        </div>
-      </header>
+      <SiteHeader />
 
-      {/* Results */}
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-4" onScroll={onResultsScroll}>
-        <div className="mx-auto max-w-2xl">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto flex min-h-0 w-full max-w-page flex-1 flex-col px-4 sm:px-6 lg:px-8"
+      >
+        <div className="shrink-0 pb-5 pt-6">
+          <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-brand">
+            {t('common:nav.search')}
+          </p>
+          <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
+            {hasQuery ? submitted : t('search.emptyPrompt')}
+          </h1>
+          <form
+            onSubmit={onSubmit}
+            className="mt-4 flex h-10 min-w-0 items-center gap-3 border-b border-foreground/30 focus-within:border-brand"
+          >
+            <SearchIcon className="pointer-events-none size-4 shrink-0 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              placeholder={t('search.placeholder')}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+            />
+            {input ? (
+              <button
+                type="button"
+                onClick={clearQuery}
+                className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                title={t('search.clear')}
+              >
+                <X className="size-3.5" />
+              </button>
+            ) : null}
+            <button type="submit" className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand hover:underline">
+              {t('search.label')}
+            </button>
+          </form>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto pb-4" onScroll={onResultsScroll}>
           {error ? (
-            <div className="py-16 text-center text-sm text-destructive">
-              {t('search.failed', { message: error.message })}
-            </div>
+            <ErrorState message={t('search.failed', { message: error.message })} />
           ) : !hasQuery ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground">
-              <FileText className="size-8 opacity-30" />
-              <p className="mt-3 text-sm">{t('search.emptyPrompt')}</p>
-              <p className="mt-1 text-xs">{t('search.emptyHint')}</p>
-            </div>
+            <EmptyState icon={FileText} title={t('search.emptyPrompt')} description={t('search.emptyHint')} />
           ) : loading && items.length === 0 ? (
             <ResultsSkeleton />
           ) : resultCount === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">
-              {t('search.noResults', { query: submitted })}
-            </div>
+            <EmptyState title={t('search.noResults', { query: submitted })} />
           ) : (
             <>
               <div className="mb-3 text-xs text-muted-foreground tabular-nums">
                 {t('search.foundApprox')} <span className="text-foreground font-medium">{resultCount}</span> {t('search.results')}
               </div>
-              <div className="space-y-2">
+              <div className="divide-y divide-border border-t border-border/80">
                 {items.map(it => (
                   <ResultCard key={it.key} item={it} query={submitted} onSelect={onSelect} />
                 ))}
               </div>
               {loadingMore && (
-                <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
-                  <Loader2 className="size-3 animate-spin" /> {t('search.loadMore')}
-                </div>
+                <LoadingSkeleton variant="list" className="py-4" label={t('search.loadMore')} />
               )}
             </>
           )}
         </div>
-      </div>
+      </main>
 
-      {/* Floating detail panel */}
-      <FloatingDetailPanel
-        open={detailOpen && !!selectedKey}
-        onClose={closeDetail}
-        width={520}
-      >
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <ItemDetail
-            itemKey={selectedKey}
-            onDeleted={onItemDeleted}
-            onChanged={() => {}}
-            onDirtyChange={setDetailDirty}
-          />
-        </div>
-      </FloatingDetailPanel>
+      <ItemDetailDialog open={detailOpen && !!selectedKey} onClose={closeDetail}>
+        <ItemDetail
+          itemKey={selectedKey}
+          onDeleted={onItemDeleted}
+          onChanged={() => {}}
+          onDirtyChange={setDetailDirty}
+        />
+      </ItemDetailDialog>
     </div>
   );
 });

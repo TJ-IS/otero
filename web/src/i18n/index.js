@@ -2,19 +2,21 @@ import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 
-import commonZh from '../locales/zh-CN/common.json';
-import libraryZh from '../locales/zh-CN/library.json';
-import dashboardZh from '../locales/zh-CN/dashboard.json';
-import adminZh from '../locales/zh-CN/admin.json';
-import docsZh from '../locales/zh-CN/docs.json';
-import itemZh from '../locales/zh-CN/item.json';
+import commonZh from '../locales/zh-CN/common.json' with { type: 'json' };
+import libraryZh from '../locales/zh-CN/library.json' with { type: 'json' };
+import dashboardZh from '../locales/zh-CN/dashboard.json' with { type: 'json' };
+import adminZh from '../locales/zh-CN/admin.json' with { type: 'json' };
+import docsZh from '../locales/zh-CN/docs.json' with { type: 'json' };
+import itemZh from '../locales/zh-CN/item.json' with { type: 'json' };
+import homeZh from '../locales/zh-CN/home.json' with { type: 'json' };
 
-import commonEn from '../locales/en/common.json';
-import libraryEn from '../locales/en/library.json';
-import dashboardEn from '../locales/en/dashboard.json';
-import adminEn from '../locales/en/admin.json';
-import docsEn from '../locales/en/docs.json';
-import itemEn from '../locales/en/item.json';
+import commonEn from '../locales/en/common.json' with { type: 'json' };
+import libraryEn from '../locales/en/library.json' with { type: 'json' };
+import dashboardEn from '../locales/en/dashboard.json' with { type: 'json' };
+import adminEn from '../locales/en/admin.json' with { type: 'json' };
+import docsEn from '../locales/en/docs.json' with { type: 'json' };
+import itemEn from '../locales/en/item.json' with { type: 'json' };
+import homeEn from '../locales/en/home.json' with { type: 'json' };
 
 export const SUPPORTED_LANGS = ['zh-CN', 'en'];
 
@@ -44,6 +46,7 @@ void i18n
         admin: adminZh,
         docs: docsZh,
         item: itemZh,
+        home: homeZh,
       },
       en: {
         common: commonEn,
@@ -52,6 +55,7 @@ void i18n
         admin: adminEn,
         docs: docsEn,
         item: itemEn,
+        home: homeEn,
       },
     },
     fallbackLng: 'zh-CN',
@@ -60,7 +64,7 @@ void i18n
     // it breaks resource lookup and leaves t() returning raw keys.
     load: 'currentOnly',
     defaultNS: 'common',
-    ns: ['common', 'library', 'dashboard', 'admin', 'docs', 'item'],
+    ns: ['common', 'library', 'dashboard', 'admin', 'docs', 'item', 'home'],
     interpolation: { escapeValue: false },
     detection: {
       order: ['localStorage', 'navigator'],

@@ -12,9 +12,10 @@ import {
   Dialog, DialogContent, DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  ArrowLeft, BookOpen, ExternalLink, Copy, Check, FileText, Loader2, AlertCircle,
+  ArrowLeft, BookOpen, ExternalLink, Copy, Check, FileText, AlertCircle,
   Image as ImageIcon, Table2, Sigma, BarChart3, Quote, List, PanelLeftClose, PanelLeft,
 } from 'lucide-react';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
 import { toast } from 'sonner';
 import DOMPurify from 'dompurify';
 import { api } from '@/api/client';
@@ -26,6 +27,7 @@ import { AuthorLinks } from './AuthorLinks';
 import { headingId } from '@/lib/fulltext';
 import { cn } from '@/lib/utils';
 import { ChatPanel } from './ChatPanel';
+import { SiteHeader } from './SiteHeader';
 
 const FulltextMarkdown = lazy(() => import('./FulltextMarkdown').then(m => ({ default: m.FulltextMarkdown })));
 
@@ -69,7 +71,7 @@ function Lightbox({ src, alt, open, onOpenChange }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[92vw] max-h-[92vh] p-2 overflow-hidden flex flex-col items-center justify-center">
         <DialogTitle className="sr-only">{alt || t('page.preview')}</DialogTitle>
-        <img src={src} alt={alt || ''} className="max-w-full max-h-[85vh] object-contain rounded" />
+        <img src={src} alt={alt || ''} className="max-h-[85vh] max-w-full rounded-sm object-contain" />
         {alt && <p className="mt-2 text-xs text-muted-foreground text-center px-4">{alt}</p>}
       </DialogContent>
     </Dialog>
@@ -79,7 +81,7 @@ function Lightbox({ src, alt, open, onOpenChange }) {
 function AssetCard({ imgUrl, caption, pageIdx, onPreview, children }) {
   const { t } = useTranslation('item');
   return (
-    <figure className="border rounded-lg overflow-hidden bg-background flex flex-col">
+    <figure className="flex flex-col overflow-hidden rounded-sm border bg-background">
       {imgUrl ? (
         <button
           type="button"
@@ -228,34 +230,51 @@ export const ItemPage = memo(function ItemPage() {
 
   if (itemLoading) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center text-sm text-muted-foreground">
-        <Loader2 className="size-5 animate-spin mr-2" /> {t('common:loading')}
+      <div className="flex min-h-[100dvh] flex-col bg-background">
+        <SiteHeader />
+        <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-page px-4 py-8 sm:px-6 lg:px-8">
+          <LoadingSkeleton variant="lines" />
+        </main>
       </div>
     );
   }
 
   if (itemError) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 text-sm text-destructive">
-        <AlertCircle className="size-8" />
-        <p>{t('common:loadFailed', { message: itemError.message })}</p>
-        <Button variant="outline" size="sm" asChild>
-          <a href="/">
-            <ArrowLeft className="size-4 mr-1" /> {t('common:backToLibrary')}
-          </a>
-        </Button>
+      <div className="flex min-h-[100dvh] flex-col bg-background">
+        <SiteHeader />
+        <main id="main-content" tabIndex={-1}>
+          <ErrorState
+            message={t('common:loadFailed', { message: itemError.message })}
+            action={(
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/library">
+                  <ArrowLeft className="size-4" />
+                  {t('common:backToLibrary')}
+                </Link>
+              </Button>
+            )}
+          />
+        </main>
       </div>
     );
   }
 
   if (!item) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 text-sm text-muted-foreground">
-        <FileText className="size-8 opacity-40" />
-        <p>{t('page.notFound')}</p>
-        <Button variant="outline" size="sm" asChild>
-          <Link to="/">{t('common:backToLibrary')}</Link>
-        </Button>
+      <div className="flex min-h-[100dvh] flex-col bg-background">
+        <SiteHeader />
+        <main id="main-content" tabIndex={-1}>
+          <EmptyState
+            icon={FileText}
+            title={t('page.notFound')}
+            action={(
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/library">{t('common:backToLibrary')}</Link>
+              </Button>
+            )}
+          />
+        </main>
       </div>
     );
   }
@@ -269,31 +288,20 @@ export const ItemPage = memo(function ItemPage() {
 
   return (
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-background">
-      {/* Compact toolbar — no truncated title */}
-      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="flex items-center gap-2 px-3 sm:px-4 h-12">
-          <Button variant="ghost" size="icon" className="shrink-0" asChild title={t('common:backToLibrary')}>
-            <a href="/">
-              <ArrowLeft className="size-4" />
-              <span className="sr-only">{t('common:backToLibrary')}</span>
-            </a>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0 hidden md:inline-flex"
-            onClick={() => setTocOpen(v => !v)}
-            title={tocOpen ? t('page.hideToc') : t('page.showToc')}
-          >
-            {tocOpen ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
-          </Button>
-          <Badge variant="outline" className="shrink-0 text-[11px] font-normal">{typeLabel}</Badge>
-          {state !== 'loading' && <StateBadge state={state} />}
-          {structure?.pageCount > 0 && (
-            <span className="hidden sm:inline text-xs text-muted-foreground">{t('fulltext.pagesShort', { count: structure.pageCount })}</span>
-          )}
-          <div className="flex-1" />
-          <div className="flex items-center gap-1.5 shrink-0">
+      {/* Reader controls live in the single global header — never a second bar. */}
+      <SiteHeader
+        className="shrink-0"
+        actions={(
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden shrink-0 md:inline-flex"
+              onClick={() => setTocOpen(v => !v)}
+              title={tocOpen ? t('page.hideToc') : t('page.showToc')}
+            >
+              {tocOpen ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
+            </Button>
             {pdfKey && (
               <Button size="sm" variant="outline" asChild>
                 <a href={`/api/attachments/${pdfKey}/file`} target="_blank" rel="noreferrer">
@@ -303,48 +311,46 @@ export const ItemPage = memo(function ItemPage() {
               </Button>
             )}
             {doi && (
-              <Button size="sm" variant="outline" asChild title={`DOI: ${doi}`}>
+              <Button size="sm" variant="outline" className="hidden sm:inline-flex" asChild title={`DOI: ${doi}`}>
                 <a href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer">
                   <ExternalLink className="size-3.5" />
                 </a>
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={copyLink} title={t('page.copyLink')}>
+            <Button size="sm" variant="outline" className="hidden sm:inline-flex" onClick={copyLink} title={t('page.copyLink')}>
               {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
             </Button>
-          </div>
-        </div>
-      </header>
+          </>
+        )}
+      />
 
-      <div className="flex-1 flex min-h-0">
+      <div className="mx-auto flex min-h-0 w-full max-w-page flex-1 px-4 sm:px-6 lg:px-8">
         {/* Collapsible TOC */}
         <aside
           className={cn(
-            'hidden md:flex md:h-full flex-col border-r bg-muted/15 shrink-0 overflow-hidden motion-toc',
+            'hidden md:flex md:h-full flex-col border-r border-border/80 bg-muted/10 shrink-0 overflow-hidden motion-toc',
             tocOpen ? 'w-56 xl:w-64' : 'w-0 border-r-0',
           )}
         >
           <div className="flex h-full w-56 xl:w-64 shrink-0 flex-col">
-            <div className="px-3 py-2.5 text-xs font-medium text-muted-foreground border-b shrink-0">{t('page.toc')}</div>
+            <div className="shrink-0 border-b border-border/80 px-3 py-3 font-display text-sm font-semibold">{t('page.toc')}</div>
             <ScrollArea className="flex-1">
               <nav className="p-2 space-y-0.5">
                 {structureLoading ? (
-                  <p className="text-xs text-muted-foreground px-2 py-3 flex items-center gap-1.5">
-                    <Loader2 className="size-3 animate-spin" /> {t('common:loading')}
-                  </p>
+                  <LoadingSkeleton variant="list" className="px-2 py-3" />
                 ) : outline.length > 0 ? outline.map((o) => (
                   <button
                     key={o.id}
                     type="button"
                     onClick={() => scrollToHeading(o.text)}
-                    className="w-full text-left text-[12px] leading-snug hover:bg-accent/70 rounded-md px-2 py-1.5 text-foreground/85"
+                    className="w-full border-l-2 border-transparent px-2 py-1.5 text-left text-[12px] leading-snug text-foreground/80 hover:border-brand hover:text-brand"
                     style={{ paddingLeft: `${0.5 + Math.min(o.level - 1, 3) * 0.65}rem` }}
                     title={o.text}
                   >
                     <span className="line-clamp-3">{o.text}</span>
                   </button>
                 )) : (
-                  <p className="text-xs text-muted-foreground px-2 py-3">{t('page.tocEmpty')}</p>
+                  <EmptyState className="px-2 py-6" title={t('page.tocEmpty')} />
                 )}
               </nav>
             </ScrollArea>
@@ -353,14 +359,22 @@ export const ItemPage = memo(function ItemPage() {
 
         {/* Reading column */}
         <main
+          id="main-content"
+          tabIndex={-1}
           ref={readerScrollRef}
           data-reader-scroll
           className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain"
         >
-          <div className="mx-auto w-full max-w-3xl min-w-0 px-4 sm:px-6 py-6 sm:py-8 space-y-8">
-            {/* Title block — full, no truncation */}
-            <header className="space-y-3">
-              <h1 className="text-xl sm:text-2xl font-semibold tracking-tight leading-snug text-balance">
+          <div className="mx-auto w-full min-w-0 max-w-measure space-y-9 px-6 py-7 sm:py-10">
+            <header className="space-y-3 text-left">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="text-[11px] font-normal">{typeLabel}</Badge>
+                {state !== 'loading' && <StateBadge state={state} />}
+                {structure?.pageCount > 0 && (
+                  <span className="text-xs text-muted-foreground">{t('fulltext.pagesShort', { count: structure.pageCount })}</span>
+                )}
+              </div>
+              <h1 className="font-display text-2xl font-semibold leading-tight text-balance sm:text-3xl">
                 {title}
               </h1>
               {authors.length > 0 && (
@@ -371,7 +385,7 @@ export const ItemPage = memo(function ItemPage() {
             </header>
 
             {/* Bibliographic metadata — dense but readable */}
-            <section className="space-y-2.5 border-y py-4">
+            <section className="space-y-2.5 border-y border-border/80 py-5">
               <MetaRow label={t('field.publicationTitle')}>
                 {f.publicationTitle === UNFILED && stampLines[0]
                   ? (
@@ -395,14 +409,14 @@ export const ItemPage = memo(function ItemPage() {
               <MetaRow label={t('field.date')}>{f.date}</MetaRow>
               <MetaRow label={t('field.DOI')}>
                 {doi ? (
-                  <a href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all">
+                  <a href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer" className="text-brand hover:underline break-all">
                     {doi}
                   </a>
                 ) : null}
               </MetaRow>
               <MetaRow label={t('field.url')}>
                 {url ? (
-                  <a href={url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline break-all inline-flex items-center gap-1">
+                  <a href={url} target="_blank" rel="noreferrer" className="text-brand hover:underline break-all inline-flex items-center gap-1">
                     {url} <ExternalLink className="size-3 shrink-0" />
                   </a>
                 ) : null}
@@ -422,22 +436,20 @@ export const ItemPage = memo(function ItemPage() {
 
             {f.abstractNote && (
               <section>
-                <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-2">{t('detail.abstract')}</h2>
-                <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">{f.abstractNote}</p>
+                <h2 className="mb-3 font-display text-lg font-semibold">{t('detail.abstract')}</h2>
+                <p className="whitespace-pre-wrap font-serif text-[15px] leading-7 text-foreground/90">{f.abstractNote}</p>
               </section>
             )}
 
             {/* MinerU assets — tabbed gallery in main flow */}
             {structureLoading && (
-              <div className="text-xs text-muted-foreground flex items-center gap-2">
-                <Loader2 className="size-3.5 animate-spin" /> {t('page.loadingStructure')}
-              </div>
+              <LoadingSkeleton variant="chart" label={t('page.loadingStructure')} />
             )}
 
             {!structureLoading && assetTabs.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <h2 className="font-display text-lg font-semibold">
                     {t('page.assets')}
                   </h2>
                   <span className="text-[11px] text-muted-foreground">
@@ -450,9 +462,9 @@ export const ItemPage = memo(function ItemPage() {
                   </span>
                 </div>
                 <Tabs value={assetTab} onValueChange={setAssetTab}>
-                  <TabsList className="h-auto flex-wrap justify-start gap-1">
+                  <TabsList className="h-auto w-full flex-wrap justify-start gap-5 rounded-none border-b border-border bg-transparent p-0">
                     {assetTabs.map(tab => (
-                      <TabsTrigger key={tab.id} value={tab.id} className="text-xs gap-1.5">
+                      <TabsTrigger key={tab.id} value={tab.id} className="gap-1.5 rounded-none border-b-2 border-transparent px-0 py-2 text-xs shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none">
                         <tab.icon className="size-3.5" />
                         {tab.label}
                         <span className="opacity-60">{tab.count}</span>
@@ -561,30 +573,28 @@ export const ItemPage = memo(function ItemPage() {
               </div>
 
               {(fulltextLoading || state === 'loading') && (
-                <div className="rounded-lg border px-6 py-10 text-center text-sm text-muted-foreground">
-                  <Loader2 className="size-7 animate-spin mx-auto mb-2 opacity-60" />
-                  <p>{t('fulltext.loadingMd')}</p>
-                </div>
+                <LoadingSkeleton variant="chart" className="rounded-sm border border-border/80 px-6 py-8" label={t('fulltext.loadingMd')} />
               )}
 
               {!fulltextLoading && state === 'idle' && (
-                <div className="rounded-lg border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
-                  <FileText className="size-7 opacity-40 mx-auto mb-2" />
-                  <p>{t('fulltext.notParsed')}</p>
-                  <p className="text-xs mt-1">{t('fulltext.notParsedHint')}</p>
-                </div>
+                <EmptyState
+                  className="rounded-sm border border-dashed border-border/80"
+                  icon={FileText}
+                  title={t('fulltext.notParsed')}
+                  description={t('fulltext.notParsedHint')}
+                />
               )}
 
               {!fulltextLoading && isActive && (
-                <div className="rounded-lg border px-6 py-10 text-center text-sm text-muted-foreground">
-                  <Loader2 className="size-7 animate-spin mx-auto mb-2 opacity-60" />
-                  <p>{t(`fulltextStatus.${state}`)}…</p>
-                  <p className="text-xs mt-1">{t('fulltext.autoRefreshShort')}</p>
-                </div>
+                <EmptyState
+                  className="rounded-sm border border-border/80"
+                  title={`${t(`fulltextStatus.${state}`)}…`}
+                  description={t('fulltext.autoRefreshShort')}
+                />
               )}
 
               {!fulltextLoading && state === 'failed' && (
-                <div className="rounded-lg border px-6 py-10 text-center text-sm text-destructive">
+                <div className="rounded-sm border px-6 py-10 text-center text-sm text-destructive">
                   <AlertCircle className="size-7 mx-auto mb-2" />
                   <p>{t('fulltext.parseFailed')}</p>
                   <p className="text-xs text-muted-foreground max-w-md mx-auto mt-1">{fulltext?.errMsg || t('common:unknownError')}</p>
@@ -602,7 +612,7 @@ export const ItemPage = memo(function ItemPage() {
               )}
 
               {!fulltextLoading && state === 'done' && !fulltext?.markdown && (
-                <div className="rounded-lg border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
+                <div className="rounded-sm border border-dashed px-6 py-10 text-center text-sm text-muted-foreground">
                   {t('fulltext.mdMissing')}
                 </div>
               )}

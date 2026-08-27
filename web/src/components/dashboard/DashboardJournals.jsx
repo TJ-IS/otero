@@ -5,29 +5,14 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Loader2, AlertCircle } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { UNFILED } from '@/lib/items';
 import { CATEGORICAL_COLORS, SINGLE_SERIES_COLOR } from '@/lib/chartColors';
 import { BasketCoveragePanel } from '@/components/dashboard/BasketCoveragePanel';
-
-function ChartTooltip({ active, payload, label, yearLabel }) {
-  if (!active || !payload?.length) return null;
-  const sorted = [...payload].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
-  return (
-    <div className="max-h-72 overflow-y-auto rounded-md border bg-popover px-3 py-2 text-xs shadow-lg">
-      {label != null && <div className="mb-1.5 font-medium text-popover-foreground">{yearLabel(label)}</div>}
-      {sorted.map((p, i) => (
-        <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="inline-block size-2 shrink-0 rounded-full" style={{ background: p.color }} />
-          <span className="truncate max-w-[200px]">{p.name}</span>
-          <span className="ml-auto tabular-nums">{p.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+import { ChartTooltip } from '@/components/ui/chart-tooltip';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
+import { PageHeader } from '@/components/PageHeader';
 
 function displayJournalName(name, t) {
   return name === UNFILED ? t('common:unfiled') : name;
@@ -75,17 +60,11 @@ export function DashboardJournals() {
   const barHeight = Math.max(240, chartData.length * 32);
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6">
-      {loading && (
-        <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" /> {t('loading')}
-        </div>
-      )}
+    <div className="mx-auto w-full max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader eyebrow={t('common:nav.dashboard')} title={t('nav.journals')} />
+      {loading && <LoadingSkeleton variant="chart" className="py-8" />}
       {error && (
-        <div className="flex flex-col items-center gap-2 py-16 text-sm text-destructive">
-          <AlertCircle className="size-8" />
-          <p>{t('loadFailed', { message: error.message })}</p>
-        </div>
+        <ErrorState message={t('loadFailed', { message: error.message })} />
       )}
 
       {!loading && !error && <BasketCoveragePanel />}
@@ -94,7 +73,7 @@ export function DashboardJournals() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">{t('journals.countTitle')}</CardTitle>
+              <CardTitle>{t('journals.countTitle')}</CardTitle>
               <CardDescription>{t('journals.countDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
@@ -108,7 +87,7 @@ export function DashboardJournals() {
                     width={220}
                     tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                   />
-                  <Tooltip content={<ChartTooltip yearLabel={(y) => t('journals.yearLabel', { year: y })} />} />
+                  <Tooltip content={<ChartTooltip sort yearLabel={(y) => t('journals.yearLabel', { year: y })} />} />
                   <Bar dataKey="count" name={t('itemCount')} radius={[0, 4, 4, 0]} barSize={18}>
                     {chartData.map((d) => (
                       <Cell
@@ -121,9 +100,9 @@ export function DashboardJournals() {
               </ResponsiveContainer>
 
               {/* Accessible table fallback */}
-              <div className="mt-4 overflow-x-auto rounded-md border sm:hidden">
+              <div className="mt-4 overflow-x-auto border border-border/80 sm:hidden">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-background text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
+                  <thead className="sticky top-0 z-10 border-b bg-muted/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <tr>
                       <th className="px-4 py-2 font-medium">{t('journals.colJournal')}</th>
                       <th className="px-4 py-2 font-medium text-right">{t('journals.colCount')}</th>
@@ -144,12 +123,12 @@ export function DashboardJournals() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">{t('journals.trendTitle')}</CardTitle>
+              <CardTitle>{t('journals.trendTitle')}</CardTitle>
               <CardDescription>{t('journals.trendDesc')}</CardDescription>
             </CardHeader>
             <CardContent>
               {trendData.length === 0 ? (
-                <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('journals.noYearData')}</div>
+                <EmptyState className="h-64 py-0" title={t('journals.noYearData')} />
               ) : (
                 <ResponsiveContainer width="100%" height={360}>
                   <LineChart data={trendData} margin={{ left: 0, right: 16, top: 8, bottom: 8 }}>
@@ -161,7 +140,7 @@ export function DashboardJournals() {
                       minTickGap={20}
                     />
                     <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} width={40} />
-                    <Tooltip content={<ChartTooltip yearLabel={(y) => t('journals.yearLabel', { year: y })} />} />
+                    <Tooltip content={<ChartTooltip sort yearLabel={(y) => t('journals.yearLabel', { year: y })} />} />
                     <Legend
                       iconType="circle"
                       wrapperStyle={{ fontSize: 11 }}

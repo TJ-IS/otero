@@ -7,7 +7,7 @@
 // to rank — so a type keeps its color across renders/filters regardless of
 // its count.
 
-import i18n from '../i18n';
+import i18n from '../i18n/index.js';
 
 export const CATEGORICAL_COLORS = [
   'hsl(var(--chart-1))',

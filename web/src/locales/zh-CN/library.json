@@ -27,6 +27,8 @@
     "all": "全部期刊",
     "empty": "暂无期刊"
   },
+  "yearChip": "{{year}} 年",
+  "clearYear": "清除年份筛选",
   "skipToList": "跳到文献列表",
   "selectItem": "请在左侧选择一个条目",
   "itemDeleted": "条目已删除",
@@ -46,6 +48,7 @@
     "vip": "卷期页",
     "type": "类型",
     "authors": "作者",
+    "journal": "期刊",
     "sortAsc": "升序",
     "sortDesc": "降序",
     "itemCount": "{{count}} 个条目",
@@ -64,7 +67,7 @@
     "batchInfo": "批量解析：{{summary}}",
     "batchFailed": "批量解析失败: {{message}}",
     "emptyFiltered": "没有匹配的条目，请尝试调整筛选条件",
-    "emptyImport": "暂无条目，点击右上角\"导入 PDF\"开始"
+    "emptyImport": "暂无条目，可从顶部导入 PDF 开始"
   },
   "mineru": {
     "title": "MinerU 解析任务",

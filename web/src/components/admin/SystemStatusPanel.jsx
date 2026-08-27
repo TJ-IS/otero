@@ -9,19 +9,22 @@ import {
 } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
+import { PageHeader } from '@/components/PageHeader';
+import { StatTile } from '@/components/ui/stat-tile';
+import { ErrorState } from '@/components/ui/async-states';
 
 function StatusBadge({ status }) {
   const { t } = useTranslation('admin');
   const map = {
-    connected: { label: t('status.connState.connected'), cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400', icon: CheckCircle2 },
+    connected: { label: t('status.connState.connected'), cls: 'bg-success/15 text-success', icon: CheckCircle2 },
     not_configured: { label: t('status.connState.not_configured'), cls: 'bg-muted text-muted-foreground', icon: HardDrive },
-    bucket_not_found: { label: t('status.connState.bucket_not_found'), cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400', icon: AlertCircle },
-    error: { label: t('status.connState.error'), cls: 'bg-red-500/15 text-red-600 dark:text-red-400', icon: XCircle },
+    bucket_not_found: { label: t('status.connState.bucket_not_found'), cls: 'bg-warning/15 text-warning', icon: AlertCircle },
+    error: { label: t('status.connState.error'), cls: 'bg-destructive/15 text-destructive', icon: XCircle },
   };
   const s = map[status] || map.error;
   const Icon = s.icon;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${s.cls}`}>
+    <span className={`inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-medium ${s.cls}`}>
       <Icon className="size-3" /> {s.label}
     </span>
   );
@@ -65,12 +68,8 @@ export function SystemStatusPanel() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-2xl p-6">
-        <Card className="border-red-500/40">
-          <CardContent className="flex items-center gap-3 p-4 text-red-600 dark:text-red-400">
-            <AlertCircle className="size-5" /> {t('status.loadFailed', { message: error.message })}
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-page px-4 py-8 sm:px-6 lg:px-8">
+        <ErrorState message={t('status.loadFailed', { message: error.message })} onRetry={refresh} />
       </div>
     );
   }
@@ -81,21 +80,24 @@ export function SystemStatusPanel() {
   const sys = data?.config;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{t('status.title')}</h2>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('status.refresh')}
-        </Button>
-      </div>
+    <div className="mx-auto max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader
+        eyebrow={t('common:nav.admin')}
+        title={t('status.title')}
+        actions={(
+          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('status.refresh')}
+          </Button>
+        )}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* PostgreSQL */}
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Database className="size-4 text-primary" /> PostgreSQL
+              <CardTitle className="flex items-center gap-2">
+                <Database className="size-4 text-brand" /> PostgreSQL
               </CardTitle>
               <StatusBadge status={pg?.status} />
             </div>
@@ -128,7 +130,7 @@ export function SystemStatusPanel() {
                 <Row label={t('status.version')} value={pg.server?.version?.split(' ').slice(0, 2).join(' ')} mono />
               </>
             ) : (
-              <div className="py-4 text-sm text-red-600 dark:text-red-400">
+              <div className="py-4 text-sm text-destructive">
                 {pg?.error || t('status.cannotConnect')}
                 <div className="mt-1 font-mono text-xs text-muted-foreground">{pg?.connection?.url}</div>
               </div>
@@ -138,10 +140,10 @@ export function SystemStatusPanel() {
 
         {/* R2 */}
         <Card>
-          <CardHeader className="pb-3">
+          <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <HardDrive className="size-4 text-primary" /> Cloudflare R2
+              <CardTitle className="flex items-center gap-2">
+                <HardDrive className="size-4 text-brand" /> Cloudflare R2
               </CardTitle>
               <StatusBadge status={r2?.status} />
             </div>
@@ -150,7 +152,7 @@ export function SystemStatusPanel() {
           <CardContent className="divide-y">
             {r2?.storageType === 's3' ? (
               r2.status === 'error' ? (
-                <div className="py-4 text-sm text-red-600 dark:text-red-400">
+                <div className="py-4 text-sm text-destructive">
                   {r2.error}
                   {r2.errorCode && <span className="ml-1 font-mono text-xs">({r2.errorCode})</span>}
                   <div className="mt-1 font-mono text-xs text-muted-foreground">{r2.endpoint?.url}</div>
@@ -188,8 +190,8 @@ export function SystemStatusPanel() {
       {/* Table sizes */}
       {pg?.tables?.length > 0 && (
         <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">{t('status.tableSpace')}</CardTitle>
+          <CardHeader>
+            <CardTitle>{t('status.tableSpace')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="divide-y text-sm">
@@ -215,7 +217,7 @@ function StatusSkeleton() {
   const { t } = useTranslation('admin');
   return (
     <div
-      className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6"
+      className="mx-auto max-w-page space-y-4 px-4 py-8 sm:px-6 lg:px-8"
       aria-busy="true"
       aria-label={t('status.loadingAria')}
     >
@@ -253,7 +255,7 @@ function StatusSkeleton() {
         {[0, 1, 2, 3].map((tile) => (
           <Card key={tile}>
             <CardContent className="flex items-center gap-3 p-4">
-              <Skeleton className="size-9 shrink-0 rounded-lg" />
+              <Skeleton className="size-9 shrink-0 rounded-sm" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-3 w-16" />
                 <Skeleton className="h-5 w-24" />
@@ -266,17 +268,3 @@ function StatusSkeleton() {
   );
 }
 
-function StatTile({ icon, label, value, sub }) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</div>
-        <div className="min-w-0">
-          <p className="truncate text-xs text-muted-foreground">{label}</p>
-          <p className="truncate text-lg font-semibold tabular-nums">{value}</p>
-          <p className="truncate text-xs text-muted-foreground">{sub || ' '}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

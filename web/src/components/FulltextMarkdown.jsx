@@ -72,7 +72,7 @@ export const FulltextMarkdown = memo(function FulltextMarkdown({ markdown, image
       );
     },
     a: ({ href, children, ...rest }) => (
-      <a href={href} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline" {...rest}>
+      <a href={href} target="_blank" rel="noreferrer" className="text-brand hover:underline" {...rest}>
         {children}
       </a>
     ),

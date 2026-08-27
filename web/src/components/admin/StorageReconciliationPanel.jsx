@@ -18,33 +18,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   Database, HardDrive, RefreshCw, Loader2, AlertCircle, ExternalLink,
-  Trash2, ScaleIcon,
+  Trash2,
 } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
-
-function StatTile({ icon, label, value, sub, tone }) {
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div
-          className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
-            tone === 'warning'
-              ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-              : 'bg-primary/10 text-primary'
-          }`}
-        >
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-xs text-muted-foreground">{label}</p>
-          <p className="truncate text-lg font-semibold tabular-nums">{value}</p>
-          <p className="truncate text-xs text-muted-foreground">{sub || ' '}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+import { PageHeader } from '@/components/PageHeader';
+import { StatTile } from '@/components/ui/stat-tile';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
 
 function TruncatedNote({ truncated, listCap, total }) {
   const { t } = useTranslation('admin');
@@ -82,7 +62,7 @@ function VirtualMissingList({ items }) {
               <div className="min-w-0">
                 <Link
                   to={`/items/${item.key}`}
-                  className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+                  className="inline-flex items-center gap-1 font-mono text-xs text-foreground hover:text-brand hover:underline"
                 >
                   {item.key} <ExternalLink className="size-3" />
                 </Link>
@@ -205,30 +185,24 @@ export function StorageReconciliationPanel() {
 
   if (loading && !data) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
-        <div className="flex items-center text-sm">
-          <Loader2 className="mr-2 size-5 animate-spin" /> {t('reconcile.scanning')}
-        </div>
-        <p className="text-xs">{t('reconcile.scanningHint')}</p>
+      <div className="mx-auto max-w-page px-4 py-8 sm:px-6 lg:px-8">
+        <LoadingSkeleton variant="chart" label={t('reconcile.scanning')} />
+        <p className="mt-3 text-center text-xs text-muted-foreground">{t('reconcile.scanningHint')}</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mx-auto max-w-2xl p-6">
-        <Card className="border-red-500/40">
-          <CardContent className="flex items-center gap-3 p-4 text-red-600 dark:text-red-400">
-            <AlertCircle className="size-5" /> {t('reconcile.loadFailed', { message: error.message })}
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-page px-4 py-8 sm:px-6 lg:px-8">
+        <ErrorState message={t('reconcile.loadFailed', { message: error.message })} onRetry={refresh} />
       </div>
     );
   }
 
   if (data?.status === 'not_applicable') {
     return (
-      <div className="mx-auto max-w-2xl p-6">
+      <div className="mx-auto max-w-page px-4 py-8 sm:px-6 lg:px-8">
         <Card>
           <CardContent className="flex items-center gap-3 p-6 text-sm text-muted-foreground">
             <HardDrive className="size-5" /> {data.message}
@@ -239,15 +213,16 @@ export function StorageReconciliationPanel() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <ScaleIcon className="size-5" /> {t('reconcile.title')}
-        </h2>
-        <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('reconcile.rescan')}
-        </Button>
-      </div>
+    <div className="mx-auto max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader
+        eyebrow={t('common:nav.admin')}
+        title={t('reconcile.title')}
+        actions={(
+          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('reconcile.rescan')}
+          </Button>
+        )}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
@@ -274,10 +249,10 @@ export function StorageReconciliationPanel() {
       </div>
 
       {deleteResult && (
-        <Card className={deleteResult.error ? 'border-red-500/40' : 'border-emerald-500/40'}>
-          <CardContent className="p-4 text-sm">
+        <Card className={deleteResult.error ? 'border-destructive/40' : 'border-success/40'}>
+          <CardContent className="text-sm">
             {deleteResult.error ? (
-              <span className="text-red-600 dark:text-red-400">{t('reconcile.deleteFailed', { error: deleteResult.error })}</span>
+              <span className="text-destructive">{t('reconcile.deleteFailed', { error: deleteResult.error })}</span>
             ) : (
               <div className="space-y-1">
                 <p>
@@ -300,13 +275,13 @@ export function StorageReconciliationPanel() {
       )}
 
       <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">{t('reconcile.missingTitle')}</CardTitle>
+        <CardHeader>
+          <CardTitle>{t('reconcile.missingTitle')}</CardTitle>
           <CardDescription>{t('reconcile.missingDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           {missingInR2.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">{t('reconcile.noMissing')}</p>
+            <EmptyState className="py-6" title={t('reconcile.noMissing')} />
           ) : (
             <>
               <VirtualMissingList items={missingInR2} />
@@ -317,10 +292,10 @@ export function StorageReconciliationPanel() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-2">
+        <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-sm">{t('reconcile.orphanTitle')}</CardTitle>
+              <CardTitle>{t('reconcile.orphanTitle')}</CardTitle>
               <CardDescription>{t('reconcile.orphanDesc')}</CardDescription>
             </div>
             {orphanInR2.length > 0 && (
@@ -337,7 +312,7 @@ export function StorageReconciliationPanel() {
         </CardHeader>
         <CardContent>
           {orphanInR2.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">{t('reconcile.noOrphans')}</p>
+            <EmptyState className="py-6" title={t('reconcile.noOrphans')} />
           ) : (
             <>
               <div className="mb-2 flex items-center gap-2 border-b pb-2 text-xs text-muted-foreground">

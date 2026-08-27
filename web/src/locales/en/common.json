@@ -1,6 +1,18 @@
 {
   "loadingPage": "Loading page",
   "language": "Language",
+  "skipToContent": "Skip to main content",
+  "brandHome": "Otero home",
+  "primaryNavigation": "Primary navigation",
+  "secondaryNavigation": "Section navigation",
+  "nav": {
+    "home": "Home",
+    "library": "Library",
+    "search": "Search",
+    "dashboard": "Dashboard",
+    "openApi": "Open API",
+    "admin": "Admin"
+  },
   "langZh": "中文",
   "langEn": "EN",
   "langEnFull": "English",
@@ -55,6 +67,10 @@
   "yes": "Yes",
   "no": "No",
   "seo": {
+    "portalTitle": "Otero | AIS Basket research portal",
+    "portalDescription": "Search and explore the 11 AIS Senior Scholars' Basket journals through Otero's literature library, corpus statistics, full text, and open API.",
+    "libraryTitle": "Literature library | Otero",
+    "libraryDescription": "Browse, filter, and inspect the AIS Senior Scholars' Basket literature collection in Otero.",
     "siteTitle": "Otero | AIS Basket Literature API",
     "siteDescription": "Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics.",
     "searchTitle": "Search | Otero",

@@ -1,24 +1,22 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useInfiniteItems } from '@/hooks/useInfiniteItems';
 import { useIsMobile } from '@/hooks/useMediaQuery';
-import { api } from '@/api/client';
-import { ITEM_TYPE_LABELS, yearOf, itemTitle, filterTitle, volumeIssuePages } from '@/lib/items';
+import { ITEM_TYPE_LABELS, yearOf, itemTitle, volumeIssuePages } from '@/lib/items';
 import { highlight } from '@/lib/highlight';
 import { AuthorLinks } from '@/components/AuthorLinks';
+import { EmptyState, ErrorState } from '@/components/ui/async-states';
 import {
   FileText, BookOpen, GraduationCap, BookMarked, Presentation,
-  File, ChevronUp, ChevronDown, Sparkles, Loader2, ArrowUpDown,
+  File, ChevronUp, ChevronDown, ArrowUpDown,
 } from 'lucide-react';
-import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
 
 const TYPE_ICONS = {
   journalArticle: <FileText className="size-3.5 shrink-0" />,
@@ -31,8 +29,8 @@ const TYPE_ICONS = {
   document: <FileText className="size-3.5 shrink-0" />,
 };
 
-const ROW_HEIGHT = 37;
-const MOBILE_ROW_HEIGHT = 84;
+const ROW_HEIGHT = 52;
+const MOBILE_ROW_HEIGHT = 92;
 
 const SORT_OPTION_KEYS = [
   { value: 'title', labelKey: 'table.title' },
@@ -42,24 +40,25 @@ const SORT_OPTION_KEYS = [
 ];
 
 function SortIcon({ field, sortField, sortDir }) {
-  if (sortField !== field) return <ChevronDown className="size-3 opacity-25 ml-0.5" />;
+  if (sortField !== field) return <ChevronDown className="ml-1 size-3 opacity-20" />;
   return sortDir === 'asc'
-    ? <ChevronUp className="size-3 ml-0.5 text-primary" />
-    : <ChevronDown className="size-3 ml-0.5 text-primary" />;
+    ? <ChevronUp className="ml-1 size-3 text-brand" />
+    : <ChevronDown className="ml-1 size-3 text-brand" />;
 }
 
-export const ItemTable = memo(function ItemTable({ filter, version, selectedKey, onSelect }) {
+function journalOf(item) {
+  return item?.fields?.publicationTitle || '';
+}
+
+export const ItemTable = memo(function ItemTable({ filter, version, selectedKey, onSelect, onStatusChange }) {
   const { t } = useTranslation(['library', 'common']);
-  const { canEdit } = useAuth();
   const isMobile = useIsMobile();
 
   const [sortField, setSortField] = useState('dateModified');
   const [sortDir, setSortDir] = useState('desc');
   const scrollRef = useRef(null);
-  const [batchParsing, setBatchParsing] = useState(false);
+  const showJournal = !filter?.journal;
 
-  // Server-side pagination + sort. Changing sort/filter re-queries from page 1;
-  // scrolling near the bottom appends the next page (see onScroll below).
   const { items: sortedItems, total, error, loading, loadingMore, hasMore, loadMore } = useInfiniteItems({
     filter,
     sortField,
@@ -68,7 +67,6 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     version,
   });
 
-  // O(1) key -> index lookup for keyboard nav and scroll-into-view
   const keyToIndex = useMemo(() => {
     const m = new Map();
     for (let i = 0; i < sortedItems.length; i++) m.set(sortedItems[i].key, i);
@@ -82,7 +80,6 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     overscan: 8,
   });
 
-  // Trigger loadMore when the user scrolls within ~600px of the bottom.
   const onScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el || !hasMore || loadingMore || loading) return;
@@ -90,9 +87,9 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
   }, [hasMore, loadingMore, loading, loadMore]);
 
   const toggleSort = useCallback((field) => {
-    setSortField(prev => {
+    setSortField((prev) => {
       if (prev === field) {
-        setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
         return prev;
       }
       setSortDir('asc');
@@ -100,48 +97,6 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     });
   }, []);
 
-  const batchParseAll = useCallback(async () => {
-    if (!canEdit) {
-      toast.error(t('common:connectWhitelistFirst'));
-      return;
-    }
-    if (!total || batchParsing) return;
-    setBatchParsing(true);
-    const tid = toast.loading(t('table.collecting'));
-    try {
-      // The table only holds loaded pages; fetch every matching key so batch
-      // parse covers the whole filtered set, not just what's scrolled into view.
-      const keys = await api.listItemKeys({
-        type: filter?.type, journal: filter?.journal,
-        collection: filter?.collection, search: filter?.search,
-      });
-      if (!keys.length) {
-        toast.info(t('table.nothingToParse'), { id: tid });
-        return;
-      }
-      toast.loading(t('table.queuing', { count: keys.length }), { id: tid });
-      const res = await api.parseFulltextBatch(keys);
-      const s = res.summary || {};
-      const parts = [];
-      if (s.queued) parts.push(t('table.queued', { count: s.queued }));
-      if (s.skippedDone) parts.push(t('table.skippedDone', { count: s.skippedDone }));
-      if (s.skippedRunning) parts.push(t('table.skippedRunning', { count: s.skippedRunning }));
-      if (s.noPdf) parts.push(t('table.noPdf', { count: s.noPdf }));
-      if (s.notFound) parts.push(t('table.notFound', { count: s.notFound }));
-      const summary = parts.length ? parts.join('，') : t('table.noOp');
-      if (s.queued > 0) {
-        toast.success(t('table.batchSuccess', { summary }), { id: tid });
-      } else {
-        toast.info(t('table.batchInfo', { summary }), { id: tid });
-      }
-    } catch (err) {
-      toast.error(t('table.batchFailed', { message: err.message }), { id: tid });
-    } finally {
-      setBatchParsing(false);
-    }
-  }, [canEdit, total, batchParsing, filter?.type, filter?.journal, filter?.collection, filter?.search, t]);
-
-  // Keyboard navigation
   const onKeyDown = useCallback((e) => {
     if (!sortedItems.length) return;
     const current = selectedKey != null ? (keyToIndex.get(selectedKey) ?? -1) : -1;
@@ -158,23 +113,28 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     }
   }, [sortedItems, selectedKey, keyToIndex, onSelect]);
 
-  // Scroll selected row into view via virtualizer (row may not be mounted)
   useEffect(() => {
     if (selectedKey == null) return;
     const idx = keyToIndex.get(selectedKey);
     if (idx !== undefined) virtualizer.scrollToIndex(idx, { align: 'auto' });
   }, [selectedKey, keyToIndex, virtualizer]);
 
+  // The page heading owns the item count, so report it upward.
+  useEffect(() => {
+    onStatusChange?.({ total: total || 0, loading });
+  }, [total, loading, onStatusChange]);
+
   if (error) {
-    return <div className="p-4 text-sm text-destructive">{t('common:loadFailed', { message: error.message })}</div>;
+    return <ErrorState message={t('common:loadFailed', { message: error.message })} />;
   }
 
   const hasActiveFilter = filter?.search || filter?.journal || filter?.collection;
   const searchQuery = filter?.search || '';
-  const title = filterTitle(filter);
   const emptyMessage = hasActiveFilter ? t('table.emptyFiltered') : t('table.emptyImport');
+  const colCount = 5;
 
-  const thClass = 'px-3 py-2 font-medium cursor-pointer select-none hover:text-foreground transition-colors';
+  const thClass = 'px-3 py-3 font-medium cursor-pointer select-none hover:text-foreground transition-colors first:pl-0 last:pr-0';
+  const tdClass = 'px-3 py-3.5 first:pl-0 last:pr-0';
 
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
@@ -182,28 +142,9 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
   const paddingBottom = virtualItems.length > 0 ? totalSize - virtualItems[virtualItems.length - 1].end : 0;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      <div className="flex items-baseline justify-between gap-3 border-b px-4 py-2">
-        <span className="truncate text-sm font-medium" title={title}>{title}</span>
-        <div className="flex items-center gap-3">
-          {canEdit && total > 0 && (
-            <button
-              onClick={batchParseAll}
-              disabled={batchParsing}
-              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
-              title={t('table.batchParseTitle')}
-            >
-              {batchParsing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
-              {t('table.batchParse')}
-            </button>
-          )}
-          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            {loading ? t('common:loadingDots') : t('table.itemCount', { count: total })}
-          </span>
-        </div>
-      </div>
-      {isMobile && (
-        <div className="flex items-center gap-2 border-b px-4 py-2">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {isMobile ? (
+        <div className="flex items-center gap-2 border-y border-border/80 py-2">
           <Select
             value={sortField}
             onValueChange={(v) => { setSortField(v); setSortDir('asc'); }}
@@ -212,20 +153,21 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {SORT_OPTION_KEYS.map(o => (
+              {SORT_OPTION_KEYS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>{t(o.labelKey)}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <button
-            onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:text-foreground transition-colors"
+            type="button"
+            onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-sm border border-border/80 text-muted-foreground transition-colors hover:text-foreground"
             title={sortDir === 'asc' ? t('table.sortAsc') : t('table.sortDesc')}
           >
             <ArrowUpDown className="size-4" />
           </button>
         </div>
-      )}
+      ) : null}
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-auto outline-none"
@@ -237,12 +179,10 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
           <div>
             {loading && sortedItems.length === 0 && <CardSkeleton />}
             {!loading && sortedItems.length === 0 && (
-              <div className="px-3 py-16 text-center text-muted-foreground">
-                {emptyMessage}
-              </div>
+              <EmptyState title={emptyMessage} />
             )}
             {paddingTop > 0 && <div style={{ height: paddingTop }} />}
-            {virtualItems.map(virtualRow => {
+            {virtualItems.map((virtualRow) => {
               const it = sortedItems[virtualRow.index];
               const rowTitle = itemTitle(it);
               return (
@@ -253,21 +193,21 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                   ref={virtualizer.measureElement}
                   onClick={() => onSelect(it.key)}
                   className={cn(
-                    'cursor-pointer border-b px-4 py-3 transition-colors hover:bg-accent/60',
-                    selectedKey === it.key && 'bg-primary/10 text-foreground',
+                    'cursor-pointer border-b border-border/70 py-3.5 transition-colors hover:bg-accent/40',
+                    selectedKey === it.key && 'bg-brand/5 text-foreground',
                   )}
                 >
-                  <div className="text-sm font-medium leading-snug">
+                  <div className="font-display text-sm font-semibold leading-snug">
                     {highlight(rowTitle, searchQuery)}
                   </div>
-                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                  <div className="mt-1 truncate text-xs text-muted-foreground">
                     <AuthorLinks creators={it.creators} query={searchQuery} />
                   </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     <span className="tabular-nums">{yearOf(it.fields?.date) || '—'}</span>
+                    {showJournal && journalOf(it) ? <span className="truncate">{journalOf(it)}</span> : null}
                     <span className="tabular-nums">{volumeIssuePages(it.fields) || '—'}</span>
-                    <Badge variant="secondary" className="inline-flex items-center gap-1 font-normal">
-                      {TYPE_ICONS[it.itemType]}
+                    <Badge variant="secondary" className="font-normal">
                       {ITEM_TYPE_LABELS[it.itemType] || it.itemType}
                     </Badge>
                   </div>
@@ -276,32 +216,36 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
             })}
             {paddingBottom > 0 && <div style={{ height: paddingBottom }} />}
             {loadingMore && (
-              <div className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground">
-                <Loader2 className="size-3 animate-spin" /> {t('search.loadMore')}
+              <div className="py-4">
+                <div className="h-3 w-32 animate-pulse rounded-sm bg-muted" />
               </div>
             )}
           </div>
         ) : (
-          <table className="w-full table-fixed text-sm">
-            <thead className="sticky top-0 z-10 bg-background">
-              <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+          <table className="w-full table-fixed text-[13px]">
+            <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur">
+              <tr className="border-y border-border/80 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 <th className={cn(thClass, 'w-auto')} onClick={() => toggleSort('title')}>
                   <span className="inline-flex items-center">
                     {t('table.title')} <SortIcon field="title" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
-                <th className={cn(thClass, 'w-40')}>{t('table.authors')}</th>
-                <th className={cn(thClass, 'w-16')} onClick={() => toggleSort('date')}>
+                <th className={cn(thClass, 'w-52')}>{t('table.authors')}</th>
+                <th className={cn(thClass, 'w-[4.5rem]')} onClick={() => toggleSort('date')}>
                   <span className="inline-flex items-center">
                     {t('table.year')} <SortIcon field="date" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
-                <th className={cn(thClass, 'w-28')} onClick={() => toggleSort('vip')}>
-                  <span className="inline-flex items-center">
-                    {t('table.vip')} <SortIcon field="vip" sortField={sortField} sortDir={sortDir} />
-                  </span>
+                <th className={cn(thClass, showJournal ? 'w-56' : 'w-28')} onClick={() => (showJournal ? undefined : toggleSort('vip'))}>
+                  {showJournal ? (
+                    t('table.journal')
+                  ) : (
+                    <span className="inline-flex items-center">
+                      {t('table.vip')} <SortIcon field="vip" sortField={sortField} sortDir={sortDir} />
+                    </span>
+                  )}
                 </th>
-                <th className={cn(thClass, 'w-40')} onClick={() => toggleSort('itemType')}>
+                <th className={cn(thClass, 'w-44')} onClick={() => toggleSort('itemType')}>
                   <span className="inline-flex items-center">
                     {t('table.type')} <SortIcon field="itemType" sortField={sortField} sortDir={sortDir} />
                   </span>
@@ -312,17 +256,17 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               {loading && sortedItems.length === 0 && <TableSkeleton />}
               {!loading && sortedItems.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-16 text-center text-muted-foreground">
-                    {emptyMessage}
+                  <td colSpan={colCount}>
+                    <EmptyState title={emptyMessage} />
                   </td>
                 </tr>
               )}
               {paddingTop > 0 && (
                 <tr key="__pad-top" aria-hidden="true" style={{ height: paddingTop }}>
-                  <td colSpan={5} style={{ padding: 0, border: 'none' }} />
+                  <td colSpan={colCount} style={{ padding: 0, border: 'none' }} />
                 </tr>
               )}
-              {virtualItems.map(virtualRow => {
+              {virtualItems.map((virtualRow) => {
                 const it = sortedItems[virtualRow.index];
                 const rowTitle = itemTitle(it);
                 return (
@@ -333,24 +277,27 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                     ref={virtualizer.measureElement}
                     onClick={() => onSelect(it.key)}
                     className={cn(
-                      'cursor-pointer border-b transition-colors hover:bg-accent/60',
-                      selectedKey === it.key && 'bg-primary/10 text-foreground',
+                      'cursor-pointer border-b border-border/70 transition-colors hover:bg-accent/40',
+                      selectedKey === it.key && 'bg-brand/5 text-foreground',
                     )}
                   >
-                    <td className="truncate px-3 py-2" title={rowTitle}>
+                    <td className={cn(tdClass, 'truncate font-medium')} title={rowTitle}>
                       {highlight(rowTitle, searchQuery)}
                     </td>
-                    <td className="w-40 truncate px-3 py-2 text-muted-foreground">
+                    <td className={cn(tdClass, 'w-52 truncate text-muted-foreground')}>
                       <AuthorLinks creators={it.creators} query={searchQuery} className="truncate" />
                     </td>
-                    <td className="w-16 px-3 py-2 text-muted-foreground tabular-nums">
+                    <td className={cn(tdClass, 'w-[4.5rem] font-mono text-muted-foreground tabular-nums')}>
                       {yearOf(it.fields?.date) || '—'}
                     </td>
-                    <td className="w-28 truncate px-3 py-2 text-muted-foreground tabular-nums" title={volumeIssuePages(it.fields)}>
-                      {volumeIssuePages(it.fields) || '—'}
+                    <td
+                      className={cn(tdClass, 'truncate text-muted-foreground', showJournal ? 'w-56' : 'w-28 tabular-nums')}
+                      title={showJournal ? journalOf(it) : volumeIssuePages(it.fields)}
+                    >
+                      {showJournal ? (journalOf(it) || '—') : (volumeIssuePages(it.fields) || '—')}
                     </td>
-                    <td className="w-40 px-3 py-2">
-                      <Badge variant="secondary" className="inline-flex max-w-full items-center gap-1 whitespace-nowrap font-normal">
+                    <td className={cn(tdClass, 'w-44')}>
+                      <Badge variant="secondary" className="gap-1 whitespace-nowrap font-normal">
                         {TYPE_ICONS[it.itemType]}
                         {ITEM_TYPE_LABELS[it.itemType] || it.itemType}
                       </Badge>
@@ -360,15 +307,13 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               })}
               {paddingBottom > 0 && (
                 <tr key="__pad-bottom" aria-hidden="true" style={{ height: paddingBottom }}>
-                  <td colSpan={5} style={{ padding: 0, border: 'none' }} />
+                  <td colSpan={colCount} style={{ padding: 0, border: 'none' }} />
                 </tr>
               )}
               {loadingMore && (
                 <tr key="__loading-more">
-                  <td colSpan={5} className="py-4 text-center text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-2">
-                      <Loader2 className="size-3 animate-spin" /> {t('search.loadMore')}
-                    </span>
+                  <td colSpan={colCount} className="py-4">
+                    <div className="h-3 w-32 animate-pulse rounded-sm bg-muted" />
                   </td>
                 </tr>
               )}
@@ -384,12 +329,12 @@ function TableSkeleton() {
   return (
     <>
       {Array.from({ length: 10 }).map((_, i) => (
-        <tr key={i} className="border-b">
-          <td className="max-w-[420px] px-3 py-2"><Skeleton className="h-4 w-[280px]" /></td>
-          <td className="max-w-[200px] px-3 py-2"><Skeleton className="h-4 w-[140px]" /></td>
-          <td className="w-20 px-3 py-2"><Skeleton className="h-4 w-10" /></td>
-          <td className="w-28 px-3 py-2"><Skeleton className="h-4 w-16" /></td>
-          <td className="w-36 px-3 py-2"><Skeleton className="h-4 w-20" /></td>
+        <tr key={i} className="border-b border-border/70">
+          <td className="py-3.5 pr-3"><Skeleton className="h-4 w-[22rem]" /></td>
+          <td className="px-3 py-3.5"><Skeleton className="h-4 w-36" /></td>
+          <td className="px-3 py-3.5"><Skeleton className="h-4 w-10" /></td>
+          <td className="px-3 py-3.5"><Skeleton className="h-4 w-28" /></td>
+          <td className="py-3.5 pl-3"><Skeleton className="h-4 w-20" /></td>
         </tr>
       ))}
     </>
@@ -400,9 +345,9 @@ function CardSkeleton() {
   return (
     <>
       {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="border-b px-4 py-3">
+        <div key={i} className="border-b border-border/70 py-3.5">
           <Skeleton className="h-4 w-[80%]" />
-          <Skeleton className="mt-1.5 h-3 w-[50%]" />
+          <Skeleton className="mt-2 h-3 w-[50%]" />
           <Skeleton className="mt-2 h-3 w-[40%]" />
         </div>
       ))}

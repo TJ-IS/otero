@@ -230,7 +230,7 @@ function AuthorDetails({ node, neighbors, onClose, onOpenAuthor }) {
   const { t, i18n } = useTranslation('dashboard');
   if (!node) return null;
   return (
-    <aside className="absolute inset-x-3 bottom-3 max-h-[44%] overflow-auto rounded-lg border bg-background/95 p-4 shadow-lg backdrop-blur-md md:inset-x-auto md:bottom-auto md:right-3 md:top-3 md:max-h-[calc(100%-1.5rem)] md:w-80">
+    <aside className="absolute inset-x-3 bottom-3 max-h-[44%] overflow-auto rounded-sm border bg-background/95 p-4 shadow-sm backdrop-blur-md md:inset-x-auto md:bottom-auto md:right-3 md:top-3 md:max-h-[calc(100%-1.5rem)] md:w-80">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -649,14 +649,14 @@ export function AuthorGraphCanvas({
 
       {reducedMotion && positions.size !== nodes.length ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span className="rounded-full border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
+          <span className="rounded-sm border bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
             {t('authors.layouting')}
           </span>
         </div>
       ) : null}
 
       <div
-        className={`absolute top-3 flex items-center overflow-hidden rounded-lg border bg-background/90 shadow-sm backdrop-blur-md ${selectedNode ? 'right-3 md:right-[21rem]' : 'right-3'}`}
+        className={`absolute top-3 flex items-center overflow-hidden rounded-sm border bg-background/90 shadow-sm backdrop-blur-md ${selectedNode ? 'right-3 md:right-[21rem]' : 'right-3'}`}
         role="group"
         aria-label={t('authors.zoomAria')}
       >
@@ -712,7 +712,7 @@ export function AuthorGraphCanvas({
       </div>
 
       {hoveredNode && hoveredId !== selectedId ? (
-        <div className="pointer-events-none absolute left-3 top-3 rounded-md border bg-popover/95 px-3 py-2 text-sm shadow-md backdrop-blur-sm">
+        <div className="pointer-events-none absolute left-3 top-3 rounded-sm border bg-popover/95 px-3 py-2 text-sm shadow-sm backdrop-blur-sm">
           <div className="max-w-64 truncate font-medium">{hoveredNode.name || t('authors.unnamed')}</div>
           <div className="mt-0.5 text-xs text-muted-foreground">
             {t('authors.hoverPapers', {
@@ -724,7 +724,7 @@ export function AuthorGraphCanvas({
       ) : null}
 
       {!selectedNode && visibleCommunities.length ? (
-        <div className="pointer-events-none absolute bottom-3 left-3 hidden max-w-sm rounded-md border bg-background/90 px-3 py-2 backdrop-blur-sm sm:block">
+        <div className="pointer-events-none absolute bottom-3 left-3 hidden max-w-sm rounded-sm border bg-background/90 px-3 py-2 backdrop-blur-sm sm:block">
           <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
             <Network className="size-3.5" />
             {t('authors.mainCommunities')}

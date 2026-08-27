@@ -15,6 +15,9 @@ import {
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
+import { PageHeader } from '@/components/PageHeader';
+import { StatTile } from '@/components/ui/stat-tile';
+import { EmptyState, ErrorState } from '@/components/ui/async-states';
 
 const PAGE_SIZE = 50;
 
@@ -59,33 +62,31 @@ export function TrashPanel() {
   if (loading && !data) return <TrashSkeleton />;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6">
-      <header className="grid gap-5 border-b pb-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-        <div className="space-y-2">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground">{t('trash.eyebrow')}</p>
-          <h1 className="text-2xl font-semibold tracking-tight">{t('trash.title')}</h1>
-          <p className="max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
-            {t('trash.desc')}
-          </p>
-        </div>
-        <Button
-          variant="destructive"
-          onClick={() => setConfirmOpen(true)}
-          disabled={total === 0 || purging || loading}
-          className="transition-transform active:translate-y-px"
-        >
-          {purging ? t('trash.emptying') : t('trash.emptyTrash')}
-        </Button>
-      </header>
+    <div className="mx-auto w-full max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader
+        eyebrow={t('common:nav.admin')}
+        title={t('trash.title')}
+        description={t('trash.desc')}
+        actions={(
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setConfirmOpen(true)}
+            disabled={total === 0 || purging || loading}
+          >
+            {purging ? t('trash.emptying') : t('trash.emptyTrash')}
+          </Button>
+        )}
+      />
 
-      <section className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
-        <Metric label={t('trash.pendingItems')} value={total} />
-        <Metric label={t('trash.childItems')} value={childItems} />
-        <Metric label={t('trash.estRecords')} value={total + childItems} />
+      <section className="grid gap-4 sm:grid-cols-3">
+        <StatTile label={t('trash.pendingItems')} value={total} />
+        <StatTile label={t('trash.childItems')} value={childItems} />
+        <StatTile label={t('trash.estRecords')} value={total + childItems} />
       </section>
 
       {actionResult && (
-        <div className="border-l-2 border-emerald-600 bg-emerald-500/5 px-4 py-3 text-sm">
+        <div className="border-l-2 border-success bg-success/5 px-4 py-3 text-sm">
           {t('trash.purged', {
             items: actionResult.deletedItems,
             creators: actionResult.orphanCreators,
@@ -95,27 +96,23 @@ export function TrashPanel() {
       )}
 
       {(error || actionError) && (
-        <div className="border-l-2 border-destructive bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          {t('trash.actionFailed', { message: (actionError || error).message })}
-        </div>
+        <ErrorState
+          className="items-start py-6 text-left"
+          message={t('trash.actionFailed', { message: (actionError || error).message })}
+        />
       )}
 
-      <section aria-busy={loading} className="overflow-hidden rounded-lg border">
+      <section aria-busy={loading} className="overflow-hidden border border-border/80">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div>
-            <h2 className="text-sm font-semibold">{t('trash.deletedList')}</h2>
+            <h2 className="font-display text-base font-semibold">{t('trash.deletedList')}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('trash.deletedListDesc')}</p>
           </div>
           {loading && data ? <span className="text-xs text-muted-foreground">{t('trash.refreshing')}</span> : null}
         </div>
 
         {items.length === 0 ? (
-          <div className="px-6 py-16 text-center">
-            <p className="text-sm font-medium">{t('trash.emptyTitle')}</p>
-            <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
-              {t('trash.emptyDesc')}
-            </p>
-          </div>
+          <EmptyState title={t('trash.emptyTitle')} description={t('trash.emptyDesc')} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-sm">
@@ -130,7 +127,7 @@ export function TrashPanel() {
               </thead>
               <tbody className="divide-y">
                 {items.map((item) => (
-                  <tr key={item.id} className="transition-colors hover:bg-muted/30">
+                  <tr key={item.id} className="transition-colors hover:bg-accent/40">
                     <td className="max-w-md px-4 py-3 font-medium">
                       <span className="line-clamp-2">{item.title}</span>
                     </td>
@@ -203,32 +200,23 @@ export function TrashPanel() {
   );
 }
 
-function Metric({ label, value }) {
-  return (
-    <div className="bg-background px-4 py-4 sm:px-5">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 font-mono text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-    </div>
-  );
-}
-
 function TrashSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6" aria-busy="true">
-      <div className="space-y-3 border-b pb-6">
+    <div className="mx-auto w-full max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8" aria-busy="true">
+      <div className="space-y-3 border-b border-border/80 pb-6">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="h-7 w-36" />
         <Skeleton className="h-4 w-full max-w-xl" />
       </div>
-      <div className="grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-3">
         {[0, 1, 2].map((item) => (
-          <div key={item} className="space-y-3 bg-background p-5">
+          <div key={item} className="space-y-3 border-t border-border py-3">
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-7 w-16" />
           </div>
         ))}
       </div>
-      <Skeleton className="h-72 w-full rounded-lg" />
+      <Skeleton className="h-72 w-full rounded-sm" />
     </div>
   );
 }

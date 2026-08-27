@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Loader2, AlertCircle, FileText, Users, BookMarked, Link2, Paperclip, Hash } from 'lucide-react';
+import { FileText, Users, BookMarked, Link2, Paperclip, Hash } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
@@ -13,6 +13,10 @@ import {
   colorForItemType, colorForFulltextState, FULLTEXT_STATE_LABELS,
 } from '@/lib/chartColors';
 import { DoiCoverageVenn } from '@/components/dashboard/DoiCoverageVenn';
+import { StatTile } from '@/components/ui/stat-tile';
+import { ChartTooltip } from '@/components/ui/chart-tooltip';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
+import { PageHeader } from '@/components/PageHeader';
 
 function shortHash(hash) {
   if (!hash) return '—';
@@ -20,50 +24,8 @@ function shortHash(hash) {
   return `${hash.slice(0, 8)}…${hash.slice(-8)}`;
 }
 
-function StatCard({ icon, label, value, sub, valueTitle, mono }) {
-  return (
-    <Card className="min-w-0">
-      <CardContent className="flex h-full items-center gap-3 p-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          {icon}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-xs text-muted-foreground">{label}</p>
-          <p
-            className={`truncate leading-tight tracking-tight tabular-nums ${
-              mono ? 'font-mono text-sm font-semibold' : 'text-lg font-semibold'
-            }`}
-            title={valueTitle ?? (value != null ? String(value) : undefined)}
-          >
-            {value}
-          </p>
-          {/* Reserve one line so cards with/without sub stay the same height */}
-          <p className="truncate text-xs leading-4 text-muted-foreground">
-            {sub || '\u00A0'}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ChartTooltip({ active, payload, label, formatter }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-md border bg-popover px-3 py-2 text-xs shadow-lg">
-      {label != null && <div className="mb-1 font-medium text-popover-foreground">{label}</div>}
-      {payload.map((p, i) => (
-        <div key={i} className="flex items-center gap-1.5 text-muted-foreground">
-          <span className="inline-block size-2 rounded-full" style={{ background: p.color || p.fill }} />
-          <span>{p.name}: {formatter ? formatter(p.value) : p.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function DashboardOverview() {
-  const { t } = useTranslation('dashboard');
+  const { t } = useTranslation(['dashboard', 'common']);
   const { data: overview, error: overviewError, loading: overviewLoading } = useAsync(() => api.getStatsOverview(), []);
   const { data: itemTypes, loading: itemTypesLoading } = useAsync(() => api.getStatsItemTypes(), []);
   const { data: fulltext, loading: fulltextLoading } = useAsync(() => api.getStatsFulltext(), []);
@@ -97,37 +59,31 @@ export function DashboardOverview() {
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-6 sm:px-6">
-      {overviewLoading && (
-        <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" /> {t('loading')}
-        </div>
-      )}
+    <div className="mx-auto w-full max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader eyebrow={t('common:nav.dashboard')} title={t('nav.overview')} />
+      {overviewLoading && <LoadingSkeleton variant="stats" className="py-8" />}
       {overviewError && (
-        <div className="flex flex-col items-center gap-2 py-16 text-sm text-destructive">
-          <AlertCircle className="size-8" />
-          <p>{t('loadFailed', { message: overviewError.message })}</p>
-        </div>
+        <ErrorState message={t('loadFailed', { message: overviewError.message })} />
       )}
 
       {overview && (
         <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatCard icon={<FileText className="size-4" />} label={t('overview.totalItems')} value={overview.totalItems} />
-          <StatCard icon={<BookMarked className="size-4" />} label={t('overview.journalCount')} value={overview.journalCount} />
-          <StatCard icon={<Users className="size-4" />} label={t('overview.totalCreators')} value={overview.totalCreators} />
-          <StatCard
+          <StatTile icon={<FileText className="size-4" />} label={t('overview.totalItems')} value={overview.totalItems} />
+          <StatTile icon={<BookMarked className="size-4" />} label={t('overview.journalCount')} value={overview.journalCount} />
+          <StatTile icon={<Users className="size-4" />} label={t('overview.totalCreators')} value={overview.totalCreators} />
+          <StatTile
             icon={<Link2 className="size-4" />}
             label={t('overview.withDoi')}
             value={overview.withDoi}
             sub={`${Math.round((overview.withDoi / Math.max(1, overview.totalItems)) * 100)}%`}
           />
-          <StatCard
+          <StatTile
             icon={<Paperclip className="size-4" />}
             label={t('overview.withFulltext')}
             value={overview.withAttachment}
             sub={fulltextDoneRatio != null ? t('overview.parseDonePct', { pct: fulltextDoneRatio }) : undefined}
           />
-          <StatCard
+          <StatTile
             icon={<Hash className="size-4" />}
             label="Merkle Root"
             value={merkleRoot ? shortHash(merkleRoot.root) : '—'}
@@ -140,18 +96,16 @@ export function DashboardOverview() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t('overview.coverageTitle')}</CardTitle>
+          <CardTitle>{t('overview.coverageTitle')}</CardTitle>
           <CardDescription>
             {t('overview.coverageDesc')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {coverageLoading ? (
-            <div className="flex h-64 items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> {t('loading')}
-            </div>
+            <LoadingSkeleton variant="chart" />
           ) : !coverage ? (
-            <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('noData')}</div>
+            <EmptyState className="h-64 py-0" title={t('noData')} />
           ) : (
             <DoiCoverageVenn data={coverage} />
           )}
@@ -161,14 +115,14 @@ export function DashboardOverview() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{t('overview.typeDistTitle')}</CardTitle>
+            <CardTitle>{t('overview.typeDistTitle')}</CardTitle>
             <CardDescription>{t('overview.typeDistDesc')}</CardDescription>
           </CardHeader>
           <CardContent>
             {itemTypesLoading ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('loading')}</div>
+              <LoadingSkeleton variant="chart" />
             ) : itemTypeData.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('noData')}</div>
+              <EmptyState className="h-64 py-0" title={t('noData')} />
             ) : (
               <>
                 <ResponsiveContainer width="100%" height={260}>
@@ -220,7 +174,7 @@ export function DashboardOverview() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{t('overview.fulltextTitle')}</CardTitle>
+            <CardTitle>{t('overview.fulltextTitle')}</CardTitle>
             <CardDescription>
               {t('overview.fulltextDesc')}
               {failedCount > 0 && <span className="ml-1">{t('overview.fulltextFailed429', { count: failedCount })}</span>}
@@ -228,9 +182,9 @@ export function DashboardOverview() {
           </CardHeader>
           <CardContent>
             {fulltextLoading ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('loading')}</div>
+              <LoadingSkeleton variant="chart" />
             ) : fulltextData.length === 0 ? (
-              <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">{t('noData')}</div>
+              <EmptyState className="h-64 py-0" title={t('noData')} />
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={fulltextData} layout="vertical" margin={{ left: 16, right: 16 }}>

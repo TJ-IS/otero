@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { webApiJsonLd } from '@/lib/seo';
+import { PageHeader } from '@/components/PageHeader';
 
 const ENDPOINTS = [
   {
@@ -155,7 +156,7 @@ function CodeBlock({ children, className }) {
   return (
     <pre
       className={cn(
-        'overflow-x-auto rounded-md border bg-muted/40 px-3 py-2 text-[12px] leading-relaxed font-mono whitespace-pre-wrap break-all',
+        'overflow-x-auto rounded-sm border border-border/80 bg-muted/30 px-3 py-2 text-[12px] leading-relaxed font-mono whitespace-pre-wrap break-all',
         className,
       )}
     >
@@ -194,19 +195,21 @@ export function OpenApiDocsPage() {
   };
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8 space-y-10">
+    <main className="mx-auto w-full max-w-page space-y-10 px-4 py-8 sm:px-6 lg:px-8">
+      <PageHeader
+        eyebrow={t('common:nav.openApi')}
+        title={t('api.answerHeading')}
+        description={t('api.answer')}
+      />
+
       <section className="space-y-3">
-        <h2 className="text-base font-semibold tracking-tight">{t('api.answerHeading')}</h2>
-        <p className="text-sm leading-relaxed text-foreground">
-          {t('api.answer')}
-        </p>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="max-w-measure text-sm leading-relaxed text-muted-foreground">
           {t('api.intro')}
           {' '}
           {t('api.baseUrl')}
         </p>
         <CodeBlock>{`${base}/api/open/v1`}</CodeBlock>
-        <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+        <ul className="max-w-measure list-disc space-y-1 pl-5 text-sm text-muted-foreground">
           <li>{t('api.ruleWhitelist')}</li>
           <li>{t('api.ruleKey')}</li>
           <li>{t('api.rulePaging')}</li>
@@ -219,10 +222,10 @@ export function OpenApiDocsPage() {
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold tracking-tight">{t('api.filterTitle')}</h2>
-        <p className="text-sm text-muted-foreground">
+        <p className="max-w-measure text-sm text-muted-foreground">
           {t('api.filterApplies')}
         </p>
-        <div className="overflow-x-auto rounded-md border">
+        <div className="overflow-x-auto border border-border/80">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left">
               <tr>
@@ -247,10 +250,11 @@ export function OpenApiDocsPage() {
 
       <section className="space-y-5">
         <h2 className="text-base font-semibold tracking-tight">{t('api.endpointsTitle')}</h2>
-        {ENDPOINTS.map((ep) => (
-          <article key={ep.id} className="rounded-md border px-4 py-3 space-y-2">
+        <div className="divide-y border-y border-border/80">
+          {ENDPOINTS.map((ep) => (
+          <article key={ep.id} className="space-y-2 py-4">
             <div className="flex flex-wrap items-baseline gap-2">
-              <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold">
+              <span className="border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] font-semibold">
                 {ep.method}
               </span>
               <code className="text-sm font-mono break-all">{ep.path}</code>
@@ -274,7 +278,8 @@ export function OpenApiDocsPage() {
               </Button>
             </div>
           </article>
-        ))}
+          ))}
+        </div>
       </section>
     </main>
   );

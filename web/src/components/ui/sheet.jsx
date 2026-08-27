@@ -35,7 +35,7 @@ function SheetContent({ className, children, side = 'right', ...props }) {
       <SheetOverlay />
       <SheetPrimitive.Content
         className={cn(
-          'motion-panel fixed z-[60] gap-4 bg-background shadow-lg overflow-hidden',
+          'motion-panel fixed z-[60] gap-4 bg-background shadow-md overflow-hidden',
           'data-[state=closed]:duration-200 data-[state=open]:duration-200 [animation-timing-function:var(--motion-ease-drawer)]',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           side === 'right' &&

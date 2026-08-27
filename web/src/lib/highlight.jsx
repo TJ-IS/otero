@@ -17,7 +17,7 @@ export function highlight(text, query) {
     parts.push(
       <mark
         key={k}
-        className="bg-yellow-200 dark:bg-yellow-700 text-inherit rounded-sm px-0"
+        className="rounded-sm bg-brand/15 px-0 text-inherit"
       >
         {text.slice(k, k + ql.length)}
       </mark>

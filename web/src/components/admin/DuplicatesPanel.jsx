@@ -16,11 +16,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Copy, FileSearch, Loader2, AlertCircle, RefreshCw, Search, PanelRightOpen } from 'lucide-react';
-import { FloatingDetailPanel } from '@/components/FloatingDetailPanel';
+import { Copy, FileSearch, Loader2, RefreshCw, Search, PanelRightOpen } from 'lucide-react';
+import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
+import { ItemDetailDialog } from '@/components/ItemDetailDialog';
 import { ItemDetail } from '@/components/ItemDetail';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
+import { PageHeader } from '@/components/PageHeader';
 
 function ItemKeyButton({ itemKey, onSelect }) {
   const { t } = useTranslation('admin');
@@ -28,7 +30,7 @@ function ItemKeyButton({ itemKey, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(itemKey)}
-      className="inline-flex items-center gap-1 font-mono text-xs text-primary hover:underline"
+      className="inline-flex items-center gap-1 font-mono text-xs text-foreground hover:text-brand hover:underline"
       title={t('duplicates.openItem')}
     >
       {itemKey} <PanelRightOpen className="size-3" />
@@ -40,7 +42,7 @@ function DuplicateGroup({ label, count, keys, dates, titles, onSelectItem }) {
   const { t } = useTranslation('admin');
   return (
     <Card>
-      <CardContent className="p-3">
+      <CardContent className="p-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">{label}</span>
           <Badge variant="destructive" className="shrink-0">{t('duplicates.copies', { count })}</Badge>
@@ -65,21 +67,11 @@ function AllDuplicates({ onSelectItem, version }) {
   const { data, error, loading, refresh } = useAsync(() => api.getAdminDuplicates(), [version]);
 
   if (loading && !data) {
-    return (
-      <div className="flex h-48 items-center justify-center text-muted-foreground">
-        <Loader2 className="mr-2 size-5 animate-spin" /> {t('duplicates.scanning')}
-      </div>
-    );
+    return <LoadingSkeleton variant="chart" className="h-48" label={t('duplicates.scanning')} />;
   }
 
   if (error) {
-    return (
-      <Card className="border-red-500/40">
-        <CardContent className="flex items-center gap-3 p-4 text-red-600 dark:text-red-400">
-          <AlertCircle className="size-5" /> {error.message}
-        </CardContent>
-      </Card>
-    );
+    return <ErrorState message={error.message} onRetry={refresh} />;
   }
 
   const { duplicateDois = [], duplicateTitles = [], summary } = data || {};
@@ -98,16 +90,12 @@ function AllDuplicates({ onSelectItem, version }) {
       </div>
 
       {duplicateDois.length === 0 && duplicateTitles.length === 0 && (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            {t('duplicates.noneFound')}
-          </CardContent>
-        </Card>
+        <EmptyState title={t('duplicates.noneFound')} />
       )}
 
       {duplicateDois.length > 0 && (
         <section>
-          <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+          <h3 className="mb-2 flex items-center gap-1.5 font-display text-base font-semibold">
             <Copy className="size-4" /> {t('duplicates.doiExact')}
           </h3>
           <div className="grid gap-3 md:grid-cols-2">
@@ -127,7 +115,7 @@ function AllDuplicates({ onSelectItem, version }) {
 
       {duplicateTitles.length > 0 && (
         <section>
-          <h3 className="mb-2 flex items-center gap-1.5 text-sm font-medium">
+          <h3 className="mb-2 flex items-center gap-1.5 font-display text-base font-semibold">
             <Copy className="size-4" /> {t('duplicates.titleDup')}
           </h3>
           <div className="grid gap-3 md:grid-cols-2">
@@ -172,8 +160,8 @@ function DuplicateSearch({ onSelectItem }) {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">{t('duplicates.precheckTitle')}</CardTitle>
+        <CardHeader>
+          <CardTitle>{t('duplicates.precheckTitle')}</CardTitle>
           <CardDescription>{t('duplicates.precheckDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -191,13 +179,7 @@ function DuplicateSearch({ onSelectItem }) {
         </CardContent>
       </Card>
 
-      {err && (
-        <Card className="border-red-500/40">
-          <CardContent className="flex items-center gap-3 p-4 text-red-600 dark:text-red-400">
-            <AlertCircle className="size-5" /> {err}
-          </CardContent>
-        </Card>
-      )}
+      {err && <ErrorState className="py-8" message={err} />}
 
       {result && <SearchResult result={result} onSelectItem={onSelectItem} />}
     </div>
@@ -215,8 +197,8 @@ function SearchResult({ result, onSelectItem }) {
   if (nothing) {
     return (
       <Card>
-        <CardContent className="py-8 text-center text-sm text-muted-foreground">
-          {t('duplicates.safe')}
+        <CardContent>
+          <EmptyState className="py-8" title={t('duplicates.safe')} />
         </CardContent>
       </Card>
     );
@@ -251,11 +233,11 @@ function SearchResult({ result, onSelectItem }) {
 }
 
 function ResultBlock({ title, tone, rows, onSelectItem }) {
-  const badgeVariant = tone === 'warning' ? 'outline' : tone;
+  const badgeVariant = tone === 'warning' ? 'warning' : tone;
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
           <Badge variant={badgeVariant}>{rows.length}</Badge> {title}
         </CardTitle>
       </CardHeader>
@@ -315,12 +297,14 @@ export function DuplicatesPanel() {
   }, []);
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden">
+      <div className="relative h-full min-h-0 overflow-hidden">
       <div className="h-full overflow-auto">
-        <div className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
-          <h2 className="flex items-center gap-2 text-lg font-semibold">
-            <FileSearch className="size-5" /> {t('duplicates.title')}
-          </h2>
+        <div className="mx-auto max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+          <PageHeader
+            eyebrow={t('common:nav.admin')}
+            title={t('duplicates.title')}
+            actions={<FileSearch className="size-5 text-brand" aria-hidden="true" />}
+          />
           <Tabs defaultValue="all">
             <TabsList>
               <TabsTrigger value="all">{t('duplicates.tabAll')}</TabsTrigger>
@@ -336,18 +320,16 @@ export function DuplicatesPanel() {
         </div>
       </div>
 
-      <FloatingDetailPanel open={!!selectedKey} onClose={closeDetail} width={520}>
-        <div className="min-h-0 flex-1 overflow-hidden">
-          {selectedKey ? (
-            <ItemDetail
-              itemKey={selectedKey}
-              onDeleted={handleDeleted}
-              onChanged={handleChanged}
-              onDirtyChange={setDetailDirty}
-            />
-          ) : null}
-        </div>
-      </FloatingDetailPanel>
+      <ItemDetailDialog open={!!selectedKey} onClose={closeDetail}>
+        {selectedKey ? (
+          <ItemDetail
+            itemKey={selectedKey}
+            onDeleted={handleDeleted}
+            onChanged={handleChanged}
+            onDirtyChange={setDetailDirty}
+          />
+        ) : null}
+      </ItemDetailDialog>
 
       <AlertDialog open={!!pendingKey} onOpenChange={(open) => { if (!open) setPendingKey(null); }}>
         <AlertDialogContent>

@@ -311,7 +311,7 @@ export function DoiCoverageVenn({ data }) {
           </p>
         </div>
 
-        <ul className="divide-y rounded-lg border">
+        <ul className="divide-y border border-border/80">
           {regions.map((r) => {
             const active = hover === r.id;
             const isAction = r.actionable && canOpenMissing;

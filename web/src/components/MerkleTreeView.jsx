@@ -74,9 +74,12 @@ export function MerkleTreeView() {
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
-      {/* Header — mirrors SearchPage layout */}
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b bg-background px-4">
+    <div className="relative mx-auto flex h-full w-full max-w-page flex-col overflow-hidden bg-background px-4 sm:px-6 lg:px-8">
+      <div className="shrink-0 pb-4 pt-6">
+        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-brand">{t('common:nav.dashboard')}</p>
+        <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">{t('nav.merkle')}</h1>
+      </div>
+      <header className="flex shrink-0 items-center gap-2 border-y border-border/80 py-3">
         <div className="relative flex h-8 flex-1 max-w-md min-w-[160px] items-center">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -118,7 +121,7 @@ export function MerkleTreeView() {
       </header>
 
       {/* Results */}
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
+      <div className="min-h-0 flex-1 overflow-auto py-4">
         <div className="mx-auto max-w-2xl">
           {!result && !verifying && (
             <div className="flex flex-col items-center justify-center py-24 text-center text-muted-foreground">
@@ -136,7 +139,7 @@ export function MerkleTreeView() {
           )}
 
           {result && !result.exists && (
-            <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-10 text-center">
+            <div className="rounded-sm border border-destructive/40 bg-destructive/5 px-4 py-10 text-center">
               <ShieldX className="mx-auto mb-3 size-10 text-destructive" />
               <p className="font-medium text-destructive">{t('merkle.notInDb')}</p>
               <code className="mt-1 block break-all text-xs text-muted-foreground">{result.doi}</code>
@@ -165,11 +168,11 @@ function ProofResult({ doi, proof, clientVerification }) {
   return (
     <div className="space-y-3">
       {/* Summary block */}
-      <div className={`rounded-md border px-4 py-3 ${fullyVerified ? 'border-emerald-500/40 bg-emerald-500/5' : 'bg-background'}`}>
+      <div className={`rounded-sm border px-4 py-3 ${fullyVerified ? 'border-success/40 bg-success/5' : 'bg-background'}`}>
         <div className="flex items-center gap-3">
           {fullyVerified ? (
-            <div className="flex size-8 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
-              <CheckCircle2 className="size-4 text-emerald-700 dark:text-emerald-400" />
+            <div className="flex size-8 items-center justify-center rounded-full bg-success/15">
+              <CheckCircle2 className="size-4 text-success" />
             </div>
           ) : (
             <div className="flex size-8 items-center justify-center rounded-full bg-muted">
@@ -203,10 +206,10 @@ function ProofResult({ doi, proof, clientVerification }) {
 
       {/* Verification status */}
       {clientVerification && (
-        <div className={`rounded-md border px-4 py-3 text-sm ${fullyVerified ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-destructive/40 bg-destructive/5'}`}>
+        <div className={`rounded-sm border px-4 py-3 text-sm ${fullyVerified ? 'border-success/40 bg-success/5' : 'border-destructive/40 bg-destructive/5'}`}>
           <div className="flex items-center gap-2 font-medium">
             {fullyVerified ? (
-              <CheckCircle2 className="size-4 text-emerald-600" />
+              <CheckCircle2 className="size-4 text-success" />
             ) : (
               <ShieldX className="size-4 text-destructive" />
             )}
@@ -231,7 +234,7 @@ function ProofResult({ doi, proof, clientVerification }) {
       )}
 
       {/* Step-by-step path */}
-      <div className="rounded-md border bg-background px-4 py-3">
+      <div className="rounded-sm border bg-background px-4 py-3">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Hash className="size-4" />
           {t('merkle.proofPath')}
@@ -283,7 +286,7 @@ function ProofResult({ doi, proof, clientVerification }) {
 
 function StepStatus({ verified }) {
   return verified ? (
-    <Check className="size-3.5 text-emerald-600" />
+    <Check className="size-3.5 text-success" />
   ) : (
     <X className="size-3.5 text-destructive" />
   );
@@ -292,7 +295,7 @@ function StepStatus({ verified }) {
 function PathStep({ label, subtitle, hash, highlight, isRoot, siblingHash, siblingSide, clientVerified }) {
   const { t } = useTranslation('dashboard');
   return (
-    <div className={`rounded-md border p-3 ${highlight ? (isRoot ? 'border-primary bg-primary/5' : 'border-accent bg-accent/5') : 'border-border bg-muted/30'}`}>
+    <div className={`rounded-sm border p-3 ${highlight ? (isRoot ? 'border-primary bg-primary/5' : 'border-accent bg-accent/5') : 'border-border bg-muted/30'}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{label}</span>
@@ -306,7 +309,7 @@ function PathStep({ label, subtitle, hash, highlight, isRoot, siblingHash, sibli
       {siblingHash && (
         <div className="mt-2 border-t pt-2">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className={`rounded px-1.5 py-0.5 font-medium ${siblingSide === 'left' ? 'bg-blue-500/10 text-blue-600' : 'bg-orange-500/10 text-orange-600'}`}>
+            <span className={`rounded-sm px-1.5 py-0.5 font-medium ${siblingSide === 'left' ? 'bg-brand/10 text-brand' : 'bg-warning/15 text-warning'}`}>
               {siblingSide === 'left' ? t('merkle.leftSibling') : t('merkle.rightSibling')}
             </span>
           </div>

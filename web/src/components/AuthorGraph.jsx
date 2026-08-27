@@ -149,24 +149,27 @@ export function AuthorGraph() {
   const visibleError = yearError || error?.message;
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
-      <header className="shrink-0 border-b bg-background">
-        <div className="flex min-h-12 flex-wrap items-center gap-2 px-3 py-2 sm:px-4">
-          <div className="mr-1 min-w-0">
-            <h1 className="text-sm font-semibold tracking-tight">{t('authors.graphTitle')}</h1>
-            <p className="hidden text-[11px] text-muted-foreground lg:block">{t('authors.graphSubtitle')}</p>
+    <div className="relative mx-auto flex h-full w-full max-w-page flex-col overflow-hidden bg-background px-4 sm:px-6 lg:px-8">
+      <header className="shrink-0">
+        <div className="flex flex-wrap items-end gap-3 pb-4 pt-6">
+          <div className="mr-1 min-w-0 flex-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-brand">{t('common:nav.dashboard')}</p>
+            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">{t('authors.graphTitle')}</h1>
+            <p className="mt-1 hidden text-sm text-muted-foreground lg:block">{t('authors.graphSubtitle')}</p>
           </div>
 
           {meta ? (
-            <div className="hidden items-center gap-1.5 md:flex">
+            <div className="hidden items-center gap-1.5 pb-1 md:flex">
               <Badge variant="secondary" className="font-normal tabular-nums">{t('authors.nScholars', { count: meta.nodeCount })}</Badge>
               <Badge variant="secondary" className="font-normal tabular-nums">{t('authors.nEdges', { count: meta.edgeCount })}</Badge>
               <Badge variant="outline" className="font-normal tabular-nums">{t('authors.nCommunities', { count: meta.communityCount })}</Badge>
             </div>
           ) : null}
+        </div>
 
+        <div className="flex items-center gap-2 pb-3">
           <div
-            className="relative ml-auto w-full sm:w-64"
+            className="relative w-full sm:w-64"
             onFocus={() => setSearchOpen(true)}
             onBlur={(event) => {
               if (!event.currentTarget.contains(event.relatedTarget)) setSearchOpen(false);
@@ -188,7 +191,7 @@ export function AuthorGraph() {
               aria-label={t('authors.searchPlaceholder')}
             />
             {searchOpen && searchQuery.trim() ? (
-              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-md border bg-popover shadow-md">
+              <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-sm border bg-popover shadow-sm">
                 {searchMatches.length ? searchMatches.map((node) => (
                   <button
                     key={node.id}
@@ -211,7 +214,7 @@ export function AuthorGraph() {
           <Button
             variant="outline"
             size="sm"
-            className="h-8"
+            className="ml-auto h-8"
             onClick={() => navigate('/dashboard/authors/stats')}
             title={t('authors.statsTitle')}
           >
@@ -230,7 +233,7 @@ export function AuthorGraph() {
           </Button>
         </div>
 
-        <div className="overflow-x-auto border-t bg-muted/20 px-3 py-2 sm:px-4">
+        <div className="overflow-x-auto border-y border-border/80 py-3">
           <div className="flex min-w-max items-end gap-3">
             <CompactField label={t('authors.journal')} className="w-64">
               <Select
@@ -329,7 +332,7 @@ export function AuthorGraph() {
       ) : null}
 
       {meta?.truncated ? (
-        <div className="flex shrink-0 items-center gap-2 border-b border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
+        <div className="flex shrink-0 items-center gap-2 border-b border-warning/30 bg-warning/5 px-4 py-2 text-xs text-warning">
           <AlertTriangle className="size-4 shrink-0" />
           {t('authors.truncatedNote', {
             eligible: meta.eligibleNodeCount.toLocaleString(i18n.language),
@@ -378,7 +381,7 @@ export function AuthorGraph() {
       ) : null}
 
       {loading && graph ? (
-        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-sm border bg-background/90 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
           {t('authors.updating')}
         </div>
       ) : null}
