@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '../config.js';
 import { query } from '../db/connection.js';
-import { appendItemScopeFilters, fieldIdByName } from '../repositories/itemRepo.js';
+import { appendDoiRequiredForArticles, appendItemScopeFilters, fieldIdByName } from '../repositories/itemRepo.js';
 import { getAuthorDetail } from '../repositories/authorRepo.js';
 import { Item } from '../models/Item.js';
 import { getOpenItemByKey, OpenApiError } from './openApiService.js';
@@ -34,6 +34,7 @@ function setCachedSitemap(key, xml) {
 
 const STATIC_PAGES = [
   { path: '/', changefreq: 'daily', priority: '1.0' },
+  { path: '/library', changefreq: 'daily', priority: '0.95' },
   { path: '/search', changefreq: 'weekly', priority: '0.8' },
   { path: '/docs/api', changefreq: 'weekly', priority: '0.9' },
   { path: '/docs/agents', changefreq: 'weekly', priority: '0.9' },
@@ -143,9 +144,13 @@ export function injectSpaShell(html, {
   out = out.replace(/<\/head>/i, `    ${inject}\n  </head>`);
 
   if (bodyHtml) {
+    // Keep #root empty: anything rendered there is painted before the SPA
+    // bundle boots and then wiped on mount, which users see as a flash of
+    // crawler copy. <noscript> is invisible to JS-enabled browsers but still
+    // present in the served HTML for crawlers that never execute scripts.
     out = out.replace(
       /<div id="root"><\/div>/i,
-      `<div id="root">${bodyHtml}</div>`,
+      `<div id="root"></div>\n    <noscript>${bodyHtml}</noscript>`,
     );
   }
   return out;
@@ -229,7 +234,8 @@ Otero does not modify the corpus via its public Open API. All open endpoints are
 
 ## Site
 
-- [Library](${base}/): Browse Basket literature
+- [Research portal](${base}/): Overview, statistics, journals, and recently added literature
+- [Library](${base}/library): Browse Basket literature
 - [Search](${base}/search): Full-text and metadata search
 - [Dashboard](${base}/dashboard): Corpus overview, journals, timeline, author graph
 
@@ -266,7 +272,10 @@ function urlEntry({ loc, lastmod, changefreq, priority }) {
 async function listSitemapItems() {
   const where = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
   const params = [];
-  const p = await appendItemScopeFilters(where, params, 1, { basketOnly: true });
+  const p = await appendItemScopeFilters(where, params, 1, {
+    basketOnly: true,
+    requireDoiForArticles: true,
+  });
   if (p == null) return [];
   const rows = await query(
     `SELECT i.key, i."dateModified" AS "dateModified"
@@ -283,6 +292,9 @@ async function listSitemapAuthors() {
   if (!jfid) return [];
   const params = [jfid, ...JOURNAL_WHITELIST];
   const wl = JOURNAL_WHITELIST.map((_, i) => `$${i + 2}`).join(',');
+  const extra = [];
+  await appendDoiRequiredForArticles(extra, params, params.length + 1);
+  const doiSql = extra.length ? `AND ${extra[0]}` : '';
   return query(
     `SELECT c."creatorID" AS id, MAX(i."dateModified") AS "dateModified"
      FROM creators c
@@ -295,6 +307,7 @@ async function listSitemapAuthors() {
          JOIN "itemDataValues" v ON v."valueID" = d."valueID"
          WHERE d."itemID" = i."itemID" AND d."fieldID" = $1 AND v.value IN (${wl})
        )
+       ${doiSql}
      GROUP BY c."creatorID"
      ORDER BY MAX(i."dateModified") DESC`,
     params,
@@ -374,13 +387,16 @@ export async function buildSitemapXml(which = 'index') {
 const DEFAULT_DESCRIPTION =
   'Otero is a read-only literature library and Open API for the AIS Senior Scholars\' Basket of Journals — search articles, authors, and corpus statistics.';
 
+const PORTAL_DESCRIPTION =
+  'Otero is a research portal for the AIS Senior Scholars\' Basket of Journals: explore corpus statistics, browse 11 leading information systems journals, search literature, and use the read-only Open API.';
+
 function organizationJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'Otero',
     url: absoluteUrl('/'),
-    description: DEFAULT_DESCRIPTION,
+    description: PORTAL_DESCRIPTION,
     publisher: {
       '@type': 'Organization',
       name: 'Otero',
@@ -494,11 +510,17 @@ function authorBodyHtml(author, items) {
 
 const PAGE_COPY = {
   home: {
-    title: 'Otero | AIS Basket Literature API',
-    description: DEFAULT_DESCRIPTION,
+    title: 'Otero | AIS Basket research portal',
+    description: PORTAL_DESCRIPTION,
     path: '/',
-    body: `<article><h1>Otero</h1><p>${escapeHtml(DEFAULT_DESCRIPTION)}</p><p>Browse the <a href="/search">library search</a>, explore the <a href="/dashboard">dashboard</a>, or read the <a href="/docs/api">Open API docs</a>.</p></article>`,
+    body: `<article><h1>Otero research portal</h1><p>${escapeHtml(PORTAL_DESCRIPTION)}</p><p>Browse the <a href="/library">literature library</a>, use <a href="/search">search</a>, explore the <a href="/dashboard">dashboard</a>, or read the <a href="/docs/api">Open API docs</a>.</p></article>`,
     jsonLd: () => organizationJsonLd(),
+  },
+  library: {
+    title: 'Literature library | Otero',
+    description: 'Browse and filter the AIS Senior Scholars\' Basket of Journals literature collection in Otero.',
+    path: '/library',
+    body: `<article><h1>Otero literature library</h1><p>Browse non-deleted top-level literature items from the 11 AIS Senior Scholars' Basket journals. Filter by journal, type, collection, or search phrase.</p><p><a href="/">Back to the research portal</a> · <a href="/search">Search the library</a></p></article>`,
   },
   search: {
     title: 'Search | Otero',
@@ -656,6 +678,10 @@ export async function renderSpaShellForRequest(req) {
         canonicalPath: '/search',
       }),
     };
+  }
+
+  if (urlPath === '/library' || urlPath === '/library/') {
+    return { status: 200, html: shellFromCopy('library') };
   }
 
   if (urlPath === '/' || urlPath === '') {

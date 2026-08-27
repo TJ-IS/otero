@@ -70,6 +70,7 @@ export async function getCoauthorGraph({
   yearFrom,
   yearTo,
   basketOnly = true,
+  requireDoiForArticles = false,
 } = {}) {
   const authorTypeId = await creatorTypeIdByName('author');
   const filterMeta = {
@@ -81,7 +82,7 @@ export async function getCoauthorGraph({
   const candidateWhere = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
   const candidateParams = [authorTypeId, minPapers, maxNodes];
   const nextParam = await appendItemScopeFilters(candidateWhere, candidateParams, 4, {
-    journal, yearFrom, yearTo, basketOnly,
+    journal, yearFrom, yearTo, basketOnly, requireDoiForArticles,
   });
   if (nextParam == null) return emptyCoauthorGraph(filterMeta);
 
@@ -111,7 +112,7 @@ export async function getCoauthorGraph({
   const edgeWhere = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
   const edgeParams = [authorTypeId, candidateIds, minCollaborations];
   const edgeNextParam = await appendItemScopeFilters(edgeWhere, edgeParams, 4, {
-    journal, yearFrom, yearTo, basketOnly,
+    journal, yearFrom, yearTo, basketOnly, requireDoiForArticles,
   });
   if (edgeNextParam == null) return emptyCoauthorGraph(filterMeta);
   const edgeRows = await query(`
@@ -163,19 +164,30 @@ export async function getCoauthorGraph({
   };
 }
 
-export async function getAuthorDetail(creatorId) {
+export async function getAuthorDetail(creatorId, { basketOnly = false, requireDoiForArticles = false } = {}) {
   const creator = await queryOne(
     'SELECT "creatorID" AS id, "firstName", "lastName", "fieldMode" FROM creators WHERE "creatorID" = $1',
     [creatorId]
   );
   if (!creator) return null;
 
+  const where = [
+    'ic."creatorID" = $1',
+    'i.deleted = 0',
+    'i."parentItemID" IS NULL',
+  ];
+  const params = [creatorId];
+  const next = await appendItemScopeFilters(where, params, 2, { basketOnly, requireDoiForArticles });
+  if (next == null) {
+    return { id: creator.id, name: creatorDisplayName(creator), itemIds: [] };
+  }
+
   const rows = await query(`
     SELECT DISTINCT i."itemID" AS "itemID"
     FROM "itemCreators" ic
     JOIN items i ON i."itemID" = ic."itemID"
-    WHERE ic."creatorID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL
-  `, [creatorId]);
+    WHERE ${where.join(' AND ')}
+  `, params);
 
   return {
     id: creator.id,
@@ -191,6 +203,7 @@ export async function getAuthorDetail(creatorId) {
 export async function searchAuthors({
   q, page = 1, pageSize = 20,
   journal, journals, yearFrom, yearTo, type, basketOnly = true,
+  requireDoiForArticles = false,
 } = {}) {
   const validPage = Math.max(1, parseInt(page, 10) || 1);
   const validPageSize = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
@@ -214,7 +227,7 @@ export async function searchAuthors({
   }
 
   p = await appendItemScopeFilters(where, params, p, {
-    journal, journals, yearFrom, yearTo, basketOnly,
+    journal, journals, yearFrom, yearTo, basketOnly, requireDoiForArticles,
   });
   if (p == null) return empty;
 
@@ -277,6 +290,7 @@ export async function searchAuthors({
 export async function listAuthorItems({
   creatorId, page = 1, pageSize = 20,
   journal, journals, yearFrom, yearTo, type, basketOnly = true,
+  requireDoiForArticles = false,
 } = {}) {
   const validPage = Math.max(1, parseInt(page, 10) || 1);
   const validPageSize = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
@@ -313,7 +327,7 @@ export async function listAuthorItems({
   }
 
   p = await appendItemScopeFilters(where, params, p, {
-    journal, journals, yearFrom, yearTo, basketOnly,
+    journal, journals, yearFrom, yearTo, basketOnly, requireDoiForArticles,
   });
   if (p == null) return emptyResult;
 
@@ -381,18 +395,32 @@ export async function listAuthorItems({
  * top authors, creator-type mix, productivity histogram, collaboration-size
  * histogram, and per-Basket-journal core authors.
  */
-export async function getAuthorAnalytics({ topN = 25, coreN = 5 } = {}) {
+export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = false, requireDoiForArticles = false } = {}) {
   const authorTypeId = await creatorTypeIdByName('author');
+  const itemWhere = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
+  const itemParams = [];
+  const next = await appendItemScopeFilters(itemWhere, itemParams, 1, { basketOnly, requireDoiForArticles });
+  if (next == null) {
+    return {
+      authorTotal: 0,
+      topAuthors: [],
+      creatorTypes: [],
+      papersPerAuthor: PAPER_BUCKETS.map((b) => ({ id: b.id, label: b.label, count: 0 })),
+      collabSize: COLLAB_BUCKETS.map((b) => ({ id: b.id, label: b.label, count: 0 })),
+      journalCores: JOURNAL_WHITELIST.map((journal) => ({ journal, authors: [] })),
+    };
+  }
+  const itemSql = itemWhere.join(' AND ');
 
   const typeRows = await query(`
     SELECT ct."creatorType" AS type, COUNT(*)::int AS count
     FROM "itemCreators" ic
     JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
     JOIN items i ON i."itemID" = ic."itemID"
-    WHERE i.deleted = 0 AND i."parentItemID" IS NULL
+    WHERE ${itemSql}
     GROUP BY ct."creatorType"
     ORDER BY count DESC
-  `);
+  `, itemParams);
 
   let topAuthors = [];
   let papersPerAuthor = PAPER_BUCKETS.map((b) => ({ id: b.id, label: b.label, count: 0 }));
@@ -406,12 +434,11 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5 } = {}) {
       FROM "itemCreators" ic
       JOIN creators c ON c."creatorID" = ic."creatorID"
       JOIN items i ON i."itemID" = ic."itemID"
-      WHERE ic."creatorTypeID" = $1
-        AND i.deleted = 0
-        AND i."parentItemID" IS NULL
+      WHERE ic."creatorTypeID" = $${itemParams.length + 1}
+        AND ${itemSql}
       GROUP BY c."creatorID"
       ORDER BY "paperCount" DESC, c."lastName" ASC
-    `, [authorTypeId]);
+    `, [...itemParams, authorTypeId]);
 
     authorTotal = authorRows.length;
     topAuthors = authorRows.slice(0, topN).map((r) => ({
@@ -437,14 +464,13 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5 } = {}) {
         SELECT ic."itemID", COUNT(DISTINCT ic."creatorID")::int AS authors
         FROM "itemCreators" ic
         JOIN items i ON i."itemID" = ic."itemID"
-        WHERE ic."creatorTypeID" = $1
-          AND i.deleted = 0
-          AND i."parentItemID" IS NULL
+        WHERE ic."creatorTypeID" = $${itemParams.length + 1}
+          AND ${itemSql}
         GROUP BY ic."itemID"
       ) t
       GROUP BY authors
       ORDER BY authors
-    `, [authorTypeId]);
+    `, [...itemParams, authorTypeId]);
 
     const collabHist = Object.fromEntries(COLLAB_BUCKETS.map((b) => [b.id, 0]));
     for (const r of sizeRows) {

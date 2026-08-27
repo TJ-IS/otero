@@ -11,12 +11,13 @@ import {
   getMissingTargetDois,
 } from '../../repositories/statsRepo.js';
 import { UNFILED } from '../../services/journalWhitelist.js';
+import { publicItemScope } from '../../services/itemVisibility.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const statsRouter = Router();
 
 statsRouter.get('/overview', asyncHandler(async (req, res) => {
-  res.json(await getOverviewStats());
+  res.json(await getOverviewStats(publicItemScope(req)));
 }));
 
 statsRouter.get('/doi-coverage', asyncHandler(async (req, res) => {
@@ -40,11 +41,11 @@ statsRouter.get('/doi-coverage/missing', asyncHandler(async (req, res) => {
 }));
 
 statsRouter.get('/item-types', asyncHandler(async (req, res) => {
-  res.json({ itemTypes: await getItemTypeDistribution() });
+  res.json({ itemTypes: await getItemTypeDistribution(publicItemScope(req)) });
 }));
 
 statsRouter.get('/years', asyncHandler(async (req, res) => {
-  res.json({ years: await getPublicationYearHistogram() });
+  res.json({ years: await getPublicationYearHistogram(publicItemScope(req)) });
 }));
 
 statsRouter.get('/journals', asyncHandler(async (req, res) => {

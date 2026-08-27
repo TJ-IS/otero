@@ -3,6 +3,7 @@ import { getCoauthorGraph, getAuthorDetail, getAuthorAnalytics } from '../../rep
 import { Item } from '../../models/Item.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { JOURNAL_WHITELIST } from '../../services/journalWhitelist.js';
+import { hideFromPublic, publicItemScope } from '../../services/itemVisibility.js';
 
 export const authorsRouter = Router();
 
@@ -59,6 +60,7 @@ authorsRouter.get('/graph', asyncHandler(async (req, res) => {
     yearFrom: yearFromResult.value,
     yearTo: yearToResult.value,
     basketOnly: true,
+    requireDoiForArticles: !req.auth?.canEdit,
   }));
 }));
 
@@ -66,7 +68,7 @@ authorsRouter.get('/graph', asyncHandler(async (req, res) => {
 authorsRouter.get('/analytics', asyncHandler(async (req, res) => {
   const topN = Math.min(100, Math.max(5, parseInt(req.query.topN, 10) || 25));
   const coreN = Math.min(20, Math.max(3, parseInt(req.query.coreN, 10) || 5));
-  res.json(await getAuthorAnalytics({ topN, coreN }));
+  res.json(await getAuthorAnalytics({ topN, coreN, ...publicItemScope(req) }));
 }));
 
 // GET /api/authors/:id — author name + all their papers (full item JSON, same
@@ -77,14 +79,18 @@ authorsRouter.get('/:id', asyncHandler(async (req, res) => {
   if (!Number.isInteger(creatorId)) {
     return res.status(400).json({ error: 'invalid author id' });
   }
-  const detail = await getAuthorDetail(creatorId);
+  const detail = await getAuthorDetail(creatorId, publicItemScope(req));
   if (!detail) return res.status(404).json({ error: 'author not found' });
 
   const loaded = await Promise.all(detail.itemIds.map(id => Item.loadById(id)));
   const items = loaded
-    .filter(Boolean)
+    .filter((it) => it && !hideFromPublic(req, it))
     .map(it => it.toJSON())
     .sort((a, b) => (b.fields?.date || '').localeCompare(a.fields?.date || ''));
+
+  if (!req.auth?.canEdit && items.length === 0) {
+    return res.status(404).json({ error: 'author not found' });
+  }
 
   res.json({ id: detail.id, name: detail.name, items });
 }));

@@ -1,5 +1,5 @@
 import { query, queryOne } from '../db/connection.js';
-import { fieldIdByName, listJournals } from './itemRepo.js';
+import { appendDoiRequiredForArticles, fieldIdByName, listJournals } from './itemRepo.js';
 import { getFullTextCounts } from './fulltextRepo.js';
 import { JOURNAL_WHITELIST, UNFILED, classifyJournal } from '../services/journalWhitelist.js';
 import { doiCompareKey, getTargetDoiKeys } from '../services/targetDois.js';
@@ -22,28 +22,66 @@ function extractYear(dateStr) {
   return year;
 }
 
-export async function getOverviewStats() {
+function emptyOverview() {
+  return {
+    totalItems: 0,
+    totalCreators: 0,
+    journalCount: JOURNAL_WHITELIST.length,
+    withDoi: 0,
+    withAttachment: 0,
+  };
+}
+
+async function basketScope(itemAlias = 'i') {
+  const jfid = await fieldIdByName('publicationTitle');
+  if (!jfid) return null;
+  const placeholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 2}`).join(',');
+  const where = [`EXISTS (
+      SELECT 1 FROM "itemData" scope_d
+      JOIN "itemDataValues" scope_v ON scope_v."valueID" = scope_d."valueID"
+      WHERE scope_d."itemID" = ${itemAlias}."itemID"
+        AND scope_d."fieldID" = $1
+        AND scope_v.value IN (${placeholders})
+    )`];
+  const params = [jfid, ...JOURNAL_WHITELIST];
+  await appendDoiRequiredForArticles(where, params, params.length + 1, itemAlias);
+  return {
+    sql: where.join(' AND '),
+    params,
+  };
+}
+
+export async function getOverviewStats({ basketOnly = false } = {}) {
   // Return all overview counters in one database round trip. This matters for
   // hosted PostgreSQL where four serial COUNT queries are dominated by latency.
+  let extra = 'TRUE';
+  let params = [];
+  if (basketOnly) {
+    const scope = await basketScope('i');
+    if (!scope) return emptyOverview();
+    extra = scope.sql;
+    params = scope.params;
+  }
+
   const row = await queryOne(`
     SELECT
       (SELECT COUNT(*)::int
        FROM items i
-       WHERE i.deleted = 0 AND i."parentItemID" IS NULL) AS "totalItems",
+       WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${extra}) AS "totalItems",
       (SELECT COUNT(DISTINCT ic."creatorID")::int
        FROM "itemCreators" ic
        JOIN items i ON i."itemID" = ic."itemID"
-       WHERE i.deleted = 0 AND i."parentItemID" IS NULL) AS "totalCreators",
+       WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${extra}) AS "totalCreators",
       (SELECT COUNT(*)::int
        FROM "itemData" d
        JOIN fields f ON f."fieldID" = d."fieldID" AND f."fieldName" = 'DOI'
        JOIN items i ON i."itemID" = d."itemID"
-       WHERE i.deleted = 0 AND i."parentItemID" IS NULL) AS "withDoi",
+       WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${extra}) AS "withDoi",
       (SELECT COUNT(DISTINCT ia."parentItemID")::int
        FROM "itemAttachments" ia
        JOIN items i ON i."itemID" = ia."parentItemID"
-       WHERE i.deleted = 0 AND i."parentItemID" IS NULL) AS "withAttachment"
-  `);
+       WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${extra}) AS "withAttachment"
+  `, params);
 
   return {
     totalItems: row?.totalItems ?? 0,
@@ -54,28 +92,55 @@ export async function getOverviewStats() {
   };
 }
 
-export async function getItemTypeDistribution() {
+export async function getItemTypeDistribution({ basketOnly = false } = {}) {
+  let extra = 'TRUE';
+  let params = [];
+  if (basketOnly) {
+    const scope = await basketScope('i');
+    if (!scope) return [];
+    extra = scope.sql;
+    params = scope.params;
+  }
   return query(`
     SELECT it."typeName" AS "itemType", COUNT(*)::int AS count
     FROM items i
     JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
-    WHERE i.deleted = 0 AND i."parentItemID" IS NULL
+    WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${extra}
     GROUP BY it."typeName"
     ORDER BY count DESC
-  `);
+  `, params);
 }
 
-export async function getPublicationYearHistogram() {
+export async function getPublicationYearHistogram({ basketOnly = false } = {}) {
   const dateFieldId = await fieldIdByName('date');
   if (!dateFieldId) return [];
+
+  let extra = 'TRUE';
+  const params = [dateFieldId];
+  if (basketOnly) {
+    const jfid = await fieldIdByName('publicationTitle');
+    if (!jfid) return [];
+    const placeholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 3}`).join(',');
+    extra = `EXISTS (
+      SELECT 1 FROM "itemData" scope_d
+      JOIN "itemDataValues" scope_v ON scope_v."valueID" = scope_d."valueID"
+      WHERE scope_d."itemID" = i."itemID"
+        AND scope_d."fieldID" = $2
+        AND scope_v.value IN (${placeholders})
+    )`;
+    params.push(jfid, ...JOURNAL_WHITELIST);
+    const doiWhere = [];
+    await appendDoiRequiredForArticles(doiWhere, params, params.length + 1);
+    if (doiWhere.length) extra = `${extra} AND ${doiWhere[0]}`;
+  }
 
   const rows = await query(`
     SELECT v.value AS date
     FROM "itemData" d
     JOIN "itemDataValues" v ON v."valueID" = d."valueID"
     JOIN items i ON i."itemID" = d."itemID"
-    WHERE d."fieldID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL
-  `, [dateFieldId]);
+    WHERE d."fieldID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL AND ${extra}
+  `, params);
 
   const counts = new Map();
   for (const r of rows) {

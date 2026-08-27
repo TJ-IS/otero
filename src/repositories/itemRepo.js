@@ -193,9 +193,35 @@ const ITEM_SORT_FIELDS = {
  * @param {number} [opts.yearFrom] inclusive start year
  * @param {number} [opts.yearTo] inclusive end year
  * @param {boolean} [opts.basketOnly] when true and no journal(s), restrict to whitelist
+ * @param {boolean} [opts.requireDoiForArticles] journalArticle rows must have a non-empty DOI
  */
+export async function appendDoiRequiredForArticles(where, params, p, itemAlias = 'i') {
+  const articleTypeId = await itemTypeIdByName('journalArticle');
+  if (articleTypeId == null) return p;
+  const doiFid = await fieldIdByName('DOI');
+  if (!doiFid) {
+    where.push(`${itemAlias}."itemTypeID" <> $${p++}`);
+    params.push(articleTypeId);
+    return p;
+  }
+  const typeParam = p++;
+  const doiParam = p++;
+  where.push(`(
+    ${itemAlias}."itemTypeID" <> $${typeParam}
+    OR EXISTS (
+      SELECT 1 FROM "itemData" doi_d
+      JOIN "itemDataValues" doi_v ON doi_v."valueID" = doi_d."valueID"
+      WHERE doi_d."itemID" = ${itemAlias}."itemID"
+        AND doi_d."fieldID" = $${doiParam}
+        AND BTRIM(doi_v.value) <> ''
+    )
+  )`);
+  params.push(articleTypeId, doiFid);
+  return p;
+}
+
 export async function appendItemScopeFilters(where, params, p, {
-  journal, journals, yearFrom, yearTo, basketOnly = false,
+  journal, journals, yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
 } = {}) {
   const jfid = await fieldIdByName('publicationTitle');
   const journalList = Array.isArray(journals) ? journals.filter(Boolean) : [];
@@ -268,6 +294,10 @@ export async function appendItemScopeFilters(where, params, p, {
     )`);
   }
 
+  if (requireDoiForArticles) {
+    p = await appendDoiRequiredForArticles(where, params, p);
+  }
+
   return p;
 }
 
@@ -278,7 +308,7 @@ export async function appendItemScopeFilters(where, params, p, {
  */
 async function _buildItemFilter({
   type, journal, journals, collection, search, includeDeleted = false,
-  yearFrom, yearTo, basketOnly = false,
+  yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
 } = {}) {
   const where = ['i."parentItemID" IS NULL'];
   const params = [];
@@ -294,7 +324,7 @@ async function _buildItemFilter({
   }
 
   p = await appendItemScopeFilters(where, params, p, {
-    journal, journals, yearFrom, yearTo, basketOnly,
+    journal, journals, yearFrom, yearTo, basketOnly, requireDoiForArticles,
   });
   if (p == null) return null;
 
@@ -349,7 +379,7 @@ async function _buildItemFilter({
 
 export async function listItems({
   type, journal, journals, collection, search, includeDeleted = false,
-  yearFrom, yearTo, basketOnly = false,
+  yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
   page = 1, pageSize = 100, sortField = 'dateModified', sortDir = 'desc',
 } = {}) {
   const validPage = Math.max(1, parseInt(page, 10) || 1);
@@ -363,7 +393,7 @@ export async function listItems({
   const empty = { items: [], total: 0, page: validPage, pageSize: validPageSize, totalPages: 0 };
   const filter = await _buildItemFilter({
     type, journal, journals, collection, search, includeDeleted,
-    yearFrom, yearTo, basketOnly,
+    yearFrom, yearTo, basketOnly, requireDoiForArticles,
   });
   if (!filter) return empty;
   const { where, params, searchQuery } = filter;
@@ -490,11 +520,11 @@ export async function listItems({
  */
 export async function listItemKeys({
   type, journal, journals, collection, search, includeDeleted = false,
-  yearFrom, yearTo, basketOnly = false,
+  yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
 } = {}) {
   const filter = await _buildItemFilter({
     type, journal, journals, collection, search, includeDeleted,
-    yearFrom, yearTo, basketOnly,
+    yearFrom, yearTo, basketOnly, requireDoiForArticles,
   });
   if (!filter) return [];
   const { where, params } = filter;

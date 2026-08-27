@@ -1,4 +1,5 @@
 import { query, queryOne } from '../db/connection.js';
+import { appendDoiRequiredForArticles } from './itemRepo.js';
 import { JOURNAL_WHITELIST } from '../services/journalWhitelist.js';
 
 function placeholders(values, params) {
@@ -8,7 +9,7 @@ function placeholders(values, params) {
   }).join(',');
 }
 
-function buildOpenWhere({ q, journal, journals, yearFrom, yearTo, type } = {}) {
+async function buildOpenWhere({ q, journal, journals, yearFrom, yearTo, type } = {}) {
   const params = [];
   const basketParams = placeholders(JOURNAL_WHITELIST, params);
   const where = [
@@ -88,11 +89,12 @@ function buildOpenWhere({ q, journal, journals, yearFrom, yearTo, type } = {}) {
     )`);
   }
 
+  await appendDoiRequiredForArticles(where, params, params.length + 1);
   return { sql: where.join(' AND '), params };
 }
 
 export async function getOpenFacets(filters = {}) {
-  const { sql, params } = buildOpenWhere(filters);
+  const { sql, params } = await buildOpenWhere(filters);
   const [fieldRows, typeRows, availability] = await Promise.all([
     query(`
       SELECT f."fieldName" AS field, v.value, COUNT(DISTINCT i."itemID")::int AS count
@@ -151,7 +153,7 @@ export async function getOpenFacets(filters = {}) {
 }
 
 export async function getOpenOverviewStats() {
-  const { sql, params } = buildOpenWhere();
+  const { sql, params } = await buildOpenWhere();
   const row = await queryOne(`
     SELECT
       COUNT(DISTINCT i."itemID")::int AS "totalItems",
@@ -174,7 +176,7 @@ export async function getOpenOverviewStats() {
 }
 
 export async function getOpenTimeline(filters = {}) {
-  const { sql, params } = buildOpenWhere(filters);
+  const { sql, params } = await buildOpenWhere(filters);
   const rows = await query(`
     SELECT substring(v.value from '(1[5-9][0-9]{2}|20[0-9]{2})') AS year,
            COUNT(DISTINCT i."itemID")::int AS count

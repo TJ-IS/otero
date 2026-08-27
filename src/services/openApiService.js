@@ -10,6 +10,7 @@ import { getFullTextStructure } from './fulltextService.js';
 import { toBibtex, toRis, toBibtexBatch, toRisBatch } from './exportService.js';
 import { getOpenFacets, getOpenOverviewStats, getOpenTimeline } from '../repositories/openApiRepo.js';
 import { JOURNAL_WHITELIST, UNFILED } from './journalWhitelist.js';
+import { isBasketVisibleItem } from './itemVisibility.js';
 import { normalizeDoi } from '../utils/doi.js';
 
 const WHITELIST_SET = new Set(JOURNAL_WHITELIST);
@@ -96,6 +97,7 @@ export function parseOpenFilters(query = {}) {
     page,
     pageSize,
     basketOnly: true,
+    requireDoiForArticles: true,
   };
 }
 
@@ -124,6 +126,7 @@ export async function searchOpenArticles({ q, ...filters }) {
     yearFrom: filters.yearFrom,
     yearTo: filters.yearTo,
     basketOnly: true,
+    requireDoiForArticles: true,
     includeDeleted: false,
     page: filters.page,
     pageSize: filters.pageSize,
@@ -146,6 +149,7 @@ export async function searchOpenAuthors({ q, ...filters }) {
     yearTo: filters.yearTo,
     type: filters.type,
     basketOnly: true,
+    requireDoiForArticles: true,
   });
 }
 
@@ -160,6 +164,7 @@ export async function getOpenAuthorItems(creatorId, filters) {
     yearTo: filters.yearTo,
     type: filters.type,
     basketOnly: true,
+    requireDoiForArticles: true,
   });
   if (!detail) throw new OpenApiError(404, 'author not found');
 
@@ -201,7 +206,7 @@ async function loadItemByKeyOrThrow(keyRaw) {
   const key = keyRaw == null ? '' : String(keyRaw).trim();
   if (!key) throw new OpenApiError(400, 'item key is required');
   const item = await Item.loadByKey(key);
-  if (!item || item.deleted || item.parentItemID != null || !WHITELIST_SET.has(item.getField('publicationTitle'))) {
+  if (!isBasketVisibleItem(item)) {
     throw new OpenApiError(404, 'item not found');
   }
   return item;
@@ -303,6 +308,7 @@ export async function exportOpenArticles({ format = 'bibtex', q, ...filters }) {
     yearFrom: filters.yearFrom,
     yearTo: filters.yearTo,
     basketOnly: true,
+    requireDoiForArticles: true,
     includeDeleted: false,
     pageSize: 200,
     sortField: 'date',

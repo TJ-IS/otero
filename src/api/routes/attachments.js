@@ -4,6 +4,7 @@ import { queryOne } from '../../db/connection.js';
 import { config } from '../../config.js';
 import { resolveStoredPath, getStoredFileStream, storedFileExists } from '../../services/storageService.js';
 import { resolveFullTextAsset } from '../../services/fulltextService.js';
+import { hideAttachmentKeyFromPublic, hideKeyFromPublic } from '../../services/itemVisibility.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const attachmentsRouter = Router();
@@ -20,7 +21,7 @@ attachmentsRouter.get('/:key/file', asyncHandler(async (req, res) => {
     WHERE i.key = $1 AND i.deleted = 0
   `, [req.params.key]);
 
-  if (!row || !row.path) {
+  if (!row || !row.path || await hideAttachmentKeyFromPublic(req, req.params.key)) {
     return res.status(404).json({ error: 'attachment not found' });
   }
 
@@ -58,6 +59,9 @@ attachmentsRouter.get('/:key/file', asyncHandler(async (req, res) => {
 attachmentsRouter.get('/:key/fulltext/*', asyncHandler(async (req, res) => {
   const subPath = req.params[0];
   if (!subPath) return res.status(400).json({ error: 'path required' });
+  if (await hideKeyFromPublic(req, req.params.key)) {
+    return res.status(404).json({ error: 'not found' });
+  }
   const resolved = await resolveFullTextAsset(req.params.key, subPath);
   if (!resolved) return res.status(404).json({ error: 'not found' });
 

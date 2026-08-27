@@ -3,6 +3,7 @@ import { streamText, convertToModelMessages, pipeTextStreamToResponse } from 'ai
 import { Item } from '../../models/Item.js';
 import { buildPaperContext, getChatModel } from '../../services/chatService.js';
 import { config } from '../../config.js';
+import { hideFromPublic } from '../../services/itemVisibility.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const chatRouter = Router();
@@ -13,7 +14,7 @@ export const chatRouter = Router();
 // editorWriteGate's publicWrites exemption) — no wallet/editor auth.
 chatRouter.post('/items/:key/chat', asyncHandler(async (req, res) => {
   const it = await Item.loadByKey(req.params.key);
-  if (!it) return res.status(404).json({ error: 'not found' });
+  if (!it || hideFromPublic(req, it)) return res.status(404).json({ error: 'not found' });
 
   const messages = Array.isArray(req.body?.messages) ? req.body.messages : null;
   if (!messages || messages.length === 0) {

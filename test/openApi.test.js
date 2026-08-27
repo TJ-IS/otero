@@ -17,7 +17,9 @@ async function makeItem({ title, journal = JOURNAL_WHITELIST[0], date = '2024', 
   item.setField('title', title || tag);
   item.setField('publicationTitle', journal);
   item.setField('date', date);
-  if (doi) item.setField('DOI', doi);
+  if (doi !== null) {
+    item.setField('DOI', doi || `10.9999/${tag}-${createdKeys.length + 1}`);
+  }
   if (creator) item.addCreator({ ...creator, creatorType: 'author' });
   await item.save();
   createdKeys.push(item.key);
@@ -53,6 +55,9 @@ test('open item endpoints expose Basket items by key and reject unfiled items', 
 
   await request(app).get(`/api/open/v1/items/${hidden.key}`).expect(404);
   await request(app).get('/api/open/v1/items/DOESNOTEXIST').expect(404);
+
+  const missingDoi = await makeItem({ title: `${tag} no-doi`, doi: null });
+  await request(app).get(`/api/open/v1/items/${missingDoi.key}`).expect(404);
 });
 
 test('open item export supports BibTeX and RIS and validates format', async () => {

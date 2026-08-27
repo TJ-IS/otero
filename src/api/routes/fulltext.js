@@ -4,7 +4,14 @@ import {
   parseItem, getFullText, getFullTextStructure, deleteFullText, enqueueBatchParse, retryFailed,
 } from '../../services/fulltextService.js';
 import { listFullTextPaged, getFullTextCounts } from '../../repositories/fulltextRepo.js';
+import { hideFromPublic } from '../../services/itemVisibility.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
+
+async function loadVisibleItem(req, key) {
+  const it = await Item.loadByKey(key);
+  if (!it || hideFromPublic(req, it)) return null;
+  return it;
+}
 
 export const fulltextRouter = Router();
 
@@ -53,7 +60,7 @@ fulltextRouter.post('/fulltext/retry-failed', asyncHandler(async (_req, res) => 
 
 // POST /api/items/:key/fulltext/parse  ?force=true
 fulltextRouter.post('/items/:key/fulltext/parse', asyncHandler(async (req, res) => {
-  const it = await Item.loadByKey(req.params.key);
+  const it = await loadVisibleItem(req, req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   const force = req.query.force === 'true' || req.query.force === '1';
   try {
@@ -66,7 +73,7 @@ fulltextRouter.post('/items/:key/fulltext/parse', asyncHandler(async (req, res) 
 
 // GET /api/items/:key/fulltext
 fulltextRouter.get('/items/:key/fulltext', asyncHandler(async (req, res) => {
-  const it = await Item.loadByKey(req.params.key);
+  const it = await loadVisibleItem(req, req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   res.json(await getFullText(req.params.key));
 }));
@@ -75,14 +82,14 @@ fulltextRouter.get('/items/:key/fulltext', asyncHandler(async (req, res) => {
 // Structured MinerU output (outline, figures, tables, equations, charts,
 // references, footnotes, publisher stamp) derived from content_list.json.
 fulltextRouter.get('/items/:key/fulltext/structure', asyncHandler(async (req, res) => {
-  const it = await Item.loadByKey(req.params.key);
+  const it = await loadVisibleItem(req, req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   res.json(await getFullTextStructure(req.params.key));
 }));
 
 // DELETE /api/items/:key/fulltext
 fulltextRouter.delete('/items/:key/fulltext', asyncHandler(async (req, res) => {
-  const it = await Item.loadByKey(req.params.key);
+  const it = await loadVisibleItem(req, req.params.key);
   if (!it) return res.status(404).json({ error: 'not found' });
   res.json(await deleteFullText(req.params.key));
 }));
