@@ -23,10 +23,14 @@ export function databaseConnectionOptions(databaseUrl) {
 }
 
 /** Set session defaults for each new physical PostgreSQL connection. */
-export function initializeClient(client) {
+export async function initializeClient(client) {
   // Do not pass this through pg's startup `options`: Neon pooled endpoints do
   // not support that startup parameter. pg queues this before later queries.
-  return client.query('SET search_path TO public');
+  await client.query('SET search_path TO public');
+  // Default random_page_cost=4 makes GIN/trgm look more expensive than a
+  // sequential sweep of toasted tsvectors. This corpus lives on SSD-backed
+  // hosted Postgres; 1.1 lets the planner use itemFullText_tsv_gin.
+  await client.query('SET random_page_cost = 1.1');
 }
 
 /** UTC timestamp string matching historical SQLite datetime('now') format. */

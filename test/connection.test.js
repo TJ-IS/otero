@@ -9,7 +9,10 @@ test('new database clients explicitly select the public schema', async () => {
 
   await initializeClient(client);
 
-  assert.deepEqual(queries, ['SET search_path TO public']);
+  assert.deepEqual(queries, [
+    'SET search_path TO public',
+    'SET random_page_cost = 1.1',
+  ]);
 });
 
 test('sslmode=require keeps the current verify-full behavior explicitly', () => {

@@ -27,7 +27,33 @@ const ADDITIVE_COLUMNS = [
 
 const ADDITIVE_INDEXES = [
   { name: 'itemFullText_tsv_gin', ddl: 'CREATE INDEX IF NOT EXISTS "itemFullText_tsv_gin" ON "itemFullText" USING GIN (tsv)' },
+  { name: 'itemCreators_creator_idx', ddl: 'CREATE INDEX IF NOT EXISTS "itemCreators_creator_idx" ON "itemCreators"("creatorID")' },
 ];
+
+const TRGM_INDEXES = [
+  {
+    name: 'creators_name_trgm_idx',
+    ddl: `CREATE INDEX IF NOT EXISTS "creators_name_trgm_idx" ON creators USING GIN ((COALESCE("firstName",'') || ' ' || COALESCE("lastName",'')) gin_trgm_ops)`,
+  },
+  {
+    name: 'creators_lastName_trgm_idx',
+    ddl: `CREATE INDEX IF NOT EXISTS "creators_lastName_trgm_idx" ON creators USING GIN ("lastName" gin_trgm_ops)`,
+  },
+  {
+    name: 'itemDataValues_value_trgm_idx',
+    ddl: `CREATE INDEX IF NOT EXISTS "itemDataValues_value_trgm_idx" ON "itemDataValues" USING GIN (value gin_trgm_ops)`,
+  },
+];
+
+async function ensureTrgmExtension() {
+  try {
+    await execute('CREATE EXTENSION IF NOT EXISTS pg_trgm');
+    return true;
+  } catch (err) {
+    console.warn(`[migrate] pg_trgm unavailable, skipping trigram indexes: ${err.message}`);
+    return false;
+  }
+}
 
 async function columnExists(table, column) {
   const row = await queryOne(
@@ -68,6 +94,15 @@ export async function runMigrations() {
     if (!(await indexExists(name))) {
       await execute(ddl);
     }
+  }
+  if (await ensureTrgmExtension()) {
+    for (const { name, ddl } of TRGM_INDEXES) {
+      if (!(await indexExists(name))) {
+        await execute(ddl);
+      }
+    }
+    // Partial short-value index cannot be used by bare ILIKE predicates.
+    await execute('DROP INDEX IF EXISTS "itemDataValues_short_trgm_idx"');
   }
 
   const row = await queryOne(

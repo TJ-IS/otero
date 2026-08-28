@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS "itemCreators" (
 );
 
 CREATE INDEX IF NOT EXISTS "itemCreators_item_idx" ON "itemCreators"("itemID");
+CREATE INDEX IF NOT EXISTS "itemCreators_creator_idx" ON "itemCreators"("creatorID");
 
 -- ---------------------------------------------------------------------------
 -- Organization: "collections"

@@ -95,40 +95,60 @@ async function buildOpenWhere({ q, journal, journals, yearFrom, yearTo, type } =
 
 export async function getOpenFacets(filters = {}) {
   const { sql, params } = await buildOpenWhere(filters);
-  const [fieldRows, typeRows, availability] = await Promise.all([
-    query(`
-      SELECT f."fieldName" AS field, v.value, COUNT(DISTINCT i."itemID")::int AS count
+  const bundled = await queryOne(`
+    WITH matched AS MATERIALIZED (
+      SELECT i."itemID", i."itemTypeID"
       FROM items i
-      JOIN "itemData" d ON d."itemID" = i."itemID"
-      JOIN fields f ON f."fieldID" = d."fieldID" AND f."fieldName" IN ('publicationTitle', 'date')
-      JOIN "itemDataValues" v ON v."valueID" = d."valueID"
       WHERE ${sql}
-      GROUP BY f."fieldName", v.value
-    `, params),
-    query(`
-      SELECT it."typeName" AS value, COUNT(*)::int AS count
-      FROM items i
-      JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
-      WHERE ${sql}
-      GROUP BY it."typeName"
-      ORDER BY count DESC, value ASC
-    `, params),
-    queryOne(`
-      SELECT
-        COUNT(*) FILTER (WHERE EXISTS (
+    ),
+    field_rows AS (
+      SELECT COALESCE(json_agg(json_build_object('field', field, 'value', value, 'count', count)), '[]'::json) AS rows
+      FROM (
+        SELECT f."fieldName" AS field, v.value, COUNT(*)::int AS count
+        FROM matched i
+        JOIN "itemData" d ON d."itemID" = i."itemID"
+        JOIN fields f ON f."fieldID" = d."fieldID" AND f."fieldName" IN ('publicationTitle', 'date')
+        JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+        GROUP BY f."fieldName", v.value
+      ) t
+    ),
+    type_rows AS (
+      SELECT COALESCE(
+        json_agg(json_build_object('value', value, 'count', count) ORDER BY count DESC, value ASC),
+        '[]'::json
+      ) AS rows
+      FROM (
+        SELECT it."typeName" AS value, COUNT(*)::int AS count
+        FROM matched i
+        JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
+        GROUP BY it."typeName"
+      ) t
+    ),
+    availability AS (
+      SELECT json_build_object(
+        'withDoi', COUNT(*) FILTER (WHERE EXISTS (
           SELECT 1 FROM "itemData" d JOIN fields f ON f."fieldID" = d."fieldID"
           WHERE d."itemID" = i."itemID" AND f."fieldName" = 'DOI'
-        ))::int AS "withDoi",
-        COUNT(*) FILTER (WHERE EXISTS (
+        )),
+        'withPdf', COUNT(*) FILTER (WHERE EXISTS (
           SELECT 1 FROM "itemAttachments" a WHERE a."parentItemID" = i."itemID" AND a.path IS NOT NULL
             AND (lower(COALESCE(a."contentType", '')) LIKE '%pdf%' OR lower(a.path) LIKE '%.pdf')
-        ))::int AS "withPdf",
-        COUNT(*) FILTER (WHERE EXISTS (
+        )),
+        'withMarkdown', COUNT(*) FILTER (WHERE EXISTS (
           SELECT 1 FROM "itemFullText" ft WHERE ft."itemID" = i."itemID" AND ft.state = 'done'
-        ))::int AS "withMarkdown"
-      FROM items i WHERE ${sql}
-    `, params),
-  ]);
+        ))
+      ) AS obj
+      FROM matched i
+    )
+    SELECT field_rows.rows AS "fieldRows",
+           type_rows.rows AS "typeRows",
+           availability.obj AS availability
+    FROM field_rows, type_rows, availability
+  `, params);
+
+  const fieldRows = bundled?.fieldRows || [];
+  const typeRows = bundled?.typeRows || [];
+  const availability = bundled?.availability || { withDoi: 0, withPdf: 0, withMarkdown: 0 };
 
   const journals = fieldRows
     .filter((row) => row.field === 'publicationTitle' && JOURNAL_WHITELIST.includes(row.value))
@@ -148,7 +168,7 @@ export async function getOpenFacets(filters = {}) {
     journals,
     years: [...yearCounts].sort((a, b) => a[0] - b[0]).map(([value, count]) => ({ value, count })),
     types: typeRows,
-    availability: availability || { withDoi: 0, withPdf: 0, withMarkdown: 0 },
+    availability,
   };
 }
 

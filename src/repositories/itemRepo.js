@@ -167,21 +167,147 @@ export async function getItemByKey(key) {
 // into SQL; callers pass a sortField key that maps to one of these fixed
 // expression lists. The sort direction is applied to every column so that a
 // multi-column sort (vip) reverses consistently, not just on its last key.
+// `hydrate` runs after fields_agg exists. `prepage` uses slim field joins so
+// we can LIMIT before building JSON / ts_headline.
 const ITEM_SORT_FIELDS = {
-  title: ["LOWER(fields_agg.fields->>'title')"],
-  date: ["SUBSTRING(fields_agg.fields->>'date', 1, 4)"],
+  title: {
+    hydrate: ["LOWER(fields_agg.fields->>'title')"],
+    prepageFields: [{ alias: 'sort_title', field: 'title' }],
+    prepage: ['LOWER(sort_title.value)'],
+  },
+  date: {
+    hydrate: ["SUBSTRING(fields_agg.fields->>'date', 1, 4)"],
+    prepageFields: [{ alias: 'sort_date', field: 'date' }],
+    prepage: ['SUBSTRING(sort_date.value, 1, 4)'],
+  },
   // Volume → issue → page-start, numeric. Only the leading digits of each are
   // used (fields may hold "3-4", "12A", etc.), and missing/non-numeric parts
   // sort last (999999). Matches the frontend's old numeric-first comparison.
-  vip: [
-    "COALESCE(NULLIF(SUBSTRING(fields_agg.fields->>'volume' FROM '^[0-9]+'),'')::INTEGER, 999999)",
-    "COALESCE(NULLIF(SUBSTRING(fields_agg.fields->>'issue' FROM '^[0-9]+'),'')::INTEGER, 999999)",
-    "COALESCE(NULLIF(SUBSTRING(fields_agg.fields->>'pages' FROM '^[0-9]+'),'')::INTEGER, 999999)",
-  ],
-  itemType: ['it."typeName"'],
-  dateModified: ['i."dateModified"'],
-  dateAdded: ['i."dateAdded"'],
+  vip: {
+    hydrate: [
+      "COALESCE(NULLIF(SUBSTRING(fields_agg.fields->>'volume' FROM '^[0-9]+'),'')::INTEGER, 999999)",
+      "COALESCE(NULLIF(SUBSTRING(fields_agg.fields->>'issue' FROM '^[0-9]+'),'')::INTEGER, 999999)",
+      "COALESCE(NULLIF(SUBSTRING(fields_agg.fields->>'pages' FROM '^[0-9]+'),'')::INTEGER, 999999)",
+    ],
+    prepageFields: [
+      { alias: 'sort_volume', field: 'volume' },
+      { alias: 'sort_issue', field: 'issue' },
+      { alias: 'sort_pages', field: 'pages' },
+    ],
+    prepage: [
+      "COALESCE(NULLIF(SUBSTRING(sort_volume.value FROM '^[0-9]+'),'')::INTEGER, 999999)",
+      "COALESCE(NULLIF(SUBSTRING(sort_issue.value FROM '^[0-9]+'),'')::INTEGER, 999999)",
+      "COALESCE(NULLIF(SUBSTRING(sort_pages.value FROM '^[0-9]+'),'')::INTEGER, 999999)",
+    ],
+  },
+  itemType: {
+    hydrate: ['it."typeName"'],
+    prepage: ['sort_it."typeName"'],
+    prepageItemType: true,
+  },
+  dateModified: {
+    hydrate: ['i."dateModified"'],
+    prepage: ['i."dateModified"'],
+  },
+  dateAdded: {
+    hydrate: ['i."dateAdded"'],
+    prepage: ['i."dateAdded"'],
+  },
 };
+
+const ITEM_HYDRATE_JOINS = `
+       JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
+       LEFT JOIN LATERAL (
+         SELECT json_object_agg(f."fieldName", v.value) AS fields
+         FROM "itemData" d
+         JOIN fields f ON f."fieldID" = d."fieldID"
+         JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+         WHERE d."itemID" = i."itemID"
+       ) fields_agg ON true
+       LEFT JOIN LATERAL (
+         SELECT json_agg(json_build_object(
+           'id', c."creatorID", 'firstName', c."firstName", 'lastName', c."lastName",
+           'fieldMode', c."fieldMode", 'creatorType', ct."creatorType", 'orderIndex', ic."orderIndex"
+         ) ORDER BY ic."orderIndex") AS creators
+         FROM "itemCreators" ic
+         JOIN creators c ON c."creatorID" = ic."creatorID"
+         JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
+         WHERE ic."itemID" = i."itemID"
+       ) creators_agg ON true`;
+
+function orderByClause(exprs, dir) {
+  return `${exprs.map((c) => `${c} ${dir}`).join(', ')}, i."itemID" ${dir}`;
+}
+
+async function appendSlimSortJoins(sortSpec, params, p, itemAlias = 'i') {
+  const joins = [];
+  for (const { alias, field } of sortSpec.prepageFields || []) {
+    const fid = await fieldIdByName(field);
+    if (!fid) continue;
+    const n = p++;
+    params.push(fid);
+    joins.push(`LEFT JOIN LATERAL (
+      SELECT v.value
+      FROM "itemData" d
+      JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+      WHERE d."itemID" = ${itemAlias}."itemID" AND d."fieldID" = $${n}
+    ) ${alias} ON true`);
+  }
+  if (sortSpec.prepageItemType) {
+    joins.push(`JOIN "itemTypes" sort_it ON sort_it."itemTypeID" = ${itemAlias}."itemTypeID"`);
+  }
+  return { sql: joins.join('\n'), p };
+}
+
+/**
+ * Match itemIDs by the same three predicates as the previous EXISTS search:
+ * metadata ILIKE, author ILIKE, or full-text tsvector. Rank comes only from
+ * the FTS branch; other hits contribute 0. Callers take MAX(rank) per item.
+ */
+async function appendSearchHitsCte(searchQuery, params, p) {
+  const qParam = p++;
+  const likeParam = p++;
+  params.push(searchQuery, `%${searchQuery}%`);
+  const fieldIds = [];
+  for (const name of ['title', 'abstractNote', 'publicationTitle', 'DOI']) {
+    const id = await fieldIdByName(name);
+    if (id != null) fieldIds.push(id);
+  }
+  const fidSql = fieldIds.length
+    ? fieldIds.map((id) => {
+        params.push(id);
+        return `$${p++}`;
+      }).join(',')
+    : 'NULL';
+  const cte = `search_hits AS MATERIALIZED (
+    SELECT u."itemID", MAX(u.rank)::float4 AS rank
+    FROM (
+      SELECT ft."itemID", ts_rank(ft.tsv, plainto_tsquery('simple', $${qParam})) AS rank
+      FROM "itemFullText" ft
+      WHERE ft.state = 'done'
+        AND ft.tsv @@ plainto_tsquery('simple', $${qParam})
+      UNION ALL
+      SELECT d."itemID", 0::float4
+      FROM "itemData" d
+      JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+      WHERE d."fieldID" IN (${fidSql})
+        AND v.value ILIKE $${likeParam}
+      UNION ALL
+      SELECT ic."itemID", 0::float4
+      FROM "itemCreators" ic
+      JOIN creators c ON c."creatorID" = ic."creatorID"
+      WHERE COALESCE(c."firstName",'') || ' ' || COALESCE(c."lastName",'') ILIKE $${likeParam}
+         OR c."lastName" ILIKE $${likeParam}
+         OR c."firstName" ILIKE $${likeParam}
+    ) u
+    GROUP BY u."itemID"
+  )`;
+  return {
+    cte,
+    join: `JOIN search_hits sh ON sh."itemID" = i."itemID"`,
+    p,
+  };
+}
 
 /**
  * Append journal / year / basket-scope constraints. Mutates where + params.
@@ -222,49 +348,43 @@ export async function appendDoiRequiredForArticles(where, params, p, itemAlias =
 
 export async function appendItemScopeFilters(where, params, p, {
   journal, journals, yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
-} = {}) {
+  joinScope = false,
+} = {}, joins = []) {
   const jfid = await fieldIdByName('publicationTitle');
   const journalList = Array.isArray(journals) ? journals.filter(Boolean) : [];
 
-  if (journal) {
-    if (!jfid) return null;
-    if (journal === UNFILED) {
-      const jParam = p++;
-      const wlParams = JOURNAL_WHITELIST.map(() => `$${p++}`).join(',');
-      where.push(`NOT EXISTS (
-        SELECT 1 FROM "itemData" d
-        JOIN "itemDataValues" v ON v."valueID"=d."valueID"
-        WHERE d."itemID"=i."itemID" AND d."fieldID"=$${jParam} AND v.value IN (${wlParams})
-      )`);
-      params.push(jfid, ...JOURNAL_WHITELIST);
-    } else {
-      where.push(`EXISTS (
-        SELECT 1 FROM "itemData" d
-        JOIN "itemDataValues" v ON v."valueID"=d."valueID"
-        WHERE d."itemID"=i."itemID" AND d."fieldID"=$${p++} AND v.value=$${p++}
-      )`);
-      params.push(jfid, journal);
-    }
-  } else if (journalList.length > 0) {
-    if (!jfid) return null;
-    const jParam = p++;
-    const jlParams = journalList.map(() => `$${p++}`).join(',');
-    where.push(`EXISTS (
-      SELECT 1 FROM "itemData" d
-      JOIN "itemDataValues" v ON v."valueID"=d."valueID"
-      WHERE d."itemID"=i."itemID" AND d."fieldID"=$${jParam} AND v.value IN (${jlParams})
-    )`);
-    params.push(jfid, ...journalList);
-  } else if (basketOnly) {
+  const journalValues = journal && journal !== UNFILED
+    ? [journal]
+    : (!journal && journalList.length > 0 ? journalList : (!journal && basketOnly ? JOURNAL_WHITELIST : null));
+
+  if (journal === UNFILED) {
     if (!jfid) return null;
     const jParam = p++;
     const wlParams = JOURNAL_WHITELIST.map(() => `$${p++}`).join(',');
-    where.push(`EXISTS (
+    where.push(`NOT EXISTS (
       SELECT 1 FROM "itemData" d
       JOIN "itemDataValues" v ON v."valueID"=d."valueID"
       WHERE d."itemID"=i."itemID" AND d."fieldID"=$${jParam} AND v.value IN (${wlParams})
     )`);
     params.push(jfid, ...JOURNAL_WHITELIST);
+  } else if (journalValues) {
+    if (!jfid) return null;
+    if (joinScope) {
+      const jParam = p++;
+      const vParam = p++;
+      joins.push(`JOIN "itemData" scope_jd ON scope_jd."itemID" = i."itemID" AND scope_jd."fieldID" = $${jParam}`);
+      joins.push(`JOIN "itemDataValues" scope_jv ON scope_jv."valueID" = scope_jd."valueID" AND scope_jv.value = ANY($${vParam}::text[])`);
+      params.push(jfid, journalValues);
+    } else {
+      const jParam = p++;
+      const jlParams = journalValues.map(() => `$${p++}`).join(',');
+      where.push(`EXISTS (
+        SELECT 1 FROM "itemData" d
+        JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+        WHERE d."itemID"=i."itemID" AND d."fieldID"=$${jParam} AND v.value IN (${jlParams})
+      )`);
+      params.push(jfid, ...journalValues);
+    }
   }
 
   const hasYearFrom = Number.isInteger(yearFrom);
@@ -276,7 +396,8 @@ export async function appendItemScopeFilters(where, params, p, {
     params.push(dfid);
     // Match the first plausible publication year anywhere in the date string
     // (e.g. "Spring 2020"), consistent with the open API and timeline stats.
-    const yearExpr = `SUBSTRING(v.value FROM '(1[5-9][0-9]{2}|20[0-9]{2})')`;
+    const yearValue = joinScope ? 'scope_yv.value' : 'v.value';
+    const yearExpr = `SUBSTRING(${yearValue} FROM '(1[5-9][0-9]{2}|20[0-9]{2})')`;
     const yearConds = [];
     if (hasYearFrom) {
       yearConds.push(`${yearExpr}::int >= $${p++}`);
@@ -286,15 +407,39 @@ export async function appendItemScopeFilters(where, params, p, {
       yearConds.push(`${yearExpr}::int <= $${p++}`);
       params.push(yearTo);
     }
-    where.push(`EXISTS (
-      SELECT 1 FROM "itemData" d
-      JOIN "itemDataValues" v ON v."valueID"=d."valueID"
-      WHERE d."itemID"=i."itemID" AND d."fieldID"=$${dParam}
-        AND ${yearConds.join(' AND ')}
-    )`);
+    if (joinScope) {
+      joins.push(`JOIN "itemData" scope_yd ON scope_yd."itemID" = i."itemID" AND scope_yd."fieldID" = $${dParam}`);
+      joins.push(`JOIN "itemDataValues" scope_yv ON scope_yv."valueID" = scope_yd."valueID" AND ${yearConds.join(' AND ')}`);
+    } else {
+      where.push(`EXISTS (
+        SELECT 1 FROM "itemData" d
+        JOIN "itemDataValues" v ON v."valueID"=d."valueID"
+        WHERE d."itemID"=i."itemID" AND d."fieldID"=$${dParam}
+          AND ${yearConds.join(' AND ')}
+      )`);
+    }
   }
 
-  if (requireDoiForArticles) {
+  if (requireDoiForArticles && joinScope) {
+    const articleTypeId = await itemTypeIdByName('journalArticle');
+    const doiFid = await fieldIdByName('DOI');
+    if (articleTypeId == null) {
+      /* no-op */
+    } else if (!doiFid) {
+      where.push(`i."itemTypeID" <> $${p++}`);
+      params.push(articleTypeId);
+    } else {
+      const typeParam = p++;
+      const doiParam = p++;
+      joins.push(`LEFT JOIN "itemData" scope_doi ON scope_doi."itemID" = i."itemID" AND scope_doi."fieldID" = $${doiParam}`);
+      joins.push(`LEFT JOIN "itemDataValues" scope_doiv ON scope_doiv."valueID" = scope_doi."valueID"`);
+      where.push(`(
+        i."itemTypeID" <> $${typeParam}
+        OR (scope_doiv.value IS NOT NULL AND BTRIM(scope_doiv.value) <> '')
+      )`);
+      params.push(articleTypeId, doiFid);
+    }
+  } else if (requireDoiForArticles) {
     p = await appendDoiRequiredForArticles(where, params, p);
   }
 
@@ -309,9 +454,11 @@ export async function appendItemScopeFilters(where, params, p, {
 async function _buildItemFilter({
   type, journal, journals, collection, search, includeDeleted = false,
   yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
+  joinScope = false,
 } = {}) {
   const where = ['i."parentItemID" IS NULL'];
   const params = [];
+  const joins = [];
   let p = 1;
 
   if (!includeDeleted) where.push('i.deleted = 0');
@@ -324,8 +471,8 @@ async function _buildItemFilter({
   }
 
   p = await appendItemScopeFilters(where, params, p, {
-    journal, journals, yearFrom, yearTo, basketOnly, requireDoiForArticles,
-  });
+    journal, journals, yearFrom, yearTo, basketOnly, requireDoiForArticles, joinScope,
+  }, joins);
   if (p == null) return null;
 
   if (collection) {
@@ -337,44 +484,8 @@ async function _buildItemFilter({
     params.push(collection);
   }
 
-  let searchQuery = null;
-  if (search && search.trim()) {
-    searchQuery = search.trim();
-    const like = `%${searchQuery}%`;
-    const qParam = p++;
-    const like1 = p++;
-    const like2 = p++;
-    const like3 = p++;
-    const like4 = p++;
-    where.push(`(
-      EXISTS (
-        SELECT 1 FROM "itemData" d1
-        JOIN "itemDataValues" v1 ON v1."valueID"=d1."valueID"
-        JOIN fields f1 ON f1."fieldID"=d1."fieldID"
-        WHERE d1."itemID"=i."itemID"
-          AND f1."fieldName" IN ('title','abstractNote','publicationTitle','DOI')
-          AND v1.value ILIKE $${like1}
-      )
-      OR EXISTS (
-        SELECT 1 FROM "itemCreators" ic2
-        JOIN creators c2 ON c2."creatorID"=ic2."creatorID"
-        WHERE ic2."itemID"=i."itemID"
-          AND (COALESCE(c2."firstName",'') || ' ' || COALESCE(c2."lastName",'') ILIKE $${like2}
-            OR c2."lastName" ILIKE $${like3}
-            OR c2."firstName" ILIKE $${like4})
-      )
-      OR EXISTS (
-        SELECT 1 FROM "itemFullText" ft
-        WHERE ft."itemID"=i."itemID"
-          AND ft.state='done'
-          AND ft.tsv IS NOT NULL
-          AND ft.tsv @@ plainto_tsquery('simple', $${qParam})
-      )
-    )`);
-    params.push(searchQuery, like, like, like, like);
-  }
-
-  return { where, params, p, searchQuery };
+  const searchQuery = search && search.trim() ? search.trim() : null;
+  return { where, params, p, searchQuery, joins };
 }
 
 export async function listItems({
@@ -385,33 +496,50 @@ export async function listItems({
   const validPage = Math.max(1, parseInt(page, 10) || 1);
   const validPageSize = Math.min(200, Math.max(1, parseInt(pageSize, 10) || 100));
   const validSortDir = sortDir === 'asc' ? 'ASC' : 'DESC';
-  const sortCols = ITEM_SORT_FIELDS[sortField] || ITEM_SORT_FIELDS.dateModified;
-  // Tie-break on itemID so pagination is stable when the sort key has ties
-  // (e.g. many items share a year), preventing duplicated/skipped rows.
-  const orderByExpr = `${sortCols.map(c => `${c} ${validSortDir}`).join(', ')}, i."itemID" ${validSortDir}`;
+  const sortSpec = ITEM_SORT_FIELDS[sortField] || ITEM_SORT_FIELDS.dateModified;
 
   const empty = { items: [], total: 0, page: validPage, pageSize: validPageSize, totalPages: 0 };
   const filter = await _buildItemFilter({
     type, journal, journals, collection, search, includeDeleted,
-    yearFrom, yearTo, basketOnly, requireDoiForArticles,
+    yearFrom, yearTo, basketOnly, requireDoiForArticles, joinScope: true,
   });
   if (!filter) return empty;
-  const { where, params, searchQuery } = filter;
-  let { p } = filter;
-
+  const { where, params: scopeParams, searchQuery, joins } = filter;
+  const whereSql = where.join(' AND ');
+  const scopeJoins = joins.join('\n');
   const offset = (validPage - 1) * validPageSize;
-  const listParams = [...params];
-  let ftsSelect = `NULL::text AS "fulltextSnippet", false AS "fulltextHit", 0::float4 AS "fulltextRank"`;
-  let ftsJoin = '';
-  let orderBy = orderByExpr;
+
+  const listParams = [...scopeParams];
+  let listP = filter.p;
+  let searchHitsCte = '';
+  let searchJoin = '';
   if (searchQuery) {
-    const qIdx = p++;
+    const hits = await appendSearchHitsCte(searchQuery, listParams, listP);
+    searchHitsCte = hits.cte;
+    searchJoin = hits.join;
+    listP = hits.p;
+  }
+  const slim = await appendSlimSortJoins(sortSpec, listParams, listP);
+  listP = slim.p;
+
+  const scopedOrderSql = searchQuery
+    ? `sh.rank DESC, ${sortSpec.prepage.map((c) => `${c} ${validSortDir}`).join(', ')}, i."itemID" ${validSortDir}`
+    : orderByClause(sortSpec.prepage, validSortDir);
+
+  const limitParam = listP++;
+  const offsetParam = listP++;
+  listParams.push(validPageSize, offset);
+
+  let ftsSelect = `NULL::text AS "fulltextSnippet", false AS "fulltextHit", 0::float4 AS "fulltextRank"`;
+  let headlineJoin = '';
+  if (searchQuery) {
+    const qIdx = listP++;
     listParams.push(searchQuery);
     ftsSelect = `
        ft_hit."fulltextSnippet" AS "fulltextSnippet",
        COALESCE(ft_hit."fulltextHit", false) AS "fulltextHit",
-       COALESCE(ft_hit."fulltextRank", 0)::float4 AS "fulltextRank"`;
-    ftsJoin = `
+       COALESCE(i.search_rank, 0)::float4 AS "fulltextRank"`;
+    headlineJoin = `
      LEFT JOIN LATERAL (
        SELECT
          regexp_replace(
@@ -425,83 +553,72 @@ export async function listItems({
            '',
            'g'
          ) AS "fulltextSnippet",
-         (ft.tsv @@ plainto_tsquery('simple', $${qIdx})) AS "fulltextHit",
-         ts_rank(ft.tsv, plainto_tsquery('simple', $${qIdx})) AS "fulltextRank"
+         (ft.tsv @@ plainto_tsquery('simple', $${qIdx})) AS "fulltextHit"
        FROM "itemFullText" ft
        WHERE ft."itemID" = i."itemID"
          AND ft.state = 'done'
          AND ft.tsv IS NOT NULL
          AND ft."plainText" IS NOT NULL
      ) ft_hit ON true`;
-    orderBy = `COALESCE(ft_hit."fulltextRank", 0) DESC, ${orderByExpr}`;
   }
 
-  // For the common timestamp sorts, choose the requested page before running
-  // the per-item field/creator aggregates. Without this CTE PostgreSQL has to
-  // build JSON for every matching item, sort all of them, and only then keep
-  // the first page. Field-based sorts and ranked search still use the general
-  // path because their sort values are produced by the later joins.
-  const canPrepaginate = !searchQuery && (
-    sortCols === ITEM_SORT_FIELDS.dateModified ||
-    sortCols === ITEM_SORT_FIELDS.dateAdded
-  );
-  const limitParam = p++;
-  const offsetParam = p++;
-  const pageCte = canPrepaginate
-    ? `WITH page_items AS MATERIALIZED (
-         SELECT i.*
-         FROM items i
-         WHERE ${where.join(' AND ')}
-         ORDER BY ${orderByExpr}
-         LIMIT $${limitParam} OFFSET $${offsetParam}
-       )`
-    : '';
-  const itemSource = canPrepaginate ? 'page_items i' : 'items i';
-  const outerWhere = canPrepaginate ? '' : `WHERE ${where.join(' AND ')}`;
-  const outerPagination = canPrepaginate
-    ? ''
-    : `LIMIT $${limitParam} OFFSET $${offsetParam}`;
+  const hydrateOrder = searchQuery
+    ? `i.search_rank DESC, ${orderByClause(sortSpec.hydrate, validSortDir)}`
+    : orderByClause(sortSpec.hydrate, validSortDir);
 
-  // Count and page data do not depend on each other. Run both concurrently to
-  // avoid paying two serial network round trips to hosted PostgreSQL.
-  const [countRow, rows] = await Promise.all([
-    queryOne(
-      `SELECT COUNT(*)::int AS cnt FROM items i WHERE ${where.join(' AND ')}`,
-      params
-    ),
-    query(
-      `${pageCte}
+  const hydrateSql = (source, extraSelect = '') => `
        SELECT i.*, it."typeName" AS "itemTypeName",
        COALESCE(fields_agg.fields, '{}'::json) AS fields,
        COALESCE(creators_agg.creators, '[]'::json) AS creators,
-       ${ftsSelect}
-       FROM ${itemSource}
-       JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
-       LEFT JOIN LATERAL (
-         SELECT json_object_agg(f."fieldName", v.value) AS fields
-         FROM "itemData" d
-         JOIN fields f ON f."fieldID" = d."fieldID"
-         JOIN "itemDataValues" v ON v."valueID" = d."valueID"
-         WHERE d."itemID" = i."itemID"
-       ) fields_agg ON true
-       LEFT JOIN LATERAL (
-         SELECT json_agg(json_build_object(
-           'id', c."creatorID", 'firstName', c."firstName", 'lastName', c."lastName",
-           'fieldMode', c."fieldMode", 'creatorType', ct."creatorType", 'orderIndex', ic."orderIndex"
-         ) ORDER BY ic."orderIndex") AS creators
-         FROM "itemCreators" ic
-         JOIN creators c ON c."creatorID" = ic."creatorID"
-         JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
-         WHERE ic."itemID" = i."itemID"
-       ) creators_agg ON true
-       ${ftsJoin}
-       ${outerWhere}
-       ORDER BY ${orderBy}
-       ${outerPagination}`,
-      [...listParams, validPageSize, offset]
-    ),
-  ]);
-  const total = countRow?.cnt || 0;
+       ${ftsSelect}${extraSelect}
+       FROM ${source} i
+       ${ITEM_HYDRATE_JOINS}
+       ${headlineJoin}
+       ORDER BY ${hydrateOrder}`;
+
+  let rows;
+  let total;
+  if (searchQuery) {
+    // One pass: rank every hit, count with a window, then hydrate only the page.
+    // A separate COUNT would recompute search_hits and ts_rank.
+    const sql = `WITH ${searchHitsCte},
+      scoped AS MATERIALIZED (
+        SELECT i.*, sh.rank AS search_rank, COUNT(*) OVER()::int AS _total,
+          ROW_NUMBER() OVER (ORDER BY ${scopedOrderSql}) AS _rn
+        FROM items i
+        ${searchJoin}
+        ${scopeJoins}
+        ${slim.sql}
+        WHERE ${whereSql}
+      ),
+      page_items AS MATERIALIZED (
+        SELECT * FROM scoped
+        WHERE _rn > $${offsetParam} AND _rn <= $${offsetParam} + $${limitParam}
+      )
+      ${hydrateSql('page_items')}`;
+    rows = await query(sql, listParams);
+    total = rows[0]?._total || 0;
+  } else {
+    const pageCte = `page_items AS MATERIALIZED (
+         SELECT i.*
+         FROM items i
+         ${scopeJoins}
+         ${slim.sql}
+         WHERE ${whereSql}
+         ORDER BY ${scopedOrderSql}
+         LIMIT $${limitParam} OFFSET $${offsetParam}
+       )`;
+    const countParams = [...scopeParams];
+    const [countRow, pageRows] = await Promise.all([
+      queryOne(
+        `SELECT COUNT(*)::int AS cnt FROM items i ${scopeJoins} WHERE ${whereSql}`,
+        countParams
+      ),
+      query(`WITH ${pageCte} ${hydrateSql('page_items')}`, listParams),
+    ]);
+    rows = pageRows;
+    total = countRow?.cnt || 0;
+  }
 
   return {
     items: rows,
@@ -524,12 +641,19 @@ export async function listItemKeys({
 } = {}) {
   const filter = await _buildItemFilter({
     type, journal, journals, collection, search, includeDeleted,
-    yearFrom, yearTo, basketOnly, requireDoiForArticles,
+    yearFrom, yearTo, basketOnly, requireDoiForArticles, joinScope: true,
   });
   if (!filter) return [];
-  const { where, params } = filter;
+  const { where, params, searchQuery, joins } = filter;
+  let searchHitsCte = '';
+  let searchJoin = '';
+  if (searchQuery) {
+    const hits = await appendSearchHitsCte(searchQuery, params, filter.p);
+    searchHitsCte = `WITH ${hits.cte} `;
+    searchJoin = hits.join;
+  }
   const rows = await query(
-    `SELECT i.key FROM items i WHERE ${where.join(' AND ')} ORDER BY i."dateAdded" DESC`,
+    `${searchHitsCte}SELECT i.key FROM items i ${searchJoin} ${joins.join(' ')} WHERE ${where.join(' AND ')} ORDER BY i."dateAdded" DESC`,
     params
   );
   return rows.map(r => r.key);
