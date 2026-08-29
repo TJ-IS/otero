@@ -13,7 +13,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 
 const CARD_WIDTH = 380;
 
-function scrollToReference(refId, reduceMotion) {
+export function scrollToReference(refId, reduceMotion) {
   const el = document.getElementById(`ref-${refId}`);
   if (!el) return false;
   const container = el.closest('[data-reader-scroll]');
@@ -32,7 +32,7 @@ function scrollToReference(refId, reduceMotion) {
   return true;
 }
 
-export const CitationRef = memo(function CitationRef({ refs, children }) {
+export const CitationRef = memo(function CitationRef({ refs, children, onNavigate }) {
   const { t } = useTranslation('item');
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, placeAbove: false });
@@ -82,9 +82,13 @@ export const CitationRef = memo(function CitationRef({ refs, children }) {
 
   const onClick = useCallback((e) => {
     e.preventDefault();
-    // Jump to the first matching reference in the list, if present on the page.
-    if (refs?.length) scrollToReference(refs[0].id, reduceMotion);
-  }, [refs, reduceMotion]);
+    if (!refs?.length) return;
+    if (onNavigate) {
+      onNavigate(refs[0].id);
+      return;
+    }
+    scrollToReference(refs[0].id, reduceMotion);
+  }, [refs, reduceMotion, onNavigate]);
 
   // Defensive: if nothing resolved, render the text untouched (no link/card).
   if (!refs || refs.length === 0) return <>{children}</>;

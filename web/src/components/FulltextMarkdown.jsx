@@ -8,6 +8,8 @@ import {
   Dialog, DialogContent, DialogTitle,
 } from '@/components/ui/dialog';
 import { headingId } from '@/lib/fulltext';
+import { buildReferenceIndex, rehypeCitations } from '@/lib/citations';
+import { CitationRef } from './CitationRef';
 
 // KaTeX CSS — imported once for this view. Vite bundles it.
 import 'katex/dist/katex.min.css';
@@ -33,7 +35,13 @@ function containsMath(markdown) {
   return /\$\$|\$[^$\n]+\$|\\\(|\\\[/.test(markdown);
 }
 
-export const FulltextMarkdown = memo(function FulltextMarkdown({ markdown, imagesBaseUrl, className = '' }) {
+export const FulltextMarkdown = memo(function FulltextMarkdown({
+  markdown,
+  imagesBaseUrl,
+  className = '',
+  references,
+  onCiteJump,
+}) {
   const { t } = useTranslation('item');
   const [lightbox, setLightbox] = useState({ open: false, src: '', alt: '' });
 
@@ -45,6 +53,15 @@ export const FulltextMarkdown = memo(function FulltextMarkdown({ markdown, image
     FORBID_ATTR: ['style'],
   }), [markdown]);
   const hasMath = useMemo(() => containsMath(safeMarkdown), [safeMarkdown]);
+  const refIndex = useMemo(() => buildReferenceIndex(references), [references]);
+  const refById = useMemo(
+    () => new Map((references || []).map((r) => [r.id, r])),
+    [references],
+  );
+  const extraRehypePlugins = useMemo(
+    () => [[rehypeCitations, refIndex]],
+    [refIndex],
+  );
 
   const mdComponents = useMemo(() => ({
     h1: ({ children, ...rest }) => <h1 id={headingId(children)} {...rest}>{children}</h1>,
@@ -71,27 +88,47 @@ export const FulltextMarkdown = memo(function FulltextMarkdown({ markdown, image
         </span>
       );
     },
-    a: ({ href, children, ...rest }) => (
-      <a href={href} target="_blank" rel="noreferrer" className="text-brand hover:underline" {...rest}>
-        {children}
-      </a>
-    ),
+    a: ({ href, children, node: _node, className: linkClass, ...rest }) => {
+      const refIds = rest['data-ref-ids'];
+      if (refIds) {
+        const refs = String(refIds)
+          .split(',')
+          .map((id) => refById.get(id))
+          .filter(Boolean);
+        if (refs.length) {
+          return <CitationRef refs={refs} onNavigate={onCiteJump}>{children}</CitationRef>;
+        }
+      }
+      return (
+        <a href={href} target="_blank" rel="noreferrer" className={linkClass || 'text-brand hover:underline'} {...rest}>
+          {children}
+        </a>
+      );
+    },
     table: ({ children, ...rest }) => (
       <div className="overflow-x-auto my-4">
         <table {...rest}>{children}</table>
       </div>
     ),
-  }), [imagesBaseUrl]);
+  }), [imagesBaseUrl, onCiteJump, refById]);
 
   return (
     <>
       <article className={`fulltext-prose min-w-0 max-w-full overflow-x-hidden ${className}`.trim()}>
         {hasMath ? (
           <Suspense fallback={<p className="py-4 text-sm text-muted-foreground">{t('page.loadingMath')}</p>}>
-            <MathMarkdown markdown={safeMarkdown} components={mdComponents} />
+            <MathMarkdown
+              markdown={safeMarkdown}
+              components={mdComponents}
+              extraRehypePlugins={extraRehypePlugins}
+            />
           </Suspense>
         ) : (
-          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={mdComponents}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw, ...extraRehypePlugins]}
+            components={mdComponents}
+          >
             {safeMarkdown}
           </ReactMarkdown>
         )}

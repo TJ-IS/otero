@@ -145,8 +145,6 @@
     "notFound": "条目不存在",
     "copyLink": "复制本页链接",
     "linkCopied": "已复制链接",
-    "showToc": "显示目录",
-    "hideToc": "隐藏目录",
     "toc": "目录",
     "tocEmpty": "暂无目录（需先完成全文解析）",
     "loadingStructure": "加载 MinerU 结构…",

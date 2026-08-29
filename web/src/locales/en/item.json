@@ -145,8 +145,6 @@
     "notFound": "Item not found",
     "copyLink": "Copy page link",
     "linkCopied": "Link copied",
-    "showToc": "Show outline",
-    "hideToc": "Hide outline",
     "toc": "Outline",
     "tocEmpty": "No outline (parse full text first)",
     "loadingStructure": "Loading MinerU structure…",

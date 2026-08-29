@@ -36,12 +36,17 @@ export function parseReference(text) {
   if (!t) return null;
   const yearM = t.match(new RegExp(`\\b(${YEAR})\\b`));
   const year = yearM ? yearM[1] : null;
-  // First author surname: substring before the first comma. Falls back to the
-  // first whitespace-delimited token when there is no comma.
+  // First author chunk: text before the first comma.
+  //   APA:      "Ashkanasy" / "Fladmoe-Lindquist"
+  //   INFORMS:  "Abbasi A" / "Creswell JW" / "Van de Ven AH"
   const beforeComma = t.split(',')[0].trim();
-  const surname = beforeComma.includes(' ') && t.includes(',')
-    ? beforeComma            // "Fladmoe-Lindquist" or rare multi-word surname
-    : beforeComma.split(/\s+/)[0];
+  const tokens = beforeComma.split(/\s+/).filter(Boolean);
+  let surname = tokens[0] || '';
+  if (tokens.length > 1) {
+    const last = tokens[tokens.length - 1];
+    const initials = /^[A-Z]{1,3}\.?$/.test(last) || /^(?:[A-Z]\.)+$/.test(last);
+    surname = initials ? tokens.slice(0, -1).join(' ') : beforeComma;
+  }
   if (!surname || !year) return null;
   return { surname: normSurname(surname), year };
 }
@@ -53,13 +58,22 @@ export function parseReference(text) {
  */
 export function buildReferenceIndex(references) {
   const index = new Map();
+  const add = (key, ref) => {
+    const bucket = index.get(key);
+    if (bucket) {
+      if (!bucket.includes(ref)) bucket.push(ref);
+    } else {
+      index.set(key, [ref]);
+    }
+  };
   for (const ref of references || []) {
     const parsed = parseReference(ref.text);
     if (!parsed) continue;
-    const key = `${parsed.surname}:${parsed.year}`;
-    const bucket = index.get(key);
-    if (bucket) bucket.push(ref);
-    else index.set(key, [ref]);
+    add(`${parsed.surname}:${parsed.year}`, ref);
+    // "von Bertalanffy" / "Van de Ven" also resolve from the last token
+    // used in in-text cites ("Bertalanffy, 1972").
+    const last = parsed.surname.split(' ').pop();
+    if (last && last !== parsed.surname) add(`${last}:${parsed.year}`, ref);
   }
   return index;
 }
@@ -83,10 +97,12 @@ function resolve(index, authorChunk, year) {
   return index.get(`${surname}:${bare}`) || null;
 }
 
-// A single in-text citation, e.g. "Contractor and Kundu 1998" within a group.
-// Matches an author chunk (starts uppercase) followed by a year.
+// A single in-text citation within a group:
+//   "Contractor and Kundu 1998"   APA
+//   "Ackoff, 1971"                Harvard / comma-year
+//   "Gonzalez et al., 2006a"
 const CITE_RE = new RegExp(
-  String.raw`([A-Z][A-Za-z.'’\-]*(?:\s+(?:and|&|et\s+al\.?)\s*[A-Za-z.'’\-]*)*?)\s+(${YEAR}[a-z]?)`,
+  String.raw`([A-Z][A-Za-z.'’\-]*(?:\s+(?:and|&|et\s+al\.?)\s*[A-Za-z.'’\-]*)*?),?\s+(${YEAR}[a-z]?)`,
   'g',
 );
 

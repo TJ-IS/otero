@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Tabs, TabsList, TabsTrigger, TabsContent,
 } from '@/components/ui/tabs';
@@ -13,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   ArrowLeft, BookOpen, ExternalLink, Copy, Check, FileText, AlertCircle,
-  Image as ImageIcon, Table2, Sigma, BarChart3, Quote, List, PanelLeftClose, PanelLeft,
+  Image as ImageIcon, Table2, Sigma, BarChart3, Quote, List,
 } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
 import { toast } from 'sonner';
@@ -25,9 +24,10 @@ import { ITEM_TYPE_LABELS, itemTitle, UNFILED, creatorsList, yearOf } from '@/li
 import { scholarlyArticleJsonLd, truncateMeta } from '@/lib/seo';
 import { AuthorLinks } from './AuthorLinks';
 import { headingId } from '@/lib/fulltext';
-import { cn } from '@/lib/utils';
 import { ChatPanel } from './ChatPanel';
 import { SiteHeader } from './SiteHeader';
+import { ReaderToc } from './ReaderToc';
+import { scrollToReference } from './CitationRef';
 
 const FulltextMarkdown = lazy(() => import('./FulltextMarkdown').then(m => ({ default: m.FulltextMarkdown })));
 
@@ -129,8 +129,8 @@ export const ItemPage = memo(function ItemPage() {
   const { t } = useTranslation(['item', 'common']);
   const { key } = useParams();
   const [copied, setCopied] = useState(false);
-  const [tocOpen, setTocOpen] = useState(true);
   const [assetTab, setAssetTab] = useState('figures');
+  const [pendingRefId, setPendingRefId] = useState(null);
   const [lightbox, setLightbox] = useState({ open: false, src: '', alt: '' });
   const readerScrollRef = useRef(null);
 
@@ -189,6 +189,34 @@ export const ItemPage = memo(function ItemPage() {
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     container.scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' });
   }, []);
+
+  const onCiteJump = useCallback((refId) => {
+    setAssetTab('references');
+    setPendingRefId(refId);
+  }, []);
+
+  useEffect(() => {
+    if (!pendingRefId || assetTab !== 'references') return;
+    const id = pendingRefId;
+    let cancelled = false;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const raf = requestAnimationFrame(() => {
+      if (cancelled) return;
+      if (!scrollToReference(id, reduceMotion)) {
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          scrollToReference(id, reduceMotion);
+          setPendingRefId(null);
+        });
+        return;
+      }
+      setPendingRefId(null);
+    });
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [pendingRefId, assetTab]);
 
   const openPreview = useCallback((src, alt) => {
     setLightbox({ open: true, src, alt: alt || '' });
@@ -293,15 +321,6 @@ export const ItemPage = memo(function ItemPage() {
         className="shrink-0"
         actions={(
           <>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="hidden shrink-0 md:inline-flex"
-              onClick={() => setTocOpen(v => !v)}
-              title={tocOpen ? t('page.hideToc') : t('page.showToc')}
-            >
-              {tocOpen ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
-            </Button>
             {pdfKey && (
               <Button size="sm" variant="outline" asChild>
                 <a href={`/api/attachments/${pdfKey}/file`} target="_blank" rel="noreferrer">
@@ -324,48 +343,33 @@ export const ItemPage = memo(function ItemPage() {
         )}
       />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-page flex-1 px-4 sm:px-6 lg:px-8">
-        {/* Collapsible TOC */}
-        <aside
-          className={cn(
-            'hidden md:flex md:h-full flex-col border-r border-border/80 bg-muted/10 shrink-0 overflow-hidden motion-toc',
-            tocOpen ? 'w-56 xl:w-64' : 'w-0 border-r-0',
-          )}
-        >
-          <div className="flex h-full w-56 xl:w-64 shrink-0 flex-col">
-            <div className="shrink-0 border-b border-border/80 px-3 py-3 font-display text-sm font-semibold">{t('page.toc')}</div>
-            <ScrollArea className="flex-1">
-              <nav className="p-2 space-y-0.5">
-                {structureLoading ? (
-                  <LoadingSkeleton variant="list" className="px-2 py-3" />
-                ) : outline.length > 0 ? outline.map((o) => (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => scrollToHeading(o.text)}
-                    className="w-full border-l-2 border-transparent px-2 py-1.5 text-left text-[12px] leading-snug text-foreground/80 hover:border-brand hover:text-brand"
-                    style={{ paddingLeft: `${0.5 + Math.min(o.level - 1, 3) * 0.65}rem` }}
-                    title={o.text}
-                  >
-                    <span className="line-clamp-3">{o.text}</span>
-                  </button>
-                )) : (
-                  <EmptyState className="px-2 py-6" title={t('page.tocEmpty')} />
-                )}
-              </nav>
-            </ScrollArea>
-          </div>
-        </aside>
-
-        {/* Reading column */}
+      <div className="relative min-h-0 w-full flex-1">
         <main
           id="main-content"
           tabIndex={-1}
           ref={readerScrollRef}
           data-reader-scroll
-          className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden overscroll-contain"
+          className="absolute inset-0 overflow-y-auto overflow-x-hidden overscroll-contain"
         >
-          <div className="mx-auto w-full min-w-0 max-w-measure space-y-9 px-6 py-7 sm:py-10">
+          <div
+            className={
+              structureLoading || outline.length > 0
+                ? 'mx-auto grid w-full max-w-page grid-cols-1 gap-x-4 px-4 py-7 sm:px-6 sm:py-10 md:grid-cols-[3rem_minmax(0,1fr)] lg:px-8'
+                : 'mx-auto grid w-full max-w-page grid-cols-1 px-4 py-7 sm:px-6 sm:py-10 lg:px-8'
+            }
+          >
+            {(structureLoading || outline.length > 0) && (
+              <div className="pointer-events-none sticky top-6 z-20 hidden h-[calc(100dvh-9rem)] overflow-visible md:block">
+                <ReaderToc
+                  outline={outline}
+                  loading={structureLoading}
+                  onSelect={scrollToHeading}
+                  scrollRef={readerScrollRef}
+                  observeKey={fulltext?.markdown}
+                />
+              </div>
+            )}
+            <div className="min-w-0 space-y-9">
             <header className="space-y-3 text-left">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-[11px] font-normal">{typeLabel}</Badge>
@@ -607,6 +611,7 @@ export const ItemPage = memo(function ItemPage() {
                     markdown={fulltext.markdown}
                     imagesBaseUrl={fulltext.imagesBaseUrl}
                     references={references}
+                    onCiteJump={onCiteJump}
                   />
                 </Suspense>
               )}
@@ -617,6 +622,7 @@ export const ItemPage = memo(function ItemPage() {
                 </div>
               )}
             </section>
+            </div>
           </div>
         </main>
       </div>
