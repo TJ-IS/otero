@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/useMediaQuery';
 
 /**
@@ -11,7 +12,9 @@ import { useIsMobile } from '@/hooks/useMediaQuery';
  */
 export function ItemDetailDialog({ open, onClose, children }) {
   const { t } = useTranslation(['library', 'common']);
+  const { canEdit } = useAuth();
   const isMobile = useIsMobile();
+  const compact = !canEdit;
   const previouslyFocused = useRef(null);
   const [present, setPresent] = useState(false);
   const [state, setState] = useState('closed');
@@ -51,10 +54,20 @@ export function ItemDetailDialog({ open, onClose, children }) {
             previouslyFocused.current?.focus?.();
           }}
           className={cn(
-            'detail-dialog fixed left-1/2 top-1/2 z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden bg-background outline-none',
-            isMobile
-              ? 'h-[100dvh] w-screen'
-              : 'h-[min(780px,calc(100dvh-6rem))] w-[min(1040px,calc(100vw-4rem))] rounded-md border shadow-2xl',
+            'detail-dialog fixed left-1/2 top-1/2 z-50 flex -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden outline-none',
+            compact
+              ? cn(
+                'min-h-0 max-h-[min(88dvh,56rem)] bg-card',
+                isMobile
+                  ? 'w-[calc(100vw-1.25rem)] rounded-lg border shadow-[0_24px_64px_-28px_hsl(var(--foreground)/0.28)]'
+                  : 'w-[min(40rem,calc(100vw-2rem))] rounded-lg border shadow-[0_24px_64px_-28px_hsl(var(--foreground)/0.28)]',
+              )
+              : cn(
+                'bg-background',
+                isMobile
+                  ? 'h-[100dvh] w-screen'
+                  : 'h-[min(780px,calc(100dvh-6rem))] w-[min(1040px,calc(100vw-4rem))] rounded-md border shadow-2xl',
+              ),
           )}
           data-state={state}
         >
@@ -65,7 +78,10 @@ export function ItemDetailDialog({ open, onClose, children }) {
             <X className="size-4" />
             <span className="sr-only">{t('common:close')}</span>
           </DialogPrimitive.Close>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className={cn(
+            'flex min-h-0 flex-col',
+            compact ? 'max-h-[inherit] flex-1 overflow-hidden' : 'flex-1 overflow-hidden',
+          )}>
             {children}
           </div>
         </DialogPrimitive.Content>

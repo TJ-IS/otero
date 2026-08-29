@@ -37,6 +37,8 @@ import { useAsync } from '@/hooks/useAsync';
 import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle, ALLOWED_PUBLICATION_TITLES, UNFILED } from '@/lib/items';
 import { CalibratePanel } from './CalibratePanel';
 import { CrossrefPanel } from './CrossrefPanel';
+import { ItemPublicCard } from './ItemPublicCard';
+import { LoadingSkeleton } from '@/components/ui/async-states';
 import { useAuth } from '@/contexts/AuthContext';
 
 // Lazy-load the full-text viewer: it pulls in react-markdown + remark-gfm +
@@ -217,7 +219,7 @@ function ExportModal({ open, onOpenChange, format, content }) {
 
 export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChanged, onDirtyChange }) {
   const { t } = useTranslation(['item', 'common']);
-  const { canEdit } = useAuth();
+  const { canEdit, ready } = useAuth();
   const { data: item, error, loading, refresh } = useAsync((signal) => api.getItem(itemKey, { signal }), [itemKey]);
   const { data: attachments } = useAsync((signal) => api.getItemAttachments(itemKey, { signal }), [itemKey]);
   const { data: fulltext, refresh: refreshFulltext } = useAsync((signal) => api.getFulltext(itemKey, { signal }), [itemKey]);
@@ -260,8 +262,8 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   }, [item, attachments]);
 
   useEffect(() => {
-    onDirtyChange?.(dirty);
-  }, [dirty, onDirtyChange]);
+    onDirtyChange?.(canEdit ? dirty : false);
+  }, [dirty, canEdit, onDirtyChange]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -276,8 +278,22 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   const pdfAttachments = (attachments || []).filter(a => (a.contentType || '').includes('pdf'));
   const previewUrl = activePdfKey ? `/api/attachments/${activePdfKey}/file` : null;
 
-  if (loading) return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t('common:loadingDots')}</div>;
+  if (!ready || loading) {
+    return (
+      <div className={canEdit ? 'flex h-full items-center justify-center p-8' : 'px-8 py-10'}>
+        <LoadingSkeleton variant="lines" className="w-full max-w-xl" />
+      </div>
+    );
+  }
   if (error) return <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">{t('common:loadFailed', { message: error.message })}</div>;
+  if (!canEdit) {
+    if (!item) return null;
+    return (
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+        <ItemPublicCard item={item} />
+      </div>
+    );
+  }
   if (!item || !draft) return null;
 
   const setField = (name, value) => {
@@ -530,7 +546,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   return (
     <div className="flex h-full flex-col">
       {/* Dirty indicator bar */}
-      {dirty && (
+      {canEdit && dirty && (
         <div className="flex items-center gap-2 border-b border-warning/40 bg-warning/15 px-3 py-1 text-xs text-foreground">
           <span className="font-medium">{t('common:unsavedChanges')}</span>
         </div>
