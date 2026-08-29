@@ -8,6 +8,7 @@
   "nav": {
     "home": "首页",
     "library": "文库",
+    "journals": "期刊",
     "search": "检索",
     "dashboard": "仪表盘",
     "openApi": "开放 API",
@@ -71,6 +72,8 @@
     "portalDescription": "通过 Otero 文献库、语料统计、解析全文与开放 API 检索和探索 AIS Senior Scholars' Basket 的 11 本期刊。",
     "libraryTitle": "文献库 | Otero",
     "libraryDescription": "在 Otero 中浏览、筛选和查阅 AIS Senior Scholars' Basket 文献语料。",
+    "journalsTitle": "AIS Senior Scholars' Basket of Journals | Otero",
+    "journalsDescription": "AIS Senior Scholars' Basket 的 11 本期刊：官方刊名、缩写、出版社，以及 Otero 收录的 AIS Basket 文献。",
     "siteTitle": "Otero | AIS Basket 文献 API",
     "siteDescription": "Otero 是面向 AIS Senior Scholars' Basket 期刊的只读文献库与开放 API，支持检索文章与作者、查看语料统计。",
     "searchTitle": "检索 | Otero",

@@ -49,7 +49,19 @@ export const config = {
    * Absolute public site origin for canonical URLs, sitemap, OG, and llms.txt.
    * Override locally with PUBLIC_BASE_URL.
    */
-  publicBaseUrl: (process.env.PUBLIC_BASE_URL || 'https://wtf-is.eu.cc').replace(/\/$/, ''),
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL || 'https://ais-basket.xyz').replace(/\/$/, ''),
+  /**
+   * Default Open Graph image path or absolute URL. Relative paths are resolved
+   * against publicBaseUrl.
+   */
+  publicOgImage: (process.env.PUBLIC_OG_IMAGE || '/og.png').trim(),
+  /** Optional Google Search Console HTML-tag verification token. */
+  googleSiteVerification: (process.env.GOOGLE_SITE_VERIFICATION || '').trim(),
+  /**
+   * When true, 301 any Host that is not publicBaseUrl's host to the canonical
+   * origin. Off by default so local/dev and in-container probes keep working.
+   */
+  enforceCanonicalHost: /^(1|true|yes)$/i.test(process.env.OTERO_ENFORCE_CANONICAL_HOST || ''),
   storageDir: path.join(projectRoot, 'data', 'storage'),
   schemaVersion: 5,
   storage: {

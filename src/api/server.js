@@ -20,6 +20,7 @@ import { authRouter } from './routes/auth.js';
 import { openRouter } from './routes/open.js';
 import { adminRouter } from './routes/admin.js';
 import { seoRouter, spaSeoFallback } from './routes/seo.js';
+import { canonicalHostRedirect } from './middleware/canonicalHost.js';
 import { optionalAuth, editorWriteGate, requireEditor } from './middleware/auth.js';
 import { startFullTextWorker } from '../services/fulltextWorker.js';
 import { recoverSubmittingOnStartup } from '../services/fulltextService.js';
@@ -36,6 +37,8 @@ export function buildApp() {
   app.use(json({ limit: '5mb' }));
 
   app.get('/health', (_req, res) => res.json({ ok: true, version: '0.1.0' }));
+
+  app.use(canonicalHostRedirect);
 
   // Machine-readable SEO files (always available, even without a web build).
   app.use(seoRouter);

@@ -40,6 +40,7 @@ services:
       - NODE_ENV=production
       - OTERO_PORT=3000
       - OTERO_HOST=0.0.0.0
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://ais-basket.xyz}
       # Object storage (S3_*) comes from .env — do not hard-override here.
       - DATABASE_URL=postgresql://${POSTGRES_USER:-otero}:${POSTGRES_PASSWORD:-otero}@postgres:5432/${POSTGRES_DB:-otero}
     networks:

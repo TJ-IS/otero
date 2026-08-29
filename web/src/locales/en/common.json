@@ -8,6 +8,7 @@
   "nav": {
     "home": "Home",
     "library": "Library",
+    "journals": "Journals",
     "search": "Search",
     "dashboard": "Dashboard",
     "openApi": "Open API",
@@ -71,6 +72,8 @@
     "portalDescription": "Search and explore the 11 AIS Senior Scholars' Basket journals through Otero's literature library, corpus statistics, full text, and open API.",
     "libraryTitle": "Literature library | Otero",
     "libraryDescription": "Browse, filter, and inspect the AIS Senior Scholars' Basket literature collection in Otero.",
+    "journalsTitle": "AIS Senior Scholars' Basket of Journals | Otero",
+    "journalsDescription": "The 11 AIS Senior Scholars' Basket journals — official titles, abbreviations, publishers, and the AIS Basket literature indexed in Otero.",
     "siteTitle": "Otero | AIS Basket Literature API",
     "siteDescription": "Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics.",
     "searchTitle": "Search | Otero",

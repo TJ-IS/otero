@@ -1,0 +1,13 @@
+{
+  "eyebrow": "AIS Senior Scholars' Basket",
+  "title": "AIS Senior Scholars' Basket of Journals",
+  "lead": "The AIS Senior Scholars' Basket is the widely used shortlist of leading information systems journals. Otero indexes the current 11-journal basket as a read-only literature library.",
+  "why": "Researchers, doctoral programs, and hiring committees treat this list as the field's core venues. The names below are the official English titles. Each row opens that journal's articles in the Otero library.",
+  "countLabel": "{{count}} articles in Otero",
+  "countUnknown": "Article count unavailable",
+  "openInLibrary": "Browse {{name}} in the library",
+  "publisher": "Publisher",
+  "homepage": "Journal homepage",
+  "loadFailed": "Journal counts could not be loaded. The 11 AIS Basket journals are still listed below.",
+  "browseLibrary": "Browse the library"
+}

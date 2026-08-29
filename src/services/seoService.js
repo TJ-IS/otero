@@ -8,6 +8,7 @@ import { getAuthorDetail } from '../repositories/authorRepo.js';
 import { Item } from '../models/Item.js';
 import { getOpenItemByKey, OpenApiError } from './openApiService.js';
 import { JOURNAL_WHITELIST } from './journalWhitelist.js';
+import { JOURNAL_META } from './journalMeta.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = path.resolve(__dirname, '..', '..', 'web', 'dist');
@@ -16,6 +17,10 @@ const WEB_INDEX_DEV = path.resolve(__dirname, '..', '..', 'web', 'index.html');
 const SITEMAP_URL_LIMIT = 45000;
 const SITEMAP_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const sitemapCache = new Map();
+
+function sitemapCacheKey(which) {
+  return `${publicBaseUrl()}::${which}`;
+}
 
 function getCachedSitemap(key) {
   const hit = sitemapCache.get(key);
@@ -35,6 +40,7 @@ function setCachedSitemap(key, xml) {
 const STATIC_PAGES = [
   { path: '/', changefreq: 'daily', priority: '1.0' },
   { path: '/library', changefreq: 'daily', priority: '0.95' },
+  { path: '/journals', changefreq: 'weekly', priority: '0.9' },
   { path: '/search', changefreq: 'weekly', priority: '0.8' },
   { path: '/docs/api', changefreq: 'weekly', priority: '0.9' },
   { path: '/docs/agents', changefreq: 'weekly', priority: '0.9' },
@@ -54,6 +60,12 @@ export function absoluteUrl(pathname = '/') {
   const base = publicBaseUrl();
   if (!pathname || pathname === '/') return `${base}/`;
   return `${base}${pathname.startsWith('/') ? pathname : `/${pathname}`}`;
+}
+
+export function ogImageUrl() {
+  const img = (config.publicOgImage || '/og.png').trim();
+  if (/^https?:\/\//i.test(img)) return img;
+  return absoluteUrl(img.startsWith('/') ? img : `/${img}`);
 }
 
 export function escapeHtml(value) {
@@ -103,6 +115,7 @@ export function injectSpaShell(html, {
   bodyHtml = '',
 } = {}) {
   const canonical = absoluteUrl(canonicalPath || '/');
+  const image = ogImageUrl();
   const safeTitle = escapeHtml(title || 'Otero');
   const safeDesc = escapeHtml(description || '');
   const headBits = [
@@ -115,10 +128,21 @@ export function injectSpaShell(html, {
     `<meta property="og:title" content="${safeTitle}" />`,
     `<meta property="og:description" content="${safeDesc}" />`,
     `<meta property="og:url" content="${escapeHtml(canonical)}" />`,
-    `<meta name="twitter:card" content="summary" />`,
+    `<meta property="og:image" content="${escapeHtml(image)}" />`,
+    `<meta property="og:image:width" content="1200" />`,
+    `<meta property="og:image:height" content="630" />`,
+    `<meta property="og:locale" content="en_US" />`,
+    `<meta property="og:locale:alternate" content="zh_CN" />`,
+    `<meta name="twitter:card" content="summary_large_image" />`,
     `<meta name="twitter:title" content="${safeTitle}" />`,
     `<meta name="twitter:description" content="${safeDesc}" />`,
+    `<meta name="twitter:image" content="${escapeHtml(image)}" />`,
   ];
+  if (config.googleSiteVerification) {
+    headBits.push(
+      `<meta name="google-site-verification" content="${escapeHtml(config.googleSiteVerification)}" />`,
+    );
+  }
   if (jsonLd) {
     headBits.push(
       `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`,
@@ -126,6 +150,11 @@ export function injectSpaShell(html, {
   }
 
   let out = html;
+  if (/\blang="/i.test(out)) {
+    out = out.replace(/\blang="[^"]*"/i, 'lang="en"');
+  } else {
+    out = out.replace(/<html\b/i, '<html lang="en"');
+  }
   if (/<title>[^<]*<\/title>/i.test(out)) {
     out = out.replace(/<title>[^<]*<\/title>/i, headBits[0]);
   } else {
@@ -138,6 +167,7 @@ export function injectSpaShell(html, {
   out = out.replace(/\n?\s*<link rel="canonical"[^>]*>/gi, '');
   out = out.replace(/\n?\s*<meta property="og:[^"]+"[^>]*>/gi, '');
   out = out.replace(/\n?\s*<meta name="twitter:[^"]+"[^>]*>/gi, '');
+  out = out.replace(/\n?\s*<meta name="google-site-verification"[^>]*>/gi, '');
   out = out.replace(/\n?\s*<script type="application\/ld\+json">[\s\S]*?<\/script>/gi, '');
 
   const inject = headBits.slice(1).join('\n    ');
@@ -158,7 +188,7 @@ export function injectSpaShell(html, {
 
 export function buildRobotsTxt() {
   const sitemap = absoluteUrl('/sitemap.xml');
-  return `# Otero — https://wtf-is.eu.cc
+  return `# Otero — ${publicBaseUrl()}
 User-agent: *
 Allow: /
 Disallow: /admin
@@ -235,6 +265,7 @@ Otero does not modify the corpus via its public Open API. All open endpoints are
 ## Site
 
 - [Research portal](${base}/): Overview, statistics, journals, and recently added literature
+- [AIS Basket journals](${base}/journals): The 11 AIS Senior Scholars' Basket journals
 - [Library](${base}/library): Browse Basket literature
 - [Search](${base}/search): Full-text and metadata search
 - [Dashboard](${base}/dashboard): Corpus overview, journals, timeline, author graph
@@ -346,7 +377,7 @@ export async function buildSitemapXml(which = 'index') {
     ]);
   }
 
-  const cached = getCachedSitemap(which);
+  const cached = getCachedSitemap(sitemapCacheKey(which));
   if (cached) return cached;
 
   const staticEntries = STATIC_PAGES.map((p) => urlEntry({
@@ -356,7 +387,7 @@ export async function buildSitemapXml(which = 'index') {
   }));
 
   if (which === 'static') {
-    return setCachedSitemap(which, buildUrlset(staticEntries));
+    return setCachedSitemap(sitemapCacheKey(which), buildUrlset(staticEntries));
   }
 
   if (which === 'items') {
@@ -367,7 +398,7 @@ export async function buildSitemapXml(which = 'index') {
       changefreq: 'monthly',
       priority: '0.7',
     }));
-    return setCachedSitemap(which, buildUrlset(itemEntries));
+    return setCachedSitemap(sitemapCacheKey(which), buildUrlset(itemEntries));
   }
 
   if (which === 'authors') {
@@ -378,7 +409,7 @@ export async function buildSitemapXml(which = 'index') {
       changefreq: 'monthly',
       priority: '0.6',
     }));
-    return setCachedSitemap(which, buildUrlset(authorEntries));
+    return setCachedSitemap(sitemapCacheKey(which), buildUrlset(authorEntries));
   }
 
   throw new Error(`Unknown sitemap variant: ${which}`);
@@ -390,11 +421,23 @@ const DEFAULT_DESCRIPTION =
 const PORTAL_DESCRIPTION =
   'Otero is a research portal for the AIS Senior Scholars\' Basket of Journals: explore corpus statistics, browse 11 leading information systems journals, search literature, and use the read-only Open API.';
 
+function websiteSearchAction() {
+  return {
+    '@type': 'SearchAction',
+    target: {
+      '@type': 'EntryPoint',
+      urlTemplate: `${absoluteUrl('/search')}?q={search_term_string}`,
+    },
+    'query-input': 'required name=search_term_string',
+  };
+}
+
 function organizationJsonLd() {
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'Otero',
+    alternateName: ['AIS Basket', "AIS Senior Scholars' Basket of Journals"],
     url: absoluteUrl('/'),
     description: PORTAL_DESCRIPTION,
     publisher: {
@@ -402,7 +445,55 @@ function organizationJsonLd() {
       name: 'Otero',
       url: absoluteUrl('/'),
     },
+    potentialAction: websiteSearchAction(),
   };
+}
+
+const JOURNALS_DESCRIPTION =
+  "The 11 AIS Senior Scholars' Basket journals: official titles, abbreviations, publishers, and the AIS Basket literature indexed in Otero.";
+
+function journalsJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: "AIS Senior Scholars' Basket of Journals",
+    url: absoluteUrl('/journals'),
+    description: JOURNALS_DESCRIPTION,
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'Otero',
+      url: absoluteUrl('/'),
+    },
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: JOURNAL_META.length,
+      itemListElement: JOURNAL_META.map((journal, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        item: {
+          '@type': 'Periodical',
+          name: journal.name,
+          alternateName: journal.abbr,
+          url: journal.homepage,
+          publisher: { '@type': 'Organization', name: journal.publisher },
+        },
+      })),
+    },
+  };
+}
+
+function journalsBodyHtml() {
+  const items = JOURNAL_META.map((journal) => (
+    `<li><a href="/library?journal=${encodeURIComponent(journal.name)}">${escapeHtml(journal.name)}</a> (${escapeHtml(journal.abbr)})</li>`
+  )).join('');
+  return [
+    '<article>',
+    '<h1>AIS Senior Scholars\' Basket of Journals</h1>',
+    `<p>${escapeHtml(JOURNALS_DESCRIPTION)}</p>`,
+    `<ol>${items}</ol>`,
+    '<p><a href="/library">Browse the literature library</a></p>',
+    '</article>',
+  ].join('\n');
 }
 
 function webApiJsonLd() {
@@ -513,14 +604,21 @@ const PAGE_COPY = {
     title: 'Otero | AIS Basket research portal',
     description: PORTAL_DESCRIPTION,
     path: '/',
-    body: `<article><h1>Otero research portal</h1><p>${escapeHtml(PORTAL_DESCRIPTION)}</p><p>Browse the <a href="/library">literature library</a>, use <a href="/search">search</a>, explore the <a href="/dashboard">dashboard</a>, or read the <a href="/docs/api">Open API docs</a>.</p></article>`,
+    body: `<article><h1>Otero research portal</h1><p>${escapeHtml(PORTAL_DESCRIPTION)}</p><p>See the <a href="/journals">AIS Senior Scholars' Basket journals</a>, browse the <a href="/library">literature library</a>, use <a href="/search">search</a>, explore the <a href="/dashboard">dashboard</a>, or read the <a href="/docs/api">Open API docs</a>.</p></article>`,
     jsonLd: () => organizationJsonLd(),
   },
   library: {
     title: 'Literature library | Otero',
     description: 'Browse and filter the AIS Senior Scholars\' Basket of Journals literature collection in Otero.',
     path: '/library',
-    body: `<article><h1>Otero literature library</h1><p>Browse non-deleted top-level literature items from the 11 AIS Senior Scholars' Basket journals. Filter by journal, type, collection, or search phrase.</p><p><a href="/">Back to the research portal</a> · <a href="/search">Search the library</a></p></article>`,
+    body: `<article><h1>Otero literature library</h1><p>Browse non-deleted top-level literature items from the 11 AIS Senior Scholars' Basket journals. Filter by journal, type, collection, or search phrase.</p><p><a href="/">Back to the research portal</a> · <a href="/journals">AIS Basket journals</a> · <a href="/search">Search the library</a></p></article>`,
+  },
+  journals: {
+    title: "AIS Senior Scholars' Basket of Journals | Otero",
+    description: JOURNALS_DESCRIPTION,
+    path: '/journals',
+    body: journalsBodyHtml(),
+    jsonLd: () => journalsJsonLd(),
   },
   search: {
     title: 'Search | Otero',
@@ -684,6 +782,10 @@ export async function renderSpaShellForRequest(req) {
     return { status: 200, html: shellFromCopy('library') };
   }
 
+  if (urlPath === '/journals' || urlPath === '/journals/') {
+    return { status: 200, html: shellFromCopy('journals') };
+  }
+
   if (urlPath === '/' || urlPath === '') {
     return { status: 200, html: shellFromCopy('home') };
   }
@@ -724,15 +826,5 @@ export async function renderSpaShellForRequest(req) {
     };
   }
 
-  // Fallback: generic shell with default site meta (SPA client routes 404s)
-  return {
-    status: 200,
-    html: injectSpaShell(html, {
-      title: PAGE_COPY.home.title,
-      description: PAGE_COPY.home.description,
-      canonicalPath: urlPath,
-      robots: 'index, follow',
-      bodyHtml: '',
-    }),
-  };
+  return { status: 404, html: shellFromCopy('notFound') };
 }

@@ -5,6 +5,7 @@
   "searchPlaceholder": "Search title, author, DOI, or full text",
   "searchAction": "Search",
   "openLibrary": "Open library",
+  "viewJournals": "The 11 AIS journals",
   "openApi": "Open API",
   "aboutLabel": "About the collection",
   "aboutBody": "Otero keeps the literature interface quiet and inspectable: titles first, provenance visible, and direct access to citations, PDFs, full text, and authors.",

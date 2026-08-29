@@ -1,0 +1,13 @@
+{
+  "eyebrow": "AIS Senior Scholars' Basket",
+  "title": "AIS Senior Scholars' Basket of Journals",
+  "lead": "AIS Senior Scholars' Basket 是信息系统领域广泛使用的核心期刊短名单。Otero 将现行 11 本 Basket 期刊收录为只读文献库。",
+  "why": "研究者、博士项目与招聘委员会通常把这份名单视为领域核心刊物。下列名称为官方英文刊名。每一行会打开该刊在 Otero 文库中的文献。",
+  "countLabel": "Otero 收录 {{count}} 篇",
+  "countUnknown": "篇数暂不可用",
+  "openInLibrary": "在文库中浏览 {{name}}",
+  "publisher": "出版社",
+  "homepage": "期刊主页",
+  "loadFailed": "未能加载期刊篇数。下面仍列出 AIS Basket 的 11 本期刊。",
+  "browseLibrary": "打开文库"
+}

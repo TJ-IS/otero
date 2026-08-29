@@ -3,6 +3,7 @@ import { Link, Navigate, Routes, Route } from 'react-router-dom';
 import { FileQuestion } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Toaster } from '@/components/ui/sonner';
+import { usePageMeta } from '@/hooks/usePageMeta';
 import { ResearchPortal } from '@/components/ResearchPortal';
 
 function lazyNamed(loader, name) {
@@ -10,6 +11,7 @@ function lazyNamed(loader, name) {
 }
 
 const LibraryView = lazyNamed(() => import('@/components/LibraryView'), 'LibraryView');
+const JournalsPage = lazyNamed(() => import('@/components/JournalsPage'), 'JournalsPage');
 const SearchPage = lazyNamed(() => import('@/components/SearchPage'), 'SearchPage');
 const MerkleTreeView = lazyNamed(() => import('@/components/MerkleTreeView'), 'MerkleTreeView');
 const AuthorGraph = lazyNamed(() => import('@/components/AuthorGraph'), 'AuthorGraph');
@@ -47,6 +49,11 @@ function RouteFallback() {
 
 function NotFoundPage() {
   const { t } = useTranslation('common');
+  usePageMeta({
+    title: `${t('notFound.title')} | Otero`,
+    description: t('notFound.body'),
+    robots: 'noindex, follow',
+  });
   return (
     <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-background px-6 text-center">
       <FileQuestion className="size-9 text-muted-foreground" />
@@ -80,6 +87,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<ResearchPortal />} />
           <Route path="/library" element={<LibraryView />} />
+          <Route path="/journals" element={<JournalsPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/docs" element={<DocsLayout />}>
             <Route index element={<Navigate to="api" replace />} />

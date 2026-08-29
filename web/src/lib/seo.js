@@ -1,7 +1,12 @@
+import { JOURNAL_META } from './journal-meta.js';
+
 const SITE_NAME = 'Otero';
 const DEFAULT_TITLE = 'Otero | AIS Basket Literature API';
 const DEFAULT_DESCRIPTION =
   "Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics.";
+const OG_IMAGE_PATH = '/og.png';
+const JOURNALS_DESCRIPTION =
+  "The 11 AIS Senior Scholars' Basket journals: official titles, abbreviations, publishers, and the AIS Basket literature indexed in Otero.";
 
 export const SEO_DEFAULTS = {
   siteName: SITE_NAME,
@@ -70,6 +75,7 @@ export function applyPageMeta({
   const pageTitle = title || SEO_DEFAULTS.title;
   const pageDesc = description || SEO_DEFAULTS.description;
   const canonical = absoluteUrl(canonicalPath || window.location.pathname || '/');
+  const image = absoluteUrl(OG_IMAGE_PATH);
 
   document.title = pageTitle;
   ensureMeta('name', 'description', pageDesc);
@@ -80,9 +86,15 @@ export function applyPageMeta({
   ensureMeta('property', 'og:title', pageTitle);
   ensureMeta('property', 'og:description', pageDesc);
   ensureMeta('property', 'og:url', canonical);
-  ensureMeta('name', 'twitter:card', 'summary');
+  ensureMeta('property', 'og:image', image);
+  ensureMeta('property', 'og:image:width', '1200');
+  ensureMeta('property', 'og:image:height', '630');
+  ensureMeta('property', 'og:locale', 'en_US');
+  ensureMeta('property', 'og:locale:alternate', 'zh_CN');
+  ensureMeta('name', 'twitter:card', 'summary_large_image');
   ensureMeta('name', 'twitter:title', pageTitle);
   ensureMeta('name', 'twitter:description', pageDesc);
+  ensureMeta('name', 'twitter:image', image);
   ensureJsonLd(jsonLd);
 }
 
@@ -156,12 +168,51 @@ export function websiteJsonLd() {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'Otero',
+    alternateName: ['AIS Basket', "AIS Senior Scholars' Basket of Journals"],
     url: absoluteUrl('/'),
     description: SEO_DEFAULTS.description,
     publisher: {
       '@type': 'Organization',
       name: 'Otero',
       url: absoluteUrl('/'),
+    },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${absoluteUrl('/search')}?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  };
+}
+
+export function journalsJsonLd() {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: "AIS Senior Scholars' Basket of Journals",
+    url: absoluteUrl('/journals'),
+    description: JOURNALS_DESCRIPTION,
+    isPartOf: {
+      '@type': 'WebSite',
+      name: 'Otero',
+      url: absoluteUrl('/'),
+    },
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: JOURNAL_META.length,
+      itemListElement: JOURNAL_META.map((journal, index) => ({
+        '@type': 'ListItem',
+        position: index + 1,
+        item: {
+          '@type': 'Periodical',
+          name: journal.name,
+          alternateName: journal.abbr,
+          url: journal.homepage,
+          publisher: { '@type': 'Organization', name: journal.publisher },
+        },
+      })),
     },
   };
 }

@@ -21,6 +21,7 @@ import {
 export const PRIMARY_NAV = [
   { to: '/', key: 'home', icon: Home, end: true },
   { to: '/library', key: 'library', icon: LibraryBig },
+  { to: '/journals', key: 'journals', icon: Newspaper },
   { to: '/search', key: 'search', icon: Search },
   {
     to: '/dashboard',

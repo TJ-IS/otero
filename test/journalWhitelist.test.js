@@ -10,6 +10,8 @@ import {
   UNFILED as WEB_UNFILED,
   ALLOWED_PUBLICATION_TITLES,
 } from '../web/src/lib/items.js';
+import { JOURNAL_META } from '../src/services/journalMeta.js';
+import { JOURNAL_META as WEB_JOURNAL_META } from '../web/src/lib/journal-meta.js';
 import { normalizeCalibrationFields } from '../src/services/calibrateService.js';
 import { mapRecognized } from '../src/services/metadataMapper.js';
 
@@ -32,6 +34,16 @@ test('frontend AIS_BASKET_JOURNALS matches backend JOURNAL_WHITELIST', () => {
   assert.deepEqual(AIS_BASKET_JOURNALS, JOURNAL_WHITELIST);
   assert.equal(WEB_UNFILED, UNFILED);
   assert.deepEqual(ALLOWED_PUBLICATION_TITLES, [...JOURNAL_WHITELIST, UNFILED]);
+});
+
+test('journal meta covers the whitelist and stays in sync across frontend and backend', () => {
+  assert.deepEqual(JOURNAL_META.map((j) => j.name), JOURNAL_WHITELIST);
+  assert.deepEqual(WEB_JOURNAL_META, JOURNAL_META);
+  for (const journal of JOURNAL_META) {
+    assert.ok(journal.abbr, `missing abbr for ${journal.name}`);
+    assert.ok(journal.publisher, `missing publisher for ${journal.name}`);
+    assert.match(journal.homepage, /^https:\/\//, `homepage must be https for ${journal.name}`);
+  }
 });
 
 test('classifyJournal maps whitelisted titles through and everything else to UNFILED', () => {

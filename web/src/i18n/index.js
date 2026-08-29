@@ -9,6 +9,7 @@ import adminZh from '../locales/zh-CN/admin.json' with { type: 'json' };
 import docsZh from '../locales/zh-CN/docs.json' with { type: 'json' };
 import itemZh from '../locales/zh-CN/item.json' with { type: 'json' };
 import homeZh from '../locales/zh-CN/home.json' with { type: 'json' };
+import journalsZh from '../locales/zh-CN/journals.json' with { type: 'json' };
 
 import commonEn from '../locales/en/common.json' with { type: 'json' };
 import libraryEn from '../locales/en/library.json' with { type: 'json' };
@@ -17,6 +18,7 @@ import adminEn from '../locales/en/admin.json' with { type: 'json' };
 import docsEn from '../locales/en/docs.json' with { type: 'json' };
 import itemEn from '../locales/en/item.json' with { type: 'json' };
 import homeEn from '../locales/en/home.json' with { type: 'json' };
+import journalsEn from '../locales/en/journals.json' with { type: 'json' };
 
 export const SUPPORTED_LANGS = ['zh-CN', 'en'];
 
@@ -47,6 +49,7 @@ void i18n
         docs: docsZh,
         item: itemZh,
         home: homeZh,
+        journals: journalsZh,
       },
       en: {
         common: commonEn,
@@ -56,6 +59,7 @@ void i18n
         docs: docsEn,
         item: itemEn,
         home: homeEn,
+        journals: journalsEn,
       },
     },
     fallbackLng: 'zh-CN',
@@ -64,7 +68,7 @@ void i18n
     // it breaks resource lookup and leaves t() returning raw keys.
     load: 'currentOnly',
     defaultNS: 'common',
-    ns: ['common', 'library', 'dashboard', 'admin', 'docs', 'item', 'home'],
+    ns: ['common', 'library', 'dashboard', 'admin', 'docs', 'item', 'home', 'journals'],
     interpolation: { escapeValue: false },
     detection: {
       order: ['localStorage', 'navigator'],

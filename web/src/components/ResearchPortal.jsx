@@ -179,6 +179,9 @@ export function ResearchPortal() {
                   <Link to="/library" className="inline-flex items-center gap-2 rounded-sm bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-transform hover:-translate-y-0.5 active:translate-y-px">
                     {t('openLibrary')} <ArrowRight className="size-3.5" />
                   </Link>
+                  <Link to="/journals" className="inline-flex items-center gap-2 rounded-sm border border-border px-4 py-2 text-sm font-medium text-foreground/80 transition-colors hover:border-brand hover:text-brand">
+                    {t('viewJournals')} <ArrowRight className="size-3.5" />
+                  </Link>
                   <Link to="/docs/api" className="inline-flex items-center gap-2 rounded-sm border border-border px-4 py-2 text-sm font-medium text-foreground/80 transition-colors hover:border-brand hover:text-brand">
                     {t('openApi')} <ArrowUpRight className="size-3.5" />
                   </Link>
@@ -205,7 +208,9 @@ export function ResearchPortal() {
             <section className="grid gap-10 border-b border-border py-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)] lg:gap-16">
               <div>
                 <div className="flex items-baseline justify-between gap-4">
-                  <h2 className="font-display text-2xl font-semibold">{t('journalsTitle')}</h2>
+                  <h2 className="font-display text-2xl font-semibold">
+                    <Link to="/journals" className="transition-colors hover:text-brand">{t('journalsTitle')}</Link>
+                  </h2>
                   <Link to="/dashboard/journals" className="text-xs font-medium text-muted-foreground hover:text-brand">{t('fullBreakdown')}</Link>
                 </div>
                 <ul className="mt-5 divide-y divide-border border-t border-border">
