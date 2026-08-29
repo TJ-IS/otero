@@ -29,6 +29,7 @@ async function signMessage(address, message) {
 export function AuthProvider({ children }) {
   const [address, setAddress] = useState(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [role, setRole] = useState(null);
   const [connecting, setConnecting] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -42,6 +43,7 @@ export function AuthProvider({ children }) {
       const me = await api.getMe();
       setAddress(getAddress(me.address));
       setCanEdit(Boolean(me.canEdit));
+      setRole(me.role || (me.canEdit ? 'admin' : 'user'));
     } catch {
       setAuthToken(null);
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
@@ -85,6 +87,7 @@ export function AuthProvider({ children }) {
       try { localStorage.setItem(STORAGE_KEY, result.token); } catch {}
       setAddress(normalized);
       setCanEdit(Boolean(result.canEdit));
+      setRole(result.role || (result.canEdit ? 'admin' : 'user'));
       return normalized;
     } finally {
       setConnecting(false);
@@ -96,11 +99,14 @@ export function AuthProvider({ children }) {
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
     setAddress(null);
     setCanEdit(false);
+    setRole(null);
   }, []);
 
   const value = {
     address,
+    role,
     canEdit,
+    isAuthenticated: Boolean(address),
     connecting,
     ready,
     login,

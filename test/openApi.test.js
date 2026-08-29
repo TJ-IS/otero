@@ -103,7 +103,13 @@ test('open PDF, markdown and structure endpoints return stable availability stat
     .expect(200);
   assert.equal(pdf.body.itemKey, item.key);
   assert.equal(pdf.body.attachmentKey, attachment.key);
-  assert.match(pdf.body.absoluteUrl, new RegExp(`/api/attachments/${attachment.key}/file$`));
+  assert.match(pdf.body.absoluteUrl, new RegExp(`/api/attachments/${attachment.key}/file\\?exp=\\d+&sig=`));
+  assert.ok(pdf.body.expiresAt);
+  assert.ok(pdf.body.ttlSec > 0);
+
+  await request(app).get(`/api/attachments/${attachment.key}/file`).expect(404);
+  const signed = await request(app).get(pdf.body.url);
+  assert.ok(signed.status === 200 || signed.body?.error === 'file missing');
 
   const structure = await request(app)
     .get(`/api/open/v1/items/${item.key}/structure`)

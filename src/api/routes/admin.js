@@ -14,6 +14,14 @@ import {
   reconcileStorage,
   deleteOrphanObjects,
 } from '../../services/adminService.js';
+import {
+  listAccounts,
+  setAccountRole,
+  getAccountByAddress,
+  getBootstrapAddresses,
+} from '../../repositories/accountRepo.js';
+import { listActivityLogs, recordActivity } from '../../repositories/activityLogRepo.js';
+import { asyncHandler } from '../../utils/asyncHandler.js';
 
 export const adminRouter = Router();
 
@@ -187,6 +195,53 @@ adminRouter.post('/reconcile/delete', async (req, res, next) => {
  * GET /api/admin/health
  * Quick health check for admin features.
  */
+adminRouter.get('/accounts', asyncHandler(async (req, res) => {
+  const result = await listAccounts({
+    page: req.query.page,
+    pageSize: req.query.pageSize,
+    q: req.query.q,
+  });
+  res.json({
+    ...result,
+    bootstrapAddresses: getBootstrapAddresses(),
+  });
+}));
+
+adminRouter.patch('/accounts/:address', asyncHandler(async (req, res) => {
+  const before = await getAccountByAddress(req.params.address);
+  try {
+    const account = await setAccountRole(req.params.address, req.body?.role);
+    if (before && before.role !== account.role) {
+      recordActivity({
+        accountID: req.auth?.accountID || null,
+        address: req.auth?.address || null,
+        method: 'PATCH',
+        path: (req.originalUrl || '').split('?')[0],
+        statusCode: 200,
+        action: 'admin.role',
+        meta: { target: account.address, from: before.role, to: account.role },
+      });
+    }
+    res.json({ account });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+}));
+
+adminRouter.get('/logs', asyncHandler(async (req, res) => {
+  const result = await listActivityLogs({
+    page: req.query.page,
+    pageSize: req.query.pageSize,
+    address: req.query.address,
+    action: req.query.action,
+    path: req.query.path,
+    from: req.query.from,
+    to: req.query.to,
+  });
+  res.json(result);
+}));
+
 adminRouter.get('/health', async (req, res) => {
   res.json({
     ok: true,
@@ -197,6 +252,8 @@ adminRouter.get('/health', async (req, res) => {
       'system-monitoring',
       'trash-management',
       'storage-reconciliation',
+      'accounts',
+      'activity-logs',
     ],
     timestamp: new Date().toISOString(),
   });

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config, ensureDataDirs } from '../config.js';
 import { initDb, closeDb, queryOne, execute } from './connection.js';
+import { seedBootstrapAdmins } from '../repositories/accountRepo.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = path.join(__dirname, 'schema.postgres.sql');
@@ -116,6 +117,7 @@ export async function runMigrations() {
       [TARGET_VERSION]
     );
   }
+  await seedBootstrapAdmins();
   return { applied: TARGET_VERSION, previous: current };
 }
 

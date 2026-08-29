@@ -5,12 +5,21 @@ import {
   signToken,
   verifyToken,
   verifyWalletSignature,
-  isEditor,
   buildSignMessage,
 } from '../middleware/auth.js';
+import { recordLogin } from '../../repositories/accountRepo.js';
+import { recordActivity } from '../../repositories/activityLogRepo.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 
 const router = Router();
+
+function publicAuth(account) {
+  return {
+    address: account.address,
+    role: account.role,
+    canEdit: account.canEdit,
+  };
+}
 
 router.get('/nonce', (req, res) => {
   const address = req.query.address;
@@ -37,9 +46,17 @@ router.post('/verify', asyncHandler(async (req, res) => {
   if (!normalized) {
     return res.status(401).json({ error: 'invalid signature' });
   }
-  const token = await signToken(normalized);
-  const canEdit = isEditor(normalized);
-  res.json({ address: normalized, token, canEdit });
+  const account = await recordLogin(normalized);
+  const token = await signToken(account.address);
+  recordActivity({
+    accountID: account.accountID,
+    address: account.address,
+    method: 'POST',
+    path: '/api/auth/verify',
+    statusCode: 200,
+    action: 'auth.verify',
+  });
+  res.json({ ...publicAuth(account), token });
 }));
 
 router.get('/me', asyncHandler(async (req, res) => {
@@ -52,7 +69,7 @@ router.get('/me', asyncHandler(async (req, res) => {
   if (!auth) {
     return res.status(401).json({ error: 'invalid token' });
   }
-  res.json({ address: auth.address, canEdit: auth.canEdit });
+  res.json(publicAuth(auth));
 }));
 
 export { router as authRouter };

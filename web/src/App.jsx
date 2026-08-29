@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { Link, Navigate, Routes, Route } from 'react-router-dom';
+import { Link, Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import { FileQuestion } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Toaster } from '@/components/ui/sonner';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import { ResearchPortal } from '@/components/ResearchPortal';
+import { api } from '@/api/client';
 
 function lazyNamed(loader, name) {
   return lazy(() => loader().then(module => ({ default: module[name] })));
@@ -33,6 +34,8 @@ const StorageReconciliationPanel = lazyNamed(
   'StorageReconciliationPanel'
 );
 const TrashPanel = lazyNamed(() => import('@/components/admin/TrashPanel'), 'TrashPanel');
+const AccountsPanel = lazyNamed(() => import('@/components/admin/AccountsPanel'), 'AccountsPanel');
+const LogsPanel = lazyNamed(() => import('@/components/admin/LogsPanel'), 'LogsPanel');
 
 function RouteFallback() {
   const { t } = useTranslation('common');
@@ -68,6 +71,15 @@ function NotFoundPage() {
 }
 
 /** Fades out the pre-boot placeholder in index.html once React has painted. */
+function ActivityBeacon() {
+  const location = useLocation();
+  useEffect(() => {
+    const path = `${location.pathname}${location.search || ''}`;
+    api.logClientActivity({ path });
+  }, [location.pathname, location.search]);
+  return null;
+}
+
 function useHideBootSkeleton() {
   useEffect(() => {
     const el = document.getElementById('app-skeleton');
@@ -83,6 +95,7 @@ export default function App() {
 
   return (
     <>
+      <ActivityBeacon />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route path="/" element={<ResearchPortal />} />
@@ -107,6 +120,8 @@ export default function App() {
             <Route path="duplicates" element={<DuplicatesPanel />} />
             <Route path="reconcile" element={<StorageReconciliationPanel />} />
             <Route path="trash" element={<TrashPanel />} />
+            <Route path="accounts" element={<AccountsPanel />} />
+            <Route path="logs" element={<LogsPanel />} />
           </Route>
           <Route path="/authors/:id" element={<AuthorPage />} />
           <Route path="/items/:key" element={<ItemPage />} />

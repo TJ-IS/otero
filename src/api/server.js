@@ -22,6 +22,8 @@ import { adminRouter } from './routes/admin.js';
 import { seoRouter, spaSeoFallback } from './routes/seo.js';
 import { canonicalHostRedirect } from './middleware/canonicalHost.js';
 import { optionalAuth, editorWriteGate, requireEditor } from './middleware/auth.js';
+import { activityLogMiddleware } from './middleware/activityLog.js';
+import { activityRouter } from './routes/activity.js';
 import { startFullTextWorker } from '../services/fulltextWorker.js';
 import { recoverSubmittingOnStartup } from '../services/fulltextService.js';
 import { config } from '../config.js';
@@ -44,7 +46,8 @@ export function buildApp() {
   app.use(seoRouter);
 
   app.use('/api/auth', authRouter);
-  app.use('/api', optionalAuth(), editorWriteGate);
+  app.use('/api', optionalAuth(), editorWriteGate, activityLogMiddleware());
+  app.use('/api/activity', activityRouter);
 
   // Admin routes: whitelist-only. editorWriteGate lets GETs through to anyone,
   // so gate the whole admin surface (including reads) behind requireEditor —

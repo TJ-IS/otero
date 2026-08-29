@@ -85,6 +85,15 @@ export const api = {
   },
   getItem(key, options) { return req(`/api/items/${key}`, options); },
   getItemAttachments(key, options) { return req(`/api/items/${key}/attachments`, options).then(r => r.attachments); },
+  getItemPdfUrl(key, { attachment } = {}) {
+    const qs = new URLSearchParams();
+    if (attachment) qs.set('attachment', attachment);
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return req(`/api/items/${key}/pdf-url${suffix}`);
+  },
+  logClientActivity({ path }) {
+    return req('/api/activity/client', { method: 'POST', body: JSON.stringify({ path }) }).catch(() => null);
+  },
   createItem(body) { return req('/api/items', { method: 'POST', body: JSON.stringify(body) }); },
   updateItem(key, body) { return req(`/api/items/${key}`, { method: 'PATCH', body: JSON.stringify(body) }); },
   deleteItem(key, permanent = false) {
@@ -221,6 +230,26 @@ export const api = {
   },
   deleteAdminOrphanObjects(names) {
     return req('/api/admin/reconcile/delete', { method: 'POST', body: JSON.stringify({ names }) });
+  },
+  getAdminAccounts({ page = 1, pageSize = 50, q } = {}) {
+    const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (q) qs.set('q', q);
+    return req(`/api/admin/accounts?${qs.toString()}`);
+  },
+  patchAdminAccount(address, role) {
+    return req(`/api/admin/accounts/${encodeURIComponent(address)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    });
+  },
+  getAdminLogs({ page = 1, pageSize = 50, address, action, path, from, to } = {}) {
+    const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (address) qs.set('address', address);
+    if (action) qs.set('action', action);
+    if (path) qs.set('path', path);
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    return req(`/api/admin/logs?${qs.toString()}`);
   },
 
   // Merkle DOI proofs

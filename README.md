@@ -200,7 +200,7 @@ node scripts/import-downloads-to-db.mjs --dry-run
 | GET | `/api/authors/graph`、`/api/authors/:id` | 作者 |
 | GET | `/api/stats/*` | overview、doi-coverage、years、journals、fulltext、ingestion… |
 | GET/POST/DELETE | `/api/fulltext…`、`/api/items/:key/fulltext…` | 全文队列与内容 |
-| GET | `/api/attachments/:key/file` | PDF 流 |
+| GET | `/api/attachments/:key/file` | 短时签名 PDF 流（需 `exp`+`sig`） |
 | GET | `/api/attachments/:key/fulltext/*` | 全文静态资源 |
 | POST | `/api/items/:key/calibrate`、`/extract`、`/chat`、`/crossref` | LLM / Crossref |
 | GET/POST | `/api/merkle/*` | root / exists / verify / rebuild |

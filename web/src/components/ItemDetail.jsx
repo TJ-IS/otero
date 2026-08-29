@@ -242,6 +242,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   const [crossrefLoading, setCrossrefLoading] = useState(false);
   const [crossrefResult, setCrossrefResult] = useState(null);
   const [crossrefError, setCrossrefError] = useState(null);
+  const [signedPdfUrl, setSignedPdfUrl] = useState(null);
 
   useEffect(() => {
     if (!item) return;
@@ -276,7 +277,33 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   }, [dirty]);
 
   const pdfAttachments = (attachments || []).filter(a => (a.contentType || '').includes('pdf'));
-  const previewUrl = activePdfKey ? `/api/attachments/${activePdfKey}/file` : null;
+
+  useEffect(() => {
+    if (tab !== 'pdf' || !activePdfKey || !itemKey || !canEdit) {
+      setSignedPdfUrl(null);
+      return undefined;
+    }
+    let cancelled = false;
+    api.getItemPdfUrl(itemKey, { attachment: activePdfKey })
+      .then((result) => {
+        if (!cancelled) setSignedPdfUrl(result.absoluteUrl || result.url || null);
+      })
+      .catch(() => {
+        if (!cancelled) setSignedPdfUrl(null);
+      });
+    return () => { cancelled = true; };
+  }, [tab, activePdfKey, itemKey, canEdit]);
+
+  const openSignedPdf = async () => {
+    if (!itemKey || !activePdfKey) return;
+    try {
+      const result = await api.getItemPdfUrl(itemKey, { attachment: activePdfKey });
+      const url = result.absoluteUrl || result.url;
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      toast.error(t('common:loadFailed', { message: err.message }));
+    }
+  };
 
   if (!ready || loading) {
     return (
@@ -916,21 +943,20 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                     ))}
                   </SelectContent>
                 </Select>
-                {previewUrl && (
-                  <a
-                    href={previewUrl}
-                    target="_blank"
-                    rel="noreferrer"
+                {activePdfKey ? (
+                  <button
+                    type="button"
+                    onClick={openSignedPdf}
                     className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                   >
                     <ExternalLink className="size-3" /> {t('detail.newWindow')}
-                  </a>
-                )}
+                  </button>
+                ) : null}
               </div>
-              {previewUrl ? (
+              {signedPdfUrl ? (
                 <iframe
-                  key={previewUrl}
-                  src={previewUrl}
+                  key={signedPdfUrl}
+                  src={signedPdfUrl}
                   title="PDF preview"
                   className="w-full flex-1 rounded-sm border border-border/80 bg-muted/30"
                 />

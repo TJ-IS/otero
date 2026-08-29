@@ -26,6 +26,7 @@ import { AuthorLinks } from './AuthorLinks';
 import { headingId } from '@/lib/fulltext';
 import { ChatPanel } from './ChatPanel';
 import { SiteHeader } from './SiteHeader';
+import { useAuth } from '@/contexts/AuthContext';
 import { ReaderToc } from './ReaderToc';
 import { scrollToReference } from './CitationRef';
 
@@ -128,7 +129,9 @@ function MetaRow({ label, children }) {
 export const ItemPage = memo(function ItemPage() {
   const { t } = useTranslation(['item', 'common']);
   const { key } = useParams();
+  const { isAuthenticated } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [pdfOpening, setPdfOpening] = useState(false);
   const [assetTab, setAssetTab] = useState('figures');
   const [pendingRefId, setPendingRefId] = useState(null);
   const [lightbox, setLightbox] = useState({ open: false, src: '', alt: '' });
@@ -222,9 +225,21 @@ export const ItemPage = memo(function ItemPage() {
     setLightbox({ open: true, src, alt: alt || '' });
   }, []);
 
-  const pdfKey = useMemo(() => {
-    return (attachments || []).find(a => (a.contentType || '').includes('pdf'))?.key;
-  }, [attachments]);
+  const hasPdf = isAuthenticated && (attachments || []).some(a => (a.contentType || '').includes('pdf'));
+
+  const openPdf = useCallback(async () => {
+    if (!key || pdfOpening) return;
+    setPdfOpening(true);
+    try {
+      const result = await api.getItemPdfUrl(key);
+      const url = result.absoluteUrl || result.url;
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      toast.error(t('common:loadFailed', { message: err.message }));
+    } finally {
+      setPdfOpening(false);
+    }
+  }, [key, pdfOpening, t]);
 
   const stampLines = useMemo(
     () => cleanStampLines(structure?.publisherStamp?.lines),
@@ -321,14 +336,12 @@ export const ItemPage = memo(function ItemPage() {
         className="shrink-0"
         actions={(
           <>
-            {pdfKey && (
-              <Button size="sm" variant="outline" asChild>
-                <a href={`/api/attachments/${pdfKey}/file`} target="_blank" rel="noreferrer">
-                  <BookOpen className="size-3.5 sm:mr-1" />
-                  <span className="hidden sm:inline">PDF</span>
-                </a>
+            {hasPdf ? (
+              <Button size="sm" variant="outline" onClick={openPdf} disabled={pdfOpening}>
+                <BookOpen className="size-3.5 sm:mr-1" />
+                <span className="hidden sm:inline">PDF</span>
               </Button>
-            )}
+            ) : null}
             {doi && (
               <Button size="sm" variant="outline" className="hidden sm:inline-flex" asChild title={`DOI: ${doi}`}>
                 <a href={`https://doi.org/${doi}`} target="_blank" rel="noreferrer">

@@ -63,7 +63,7 @@ export const config = {
    */
   enforceCanonicalHost: /^(1|true|yes)$/i.test(process.env.OTERO_ENFORCE_CANONICAL_HOST || ''),
   storageDir: path.join(projectRoot, 'data', 'storage'),
-  schemaVersion: 5,
+  schemaVersion: 6,
   storage: {
     // 'filesystem' keeps PDFs on disk; 's3' uses any S3-compatible API
     // (Cloudflare R2, AWS S3, local MinIO, …). Legacy value 'minio' maps to 's3'.
@@ -130,12 +130,14 @@ export const config = {
   },
   auth: {
     secret: process.env.OTERO_AUTH_SECRET || 'dev-insecure-secret',
+    pdfSigningSecret: process.env.OTERO_PDF_SIGNING_SECRET || '',
     editorWhitelist: (process.env.OTERO_EDITOR_WHITELIST || '')
       .split(',')
       .map(a => a.trim().toLowerCase())
       .filter(Boolean),
     jwtTtlSec: Number(process.env.OTERO_AUTH_JWT_TTL_SEC ?? 60 * 60 * 24 * 7),
     nonceTtlSec: Number(process.env.OTERO_AUTH_NONCE_TTL_SEC ?? 300),
+    pdfUrlTtlSec: Number(process.env.OTERO_PDF_URL_TTL_SEC ?? 600),
   },
 };
 

@@ -16,6 +16,8 @@ import {
   Shield,
   Trash2,
   BookMarked,
+  Users,
+  ScrollText,
 } from 'lucide-react';
 
 export const PRIMARY_NAV = [
@@ -57,6 +59,8 @@ export const PRIMARY_NAV = [
     childrenNs: 'admin',
     children: [
       { to: '/admin', labelKey: 'nav.status', icon: Activity, end: true },
+      { to: '/admin/accounts', labelKey: 'nav.accounts', icon: Users },
+      { to: '/admin/logs', labelKey: 'nav.logs', icon: ScrollText },
       { to: '/admin/duplicates', labelKey: 'nav.duplicates', icon: Copy },
       { to: '/admin/reconcile', labelKey: 'nav.reconcile', icon: HardDrive },
       { to: '/admin/trash', labelKey: 'nav.trash', icon: Trash2 },

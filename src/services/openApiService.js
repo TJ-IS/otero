@@ -12,6 +12,7 @@ import { getOpenFacets, getOpenOverviewStats, getOpenTimeline } from '../reposit
 import { JOURNAL_WHITELIST, UNFILED } from './journalWhitelist.js';
 import { isBasketVisibleItem } from './itemVisibility.js';
 import { normalizeDoi } from '../utils/doi.js';
+import { signPdfAccess } from './pdfAccess.js';
 
 const WHITELIST_SET = new Set(JOURNAL_WHITELIST);
 
@@ -244,11 +245,14 @@ export async function getPdfUrlByDoi(doiRaw) {
       itemKey: item.key,
     });
   }
+  const signed = signPdfAccess(attachmentKey);
   return {
     doi,
     itemKey: item.key,
     attachmentKey,
-    url: `/api/attachments/${attachmentKey}/file`,
+    url: signed.url,
+    expiresAt: signed.expiresAt,
+    ttlSec: signed.ttlSec,
   };
 }
 
@@ -275,7 +279,14 @@ export async function getPdfUrlByKey(key) {
   if (!attachmentKey) {
     throw new OpenApiError(404, 'pdf not available for item', { itemKey: item.key });
   }
-  return { itemKey: item.key, attachmentKey, url: `/api/attachments/${attachmentKey}/file` };
+  const signed = signPdfAccess(attachmentKey);
+  return {
+    itemKey: item.key,
+    attachmentKey,
+    url: signed.url,
+    expiresAt: signed.expiresAt,
+    ttlSec: signed.ttlSec,
+  };
 }
 
 export async function getStructureByKey(key) {
@@ -434,7 +445,7 @@ Returns \`{ q, articles, authors }\` (each bucket paginated).
 
 \`GET ${base}/api/open/v1/items/by-doi/pdf-url?doi=10.1234/example\`
 
-DOI may include an \`https://doi.org/\` prefix. PDF URL is relative (\`/api/attachments/{key}/file\`); prepend the site origin to download.
+DOI may include an \`https://doi.org/\` prefix. \`pdf-url\` returns a short-lived signed URL (\`expiresAt\`, typically 10 minutes). Fetch \`pdf-url\` immediately before downloading; do not cache the file URL.
 
 ### By item key
 

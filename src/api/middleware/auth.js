@@ -1,6 +1,7 @@
 import { getAddress, verifyMessage } from 'viem';
 import { jwtVerify, SignJWT } from 'jose';
 import { config } from '../../config.js';
+import { ensureAccount, isBootstrapAdmin, getBootstrapAddresses } from '../../repositories/accountRepo.js';
 
 const textEncoder = new TextEncoder();
 const secret = textEncoder.encode(config.auth.secret);
@@ -15,13 +16,19 @@ function cleanExpiredNonces() {
 
 setInterval(cleanExpiredNonces, 60_000).unref?.();
 
-export function isEditor(address) {
+/** True when the address is an admin (DB role, or bootstrap whitelist before first upsert). */
+export async function isEditor(address) {
   if (!address) return false;
-  return config.auth.editorWhitelist.includes(address.toLowerCase());
+  try {
+    const account = await ensureAccount(address);
+    return account.role === 'admin';
+  } catch {
+    return isBootstrapAdmin(address);
+  }
 }
 
 export function getEditorAddresses() {
-  return config.auth.editorWhitelist;
+  return getBootstrapAddresses().map(a => a.toLowerCase());
 }
 
 export function generateNonce(address) {
@@ -54,10 +61,19 @@ export function buildSignMessage(address, nonce) {
   return `Otero wants you to sign in with your Ethereum account:\n${address}\n\nNonce: ${nonce}`;
 }
 
+function authPayload(account) {
+  return {
+    address: account.address,
+    role: account.role,
+    canEdit: account.role === 'admin',
+    accountID: account.accountID,
+  };
+}
+
 export async function signToken(address) {
-  const normalized = getAddress(address);
-  const canEdit = isEditor(normalized);
-  return new SignJWT({ address: normalized, canEdit })
+  const account = await ensureAccount(address);
+  const canEdit = account.role === 'admin';
+  return new SignJWT({ address: account.address, canEdit, role: account.role })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${config.auth.jwtTtlSec}s`)
@@ -68,7 +84,8 @@ export async function verifyToken(token) {
   try {
     const { payload } = await jwtVerify(token, secret, { algorithms: ['HS256'] });
     if (!payload.address || typeof payload.address !== 'string') return null;
-    return { address: payload.address, canEdit: Boolean(payload.canEdit) };
+    const account = await ensureAccount(payload.address);
+    return authPayload(account);
   } catch {
     return null;
   }
@@ -116,9 +133,7 @@ export function editorWriteGate(req, res, next) {
     return next();
   }
   const url = req.originalUrl || req.url || '';
-  const publicWrites = ['/api/auth', '/api/merkle/verify'];
-  // Chat is a POST endpoint but must stay open to all visitors (no editor
-  // gate), matching /api/items/:key/chat.
+  const publicWrites = ['/api/auth', '/api/merkle/verify', '/api/activity'];
   const publicWritePatterns = [/^\/api\/items\/[^/]+\/chat(\?.*)?$/];
   if (publicWrites.some(prefix => url.startsWith(prefix)) || publicWritePatterns.some(re => re.test(url))) {
     return next();

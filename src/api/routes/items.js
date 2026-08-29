@@ -3,7 +3,13 @@ import { Items, Item } from '../../models/Item.js';
 import { toBibtex, toRis, toBibtexBatch, toRisBatch } from '../../services/exportService.js';
 import { UNFILED } from '../../services/journalWhitelist.js';
 import { hideFromPublic, isEditorRequest, publicItemScope } from '../../services/itemVisibility.js';
+import { findPdfAttachmentByItemId } from '../../repositories/itemRepo.js';
+import { signPdfAccess, withAbsolutePdfUrl } from '../../services/pdfAccess.js';
 import { asyncHandler } from '../../utils/asyncHandler.js';
+
+function isPdfAttachment(att) {
+  return String(att.contentType || '').toLowerCase().includes('pdf');
+}
 
 export const itemsRouter = Router();
 
@@ -166,11 +172,36 @@ itemsRouter.delete('/:key', asyncHandler(async (req, res) => {
   res.json({ deleted: true, permanent });
 }));
 
+// GET /api/items/:key/pdf-url — mint a short-lived signed PDF URL (logged-in only).
+itemsRouter.get('/:key/pdf-url', asyncHandler(async (req, res) => {
+  if (!req.auth?.address) {
+    return res.status(404).json({ error: 'not found' });
+  }
+  const it = await Item.loadByKey(req.params.key);
+  if (!it || hideFromPublic(req, it)) return res.status(404).json({ error: 'not found' });
+
+  let attachmentKey = typeof req.query.attachment === 'string' ? req.query.attachment : '';
+  if (attachmentKey) {
+    const { Attachment } = await import('../../models/Attachment.js');
+    const atts = await Attachment.listByParent(it.id);
+    const match = atts.find(a => a.key === attachmentKey && isPdfAttachment(a));
+    if (!match) return res.status(404).json({ error: 'pdf not available' });
+  } else {
+    attachmentKey = await findPdfAttachmentByItemId(it.id);
+  }
+  if (!attachmentKey) return res.status(404).json({ error: 'pdf not available' });
+
+  res.json(withAbsolutePdfUrl(req, signPdfAccess(attachmentKey), { itemKey: it.key }));
+}));
+
 // GET /api/items/:key/attachments
 itemsRouter.get('/:key/attachments', asyncHandler(async (req, res) => {
   const it = await Item.loadByKey(req.params.key);
   if (!it || hideFromPublic(req, it)) return res.status(404).json({ error: 'not found' });
   const { Attachment } = await import('../../models/Attachment.js');
   const atts = await Attachment.listByParent(it.id);
-  res.json({ attachments: atts.map(a => a.toJSON()) });
+  const payload = atts.map(a => a.toJSON());
+  res.json({
+    attachments: req.auth?.address ? payload : payload.filter(a => !isPdfAttachment(a)),
+  });
 }));

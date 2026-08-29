@@ -1,7 +1,8 @@
-import { test, before, describe } from 'node:test';
+import { test, before, after, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import request from 'supertest';
+import { prepareTestDb, closeDb } from './helpers/pg.js';
 import { buildApp } from '../src/api/server.js';
 import {
   generateNonce,
@@ -11,12 +12,18 @@ import {
   isEditor,
 } from '../src/api/middleware/auth.js';
 import { config } from '../src/config.js';
+import { setAccountRole } from '../src/repositories/accountRepo.js';
 
 describe('wallet auth', () => {
   let app;
 
-  before(() => {
+  before(async () => {
+    await prepareTestDb();
     app = buildApp();
+  });
+
+  after(async () => {
+    await closeDb();
   });
 
   test('GET endpoints are public', async () => {
@@ -58,7 +65,8 @@ describe('wallet auth', () => {
     assert.ok(auth);
     assert.equal(auth.address.toLowerCase(), whitelisted.toLowerCase());
     assert.equal(auth.canEdit, true);
-    assert.equal(isEditor(whitelisted), true);
+    assert.equal(auth.role, 'admin');
+    assert.equal(await isEditor(whitelisted), true);
   });
 
   test('auth nonce and verify flow', async () => {
@@ -80,7 +88,8 @@ describe('wallet auth', () => {
       .expect(200);
     const body = verifyRes.body;
     assert.equal(body.address.toLowerCase(), account.address.toLowerCase());
-    assert.equal(body.canEdit, isEditor(account.address));
+    assert.equal(body.canEdit, await isEditor(account.address));
+    assert.equal(body.role, 'user');
     assert.ok(body.token);
 
     await request(app)
@@ -90,7 +99,19 @@ describe('wallet auth', () => {
       .expect((res) => {
         assert.equal(res.body.address.toLowerCase(), account.address.toLowerCase());
         assert.equal(res.body.canEdit, body.canEdit);
+        assert.equal(res.body.role, 'user');
       });
+
+    await setAccountRole(account.address, 'admin');
+    await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${body.token}`)
+      .expect(200)
+      .expect((res) => {
+        assert.equal(res.body.role, 'admin');
+        assert.equal(res.body.canEdit, true);
+      });
+    await setAccountRole(account.address, 'user');
   });
 
   test('POST /api/merkle/verify stays public', async () => {
