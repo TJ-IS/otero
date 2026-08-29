@@ -48,6 +48,8 @@ test('PUBLIC_BASE_URL override is reflected in absolute URLs', () => {
     assert.equal(ogImageUrl(), 'https://example.test/og.png');
     const robots = buildRobotsTxt();
     assert.match(robots, /Sitemap: https:\/\/example\.test\/sitemap\.xml/);
+    assert.match(robots, /Disallow: \/api\/admin/);
+    assert.equal(robots.includes('Disallow: /api/\n'), false);
     assert.ok(!robots.includes(OLD_DOMAIN));
     assert.ok(!robots.includes(CANONICAL));
   } finally {
@@ -61,6 +63,8 @@ test('robots.txt uses the public base and does not mention the old domain', asyn
   assert.match(res.text, /Sitemap: https:\/\/ais-basket\.xyz\/sitemap\.xml/);
   assert.ok(!res.text.includes(OLD_DOMAIN));
   assert.match(res.text, /Disallow: \/admin/);
+  assert.match(res.text, /Disallow: \/api\/admin/);
+  assert.equal(res.text.includes('Disallow: /api/\n'), false);
 });
 
 test('sitemap index and static sitemap use the new base and include /journals', async () => {
@@ -105,6 +109,15 @@ test('unknown paths return 404 with noindex', async () => {
   const res = await request(app).get('/this-page-does-not-exist').expect(404);
   assert.match(res.text, /<meta name="robots" content="noindex, follow" \/>/);
   assert.match(res.text, /<title>Not found \| Otero<\/title>/);
+});
+
+test('homepage shell lists the 11 basket journals for crawlers', async () => {
+  const result = await renderSpaShellForRequest({ path: '/', query: {} });
+  assert.equal(result.status, 200);
+  assert.match(result.html, /<h1>AIS Senior Scholars' Basket of Journals<\/h1>/);
+  assert.match(result.html, /MIS Quarterly/);
+  assert.match(result.html, /Information Systems Research/);
+  assert.match(result.html, /<meta name="robots" content="index, follow" \/>/);
 });
 
 test('/journals shell is indexable and lists the 11 basket journals', async () => {

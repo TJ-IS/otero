@@ -186,59 +186,33 @@ export function injectSpaShell(html, {
   return out;
 }
 
+// Do not blanket-Disallow /api/: the public SPA fetches /api/journals and
+// /api/stats/* to render. Googlebot honors robots.txt during rendering, so
+// blocking those URLs leaves #root empty and the homepage is classified as
+// a soft 404. Only hide editor/auth/import surfaces.
+const ROBOTS_CRAWL_POLICY = `Allow: /
+Disallow: /admin
+Disallow: /api/admin
+Disallow: /api/auth
+Disallow: /api/import`;
+
 export function buildRobotsTxt() {
   const sitemap = absoluteUrl('/sitemap.xml');
+  const agents = [
+    '*',
+    'GPTBot',
+    'ChatGPT-User',
+    'OAI-SearchBot',
+    'PerplexityBot',
+    'ClaudeBot',
+    'anthropic-ai',
+    'Google-Extended',
+    'GoogleOther',
+    'Bingbot',
+  ];
+  const blocks = agents.map((agent) => `User-agent: ${agent}\n${ROBOTS_CRAWL_POLICY}`).join('\n\n');
   return `# Otero — ${publicBaseUrl()}
-User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-# AI search / citation crawlers (keep allowed)
-User-agent: GPTBot
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-User-agent: ChatGPT-User
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-User-agent: OAI-SearchBot
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-User-agent: PerplexityBot
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-User-agent: ClaudeBot
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-User-agent: anthropic-ai
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-User-agent: Google-Extended
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-User-agent: GoogleOther
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-User-agent: Bingbot
-Allow: /
-Disallow: /admin
-Disallow: /api/
+${blocks}
 
 # Training-oriented crawl (not search citation)
 User-agent: CCBot
@@ -604,7 +578,7 @@ const PAGE_COPY = {
     title: 'Otero | AIS Basket research portal',
     description: PORTAL_DESCRIPTION,
     path: '/',
-    body: `<article><h1>Otero research portal</h1><p>${escapeHtml(PORTAL_DESCRIPTION)}</p><p>See the <a href="/journals">AIS Senior Scholars' Basket journals</a>, browse the <a href="/library">literature library</a>, use <a href="/search">search</a>, explore the <a href="/dashboard">dashboard</a>, or read the <a href="/docs/api">Open API docs</a>.</p></article>`,
+    body: `<article><h1>AIS Senior Scholars' Basket of Journals</h1><p>${escapeHtml(PORTAL_DESCRIPTION)}</p><p>Otero indexes these 11 information systems journals:</p><ol>${JOURNAL_META.map((j) => `<li><a href="/library?journal=${encodeURIComponent(j.name)}">${escapeHtml(j.name)}</a> (${escapeHtml(j.abbr)})</li>`).join('')}</ol><p>See the <a href="/journals">AIS Basket journals list</a>, browse the <a href="/library">literature library</a>, use <a href="/search">search</a>, explore the <a href="/dashboard">dashboard</a>, or read the <a href="/docs/api">Open API docs</a>.</p></article>`,
     jsonLd: () => organizationJsonLd(),
   },
   library: {

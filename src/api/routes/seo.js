@@ -8,11 +8,24 @@ import {
 
 export const seoRouter = Router();
 
+function noStore(res) {
+  // Cloudflare's zone Browser Cache TTL is 4h when origin sends no
+  // Cache-Control; that previously kept a stale robots.txt advertising the
+  // old domain. Keep robots/llms at the origin.
+  res.set({
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'CDN-Cache-Control': 'no-store',
+    'Cloudflare-CDN-Cache-Control': 'no-store',
+  });
+}
+
 seoRouter.get('/robots.txt', (_req, res) => {
+  noStore(res);
   res.type('text/plain; charset=utf-8').send(buildRobotsTxt());
 });
 
 seoRouter.get('/llms.txt', (_req, res) => {
+  noStore(res);
   res.type('text/plain; charset=utf-8').send(buildLlmsTxt());
 });
 
