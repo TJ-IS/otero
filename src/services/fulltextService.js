@@ -327,6 +327,7 @@ export async function recoverSubmittingOnStartup() {
       await upsertFullText(row.itemID, { state: 'failed', errMsg: 'no PDF attachment' });
       continue;
     }
+    await upsertFullText(row.itemID, { submittedAt: nowStr() });
     submitQueue.push({ itemId: row.itemID, key: row.itemKey, pdfRelPath });
   }
   if (!submitQueueRunning && submitQueue.length > 0) drainSubmitQueue();
@@ -405,16 +406,36 @@ export async function pollOnce() {
         //   a different token, or the result TTL elapsed). These won't ever
         //   resolve — mark failed so the user can retry with the current token.
         // A0202/A0211: invalid/expired token — same treatment.
-        if (mineruCode === -60012 || mineruCode === 'A0202' || mineruCode === 'A0211') {
+        if (mineruCode === -60012 || mineruCode === '-60012' || mineruCode === 'A0202' || mineruCode === 'A0211') {
+          // -60012 is also returned for a few seconds after submit, before
+          // MinerU has registered the batch. Only fail rows whose submission
+          // is old enough that "not found" really means expired.
+          const STALE_MS = 45 * 60 * 1000;
+          const now = Date.now();
+          let marked = 0;
+          let deferred = 0;
           for (const row of rows) {
+            const submitted = parseSubmittedAtMs(row.submittedAt);
+            // Unparseable / missing timestamp: keep waiting, do not fail-fast.
+            const age = Number.isFinite(submitted) ? now - submitted : 0;
+            if (age < STALE_MS && (mineruCode === -60012 || mineruCode === '-60012')) {
+              deferred++;
+              continue;
+            }
             await upsertFullText(row.itemID, {
               state: 'failed',
               errMsg: err.message,
               errCode: String(mineruCode),
             });
             failed++;
+            marked++;
           }
-          console.warn(`[fulltext] batch ${batchId} unreachable (code ${mineruCode}); marked ${rows.length} item(s) as failed`);
+          if (marked) {
+            console.warn(`[fulltext] batch ${batchId} unreachable (code ${mineruCode}); marked ${marked} item(s) as failed`);
+          }
+          if (deferred) {
+            console.warn(`[fulltext] batch ${batchId} not registered yet (code ${mineruCode}); retrying ${deferred} item(s) next tick`);
+          }
         } else {
           // Transient network errors: leave state as-is for next tick.
           console.error(`[fulltext] poll error for batch ${batchId} (${rows.length} items):`, err.message);
@@ -694,6 +715,18 @@ async function cleanupAssets(key) {
 
 function nowStr() {
   return new Date().toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function parseSubmittedAtMs(value) {
+  if (value == null || value === '') return NaN;
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return Number.isFinite(t) ? t : NaN;
+  }
+  const s = String(value).trim();
+  const iso = s.includes('T') ? s : s.replace(' ', 'T');
+  const withZone = /(?:Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`;
+  return Date.parse(withZone);
 }
 
 /** List all full-text rows (for admin/queue view). */

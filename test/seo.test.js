@@ -84,6 +84,7 @@ test('sitemap index and static sitemap use the new base and include /journals', 
 test('llms.txt links the new origin and the journals page', () => {
   const txt = buildLlmsTxt();
   assert.match(txt, /https:\/\/ais-basket\.xyz\/journals/);
+  assert.match(txt, /npx skills add https:\/\/ais-basket\.xyz/);
   assert.ok(!txt.includes(OLD_DOMAIN));
 });
 

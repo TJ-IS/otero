@@ -40,6 +40,33 @@ function normalizeStorageType(type) {
   return type;
 }
 
+/**
+ * Collect MinerU API tokens from OTERO_MINERU_TOKEN, OTERO_MINERU_TOKENS
+ * (comma/semicolon/whitespace separated), and OTERO_MINERU_TOKEN_2…N.
+ */
+export function parseMineruTokens(env = process.env) {
+  const out = [];
+  const seen = new Set();
+  const add = (raw) => {
+    if (raw == null || raw === '') return;
+    for (const part of String(raw).split(/[\s,;]+/)) {
+      const token = part.trim().replace(/^["']|["']$/g, '');
+      if (!token || seen.has(token)) continue;
+      seen.add(token);
+      out.push(token);
+    }
+  };
+  add(env.OTERO_MINERU_TOKEN);
+  add(env.OTERO_MINERU_TOKENS);
+  const numbered = Object.keys(env)
+    .filter((k) => /^OTERO_MINERU_TOKEN_\d+$/.test(k))
+    .sort((a, b) => Number(a.split('_').pop()) - Number(b.split('_').pop()));
+  for (const key of numbered) add(env[key]);
+  return out;
+}
+
+const mineruTokens = parseMineruTokens();
+
 export const config = {
   projectRoot,
   dataDir: path.join(projectRoot, 'data'),
@@ -95,7 +122,8 @@ export const config = {
   },
   mineru: {
     endpoint: 'https://mineru.net',
-    token: process.env.OTERO_MINERU_TOKEN || '',
+    tokens: mineruTokens,
+    token: mineruTokens[0] || '',
     modelVersion: process.env.OTERO_MINERU_MODEL || 'vlm',
     pollIntervalMs: Number(process.env.OTERO_MINERU_POLL_MS ?? 15000),
     maxConcurrent: Number(process.env.OTERO_MINERU_MAX_CONCURRENT ?? 3),

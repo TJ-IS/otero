@@ -233,8 +233,9 @@ Otero does not modify the corpus via its public Open API. All open endpoints are
 ## Docs
 
 - [Open API reference](${base}/docs/api): Human-readable endpoint list and filter contract
-- [Agent skill (UI)](${base}/docs/agents): SKILL.md preview for agent install
+- [Agent skill (UI)](${base}/docs/agents): Install with \`npx skills add ${base}\` (scheme required)
 - [Agent skill (raw)](${base}/api/open/v1/SKILL.md): Live Markdown skill for autonomous agents
+- [Agent skill discovery](${base}/.well-known/agent-skills/index.json): well-known index for the skills CLI
 
 ## Site
 
@@ -611,9 +612,9 @@ const PAGE_COPY = {
   docsAgents: {
     title: 'Agent Skill | Otero',
     description:
-      'Install Otero\'s agent skill (SKILL.md) so autonomous agents can discover and call the read-only Open API for AIS Basket literature.',
+      'Install Otero\'s Open API skill with npx skills add https://ais-basket.xyz so agents can search AIS Basket literature.',
     path: '/docs/agents',
-    body: `<article><h1>Otero for Agents</h1><p>Otero publishes a live SKILL.md that tells agents how to search the AIS Basket library, fetch items and full text, and export citations via the read-only Open API. Copy the skill or fetch <a href="/api/open/v1/SKILL.md">/api/open/v1/SKILL.md</a> directly.</p></article>`,
+    body: `<article><h1>Otero for Agents</h1><p>Install the Otero Open API skill with <code>npx skills add https://ais-basket.xyz</code> (the https:// prefix is required). Agents can then search the AIS Basket library, fetch items and full text, and export citations. Discovery lives at <a href="/.well-known/agent-skills/index.json">/.well-known/agent-skills/index.json</a>; the live skill is also at <a href="/api/open/v1/SKILL.md">/api/open/v1/SKILL.md</a>.</p></article>`,
   },
   dashboard: {
     title: 'Dashboard | Otero',

@@ -8,10 +8,36 @@ import { config } from '../config.js';
 
 const ENDPOINT = config.mineru.endpoint;
 
-function authHeaders(extra = {}) {
+/** batch_id → token that created it, so poll uses the same account. */
+const batchToken = new Map();
+let tokenCursor = 0;
+
+function tokenPool() {
+  const list = config.mineru.tokens;
+  if (Array.isArray(list) && list.length) return list;
+  return config.mineru.token ? [config.mineru.token] : [];
+}
+
+function tokenLabel(token) {
+  const list = tokenPool();
+  const i = list.indexOf(token);
+  return i >= 0 ? `${i + 1}/${list.length}` : '?';
+}
+
+function shouldRotate(status, code) {
+  return status === 429 || status === 401 || status === 403
+    || code === 'A0202' || code === 'A0211'
+    || code === -60019 || code === '-60019';
+}
+
+function isNotFound(code) {
+  return code === -60012 || code === '-60012';
+}
+
+function authHeaders(token, extra = {}) {
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${config.mineru.token}`,
+    Authorization: `Bearer ${token}`,
     ...extra,
   };
 }
@@ -21,6 +47,38 @@ async function asJson(res) {
   let body;
   try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
   return { status: res.status, body };
+}
+
+/**
+ * Run fn(token). On 429 / auth / quota errors, try the next token in the pool.
+ * @param {'submit'|'query'} kind
+ * @param {(token: string) => Promise<T>} fn
+ * @param {{ preferred?: string, alsoTryNotFound?: boolean }} [opts]
+ */
+async function withTokenRotation(kind, fn, opts = {}) {
+  const list = tokenPool();
+  if (!list.length) throw new Error('OTERO_MINERU_TOKEN is not set');
+  const preferred = opts.preferred && list.includes(opts.preferred) ? opts.preferred : null;
+  const start = preferred ? list.indexOf(preferred) : tokenCursor;
+  const ordered = [];
+  for (let i = 0; i < list.length; i++) ordered.push(list[(start + i) % list.length]);
+
+  let lastErr;
+  for (let i = 0; i < ordered.length; i++) {
+    const token = ordered[i];
+    try {
+      const result = await fn(token);
+      tokenCursor = list.indexOf(token);
+      return result;
+    } catch (err) {
+      lastErr = err;
+      const rotate = shouldRotate(err.status, err.mineruCode)
+        || (opts.alsoTryNotFound && isNotFound(err.mineruCode));
+      if (!rotate || i === ordered.length - 1) throw err;
+      console.warn(`[mineru] ${kind} failed on token ${tokenLabel(token)}: ${err.message}; trying next`);
+    }
+  }
+  throw lastErr;
 }
 
 /**
@@ -38,34 +96,38 @@ export async function submitLocalPdf({ filePath, fileName, modelVersion, languag
     enable_table: enableTable ?? config.mineru.enableTable,
     language: language || config.mineru.language,
   };
-  const res = await fetch(`${ENDPOINT}/api/v4/file-urls/batch`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(body),
-  });
-  const { status, body: rb } = await asJson(res);
-  if (!res.ok || rb.code !== 0) {
-    const err = new Error(`MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
-    err.status = status;
-    err.mineruCode = rb.code ?? null;
-    throw err;
-  }
-  const { batch_id: batchId, file_urls: urls } = rb.data;
-  if (!urls || urls.length === 0) throw new Error('MinerU returned no upload url');
+  const { batchId } = await withTokenRotation('submit', async (token) => {
+    const res = await fetch(`${ENDPOINT}/api/v4/file-urls/batch`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(body),
+    });
+    const { status, body: rb } = await asJson(res);
+    if (!res.ok || rb.code !== 0) {
+      const err = new Error(`MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+      err.status = status;
+      err.mineruCode = rb.code ?? null;
+      throw err;
+    }
+    const { batch_id: batchId, file_urls: urls } = rb.data;
+    if (!urls || urls.length === 0) throw new Error('MinerU returned no upload url');
 
-  // Upload the file to the signed OSS URL. No Content-Type header (per docs).
-  const stat = await fs.promises.stat(filePath);
-  const src = fs.createReadStream(filePath);
-  const upRes = await fetch(urls[0], {
-    method: 'PUT',
-    headers: { 'Content-Length': String(stat.size) },
-    body: Readable.toWeb(src),
-    duplex: 'half',
+    // Upload the file to the signed OSS URL. No Content-Type header (per docs).
+    const stat = await fs.promises.stat(filePath);
+    const src = fs.createReadStream(filePath);
+    const upRes = await fetch(urls[0], {
+      method: 'PUT',
+      headers: { 'Content-Length': String(stat.size) },
+      body: Readable.toWeb(src),
+      duplex: 'half',
+    });
+    if (!upRes.ok) {
+      const t = await upRes.text().catch(() => '');
+      throw new Error(`MinerU OSS upload failed: HTTP ${upRes.status} ${t.slice(0, 200)}`);
+    }
+    batchToken.set(batchId, token);
+    return { batchId };
   });
-  if (!upRes.ok) {
-    const t = await upRes.text().catch(() => '');
-    throw new Error(`MinerU OSS upload failed: HTTP ${upRes.status} ${t.slice(0, 200)}`);
-  }
   return { batchId };
 }
 
@@ -90,29 +152,32 @@ export async function submitLocalPdfs(files, opts = {}) {
     enable_table: opts.enableTable ?? config.mineru.enableTable,
     language: opts.language || config.mineru.language,
   };
-  const res = await fetch(`${ENDPOINT}/api/v4/file-urls/batch`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(body),
+  return withTokenRotation('submit', async (token) => {
+    const res = await fetch(`${ENDPOINT}/api/v4/file-urls/batch`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify(body),
+    });
+    const { status, body: rb } = await asJson(res);
+    if (!res.ok || rb.code !== 0) {
+      const err = new Error(`MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+      err.status = status;
+      err.mineruCode = rb.code ?? null;
+      throw err;
+    }
+    const { batch_id: batchId, file_urls: urls } = rb.data;
+    if (!urls || urls.length !== files.length) {
+      throw new Error(`MinerU returned ${urls?.length || 0} upload urls for ${files.length} files`);
+    }
+    // Concurrent upload to OSS (separate domain from the API, not rate-limited
+    // by the same per-IP/per-minute cap that triggers HTTP 429).
+    await runConcurrent(
+      files.map((f, i) => () => uploadOne(f.filePath, urls[i])),
+      UPLOAD_CONCURRENCY,
+    );
+    batchToken.set(batchId, token);
+    return { batchId };
   });
-  const { status, body: rb } = await asJson(res);
-  if (!res.ok || rb.code !== 0) {
-    const err = new Error(`MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
-    err.status = status;
-    err.mineruCode = rb.code ?? null;
-    throw err;
-  }
-  const { batch_id: batchId, file_urls: urls } = rb.data;
-  if (!urls || urls.length !== files.length) {
-    throw new Error(`MinerU returned ${urls?.length || 0} upload urls for ${files.length} files`);
-  }
-  // Concurrent upload to OSS (separate domain from the API, not rate-limited
-  // by the same per-IP/per-minute cap that triggers HTTP 429).
-  await runConcurrent(
-    files.map((f, i) => () => uploadOne(f.filePath, urls[i])),
-    UPLOAD_CONCURRENCY,
-  );
-  return { batchId };
 }
 
 async function uploadOne(filePath, url) {
@@ -145,9 +210,9 @@ async function runConcurrent(tasks, concurrency) {
  * Query a batch's results. Returns the extract_result array (one entry per file).
  * Each entry: { file_name, state, full_zip_url?, err_msg?, extract_progress? }
  */
-export async function getBatchResult(batchId) {
+async function queryBatchOnce(token, batchId) {
   const res = await fetch(`${ENDPOINT}/api/v4/extract-results/batch/${batchId}`, {
-    headers: authHeaders({ Accept: '*/*' }),
+    headers: authHeaders(token, { Accept: '*/*' }),
   });
   const { status, body: rb } = await asJson(res);
   if (!res.ok || rb.code !== 0) {
@@ -156,7 +221,20 @@ export async function getBatchResult(batchId) {
     err.mineruCode = rb.code ?? null;
     throw err;
   }
+  batchToken.set(batchId, token);
   return rb.data; // { batch_id, extract_result: [...] }
+}
+
+export async function getBatchResult(batchId) {
+  const mapped = batchToken.get(batchId);
+  if (mapped) {
+    // Same account that submitted. 429 here should wait, not query other accounts.
+    return queryBatchOnce(mapped, batchId);
+  }
+  // Process restart: try every token until one can see this batch.
+  return withTokenRotation('query', (token) => queryBatchOnce(token, batchId), {
+    alsoTryNotFound: true,
+  });
 }
 
 /**

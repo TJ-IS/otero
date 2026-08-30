@@ -11,7 +11,7 @@ let started = false;
  */
 export function startFullTextWorker() {
   if (started) return;
-  if (!config.mineru.token) {
+  if (!config.mineru.tokens.length) {
     console.warn('[fulltext] OTERO_MINERU_TOKEN not set; worker disabled');
     return;
   }
@@ -22,7 +22,8 @@ export function startFullTextWorker() {
   if (timer.unref) timer.unref();
   // Kick one off shortly after start.
   setTimeout(tick, 1000).unref?.();
-  console.log(`[fulltext] worker started (poll every ${interval}ms)`);
+  const n = config.mineru.tokens.length;
+  console.log(`[fulltext] worker started (poll every ${interval}ms, ${n} MinerU token${n === 1 ? '' : 's'})`);
 }
 
 export function stopFullTextWorker() {

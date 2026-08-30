@@ -85,7 +85,7 @@
     "docsApiTitle": "开放 API | Otero",
     "docsApiDescription": "Otero 开放 API 是面向 AIS Basket 文献库的只读 HTTP 接口：检索、元数据、结构化全文、引用导出与语料统计。",
     "docsAgentsTitle": "Agent Skill | Otero",
-    "docsAgentsDescription": "安装 Otero 的 Agent Skill（SKILL.md），让自主 Agent 发现并调用 AIS Basket 只读 Open API。",
+    "docsAgentsDescription": "用 npx skills add https://ais-basket.xyz 安装 Otero Open API skill，让 Agent 检索 AIS Basket 文献。",
     "itemTitle": "{{title}} | Otero",
     "authorTitle": "{{name}} | Otero",
     "authorDescription": "{{name}} — 在 Otero 中有 {{count}} 篇 AIS Basket 论文。"

@@ -51,15 +51,19 @@
   },
   "agents": {
     "answerHeading": "How do agents use Otero?",
-    "answer": "Otero publishes a live SKILL.md so autonomous agents can discover the read-only Open API, search the AIS Basket library, fetch items and full text, and export citations. Copy the skill below or fetch /api/open/v1/SKILL.md directly.",
-    "hint": "Copy below and save as AGENTS.md or SKILL.md so other agents can access this site's open data.",
+    "answer": "Install the Otero Open API skill with the skills CLI so agents can search the AIS Basket library, fetch items and full text, and export citations via the read-only Open API.",
+    "installHeading": "Install with skills CLI",
+    "copyCommand": "Copy command",
+    "copiedCommand": "Install command copied",
+    "previewHeading": "SKILL.md",
+    "hint": "Optional: copy the live skill and save it as SKILL.md, or fetch /api/open/v1/SKILL.md.",
     "copy": "Copy",
     "copied": "Copied",
-    "copiedMd": "AGENTS.md copied",
+    "copiedMd": "SKILL.md copied",
     "copyFailed": "Copy failed",
     "rawFile": "Raw file",
     "loading": "Loading…",
     "empty": "(empty)",
-    "loadFailed": "Failed to load AGENTS.md: {{message}}"
+    "loadFailed": "Failed to load SKILL.md: {{message}}"
   }
 }

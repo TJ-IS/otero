@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Items, Item } from '../models/Item.js';
 import {
   listJournals,
@@ -13,6 +14,12 @@ import { JOURNAL_WHITELIST, UNFILED } from './journalWhitelist.js';
 import { isBasketVisibleItem } from './itemVisibility.js';
 import { normalizeDoi } from '../utils/doi.js';
 import { signPdfAccess } from './pdfAccess.js';
+
+export const OTERO_OPEN_API_SKILL_NAME = 'otero-open-api';
+export const OTERO_OPEN_API_SKILL_DESCRIPTION =
+  'Read-only access to the Otero AIS Senior Scholars\' Basket literature library via HTTP APIs. Use when searching papers or authors, resolving DOI or item keys, fetching structured full text, exporting citations, or querying corpus statistics.';
+export const AGENT_SKILLS_DISCOVERY_SCHEMA =
+  'https://schemas.agentskills.io/discovery/0.2.0/schema.json';
 
 const WHITELIST_SET = new Set(JOURNAL_WHITELIST);
 
@@ -347,11 +354,32 @@ export async function exportOpenArticles({ format = 'bibtex', q, ...filters }) {
 
 export { getOpenFacets, getOpenOverviewStats, getOpenTimeline };
 
+export function skillMarkdownDigest(markdown) {
+  const hash = createHash('sha256').update(String(markdown ?? ''), 'utf8').digest('hex');
+  return `sha256:${hash}`;
+}
+
+export function buildAgentSkillsIndex({ markdown }) {
+  const body = String(markdown ?? '');
+  return {
+    $schema: AGENT_SKILLS_DISCOVERY_SCHEMA,
+    skills: [
+      {
+        name: OTERO_OPEN_API_SKILL_NAME,
+        type: 'skill-md',
+        description: OTERO_OPEN_API_SKILL_DESCRIPTION,
+        url: `${OTERO_OPEN_API_SKILL_NAME}/SKILL.md`,
+        digest: skillMarkdownDigest(body),
+      },
+    ],
+  };
+}
+
 export function buildSkillMarkdown({ baseUrl }) {
   const base = String(baseUrl || '').replace(/\/$/, '');
   return `---
-name: otero-open-api
-description: Read-only access to the Otero AIS Senior Scholars' Basket literature library via HTTP APIs. Use when searching papers or authors, resolving DOI or item keys, fetching structured full text, exporting citations, or querying corpus statistics.
+name: ${OTERO_OPEN_API_SKILL_NAME}
+description: ${OTERO_OPEN_API_SKILL_DESCRIPTION}
 ---
 
 # Otero Open API

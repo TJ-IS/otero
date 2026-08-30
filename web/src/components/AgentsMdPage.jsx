@@ -24,17 +24,28 @@ function CodeBlock({ children, className }) {
   );
 }
 
+function currentOrigin() {
+  if (typeof window === 'undefined') return '';
+  return window.location.origin;
+}
+
 export function AgentsMdPage() {
   const { t } = useTranslation(['docs', 'common']);
   const [agentsMd, setAgentsMd] = useState('');
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [copiedCommand, setCopiedCommand] = useState(false);
+  const [origin, setOrigin] = useState(currentOrigin);
 
   usePageMeta({
     title: t('common:seo.docsAgentsTitle'),
     description: t('common:seo.docsAgentsDescription'),
     canonicalPath: '/docs/agents',
   });
+
+  useEffect(() => {
+    setOrigin(currentOrigin());
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +72,8 @@ export function AgentsMdPage() {
     };
   }, [t]);
 
+  const installCommand = origin ? `npx skills add ${origin}` : 'npx skills add https://ais-basket.xyz';
+
   const handleCopy = async () => {
     if (!agentsMd) return;
     try {
@@ -68,6 +81,17 @@ export function AgentsMdPage() {
       setCopied(true);
       toast.success(t('agents.copiedMd'));
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error(t('agents.copyFailed'));
+    }
+  };
+
+  const handleCopyCommand = async () => {
+    try {
+      await copyText(installCommand);
+      setCopiedCommand(true);
+      toast.success(t('agents.copiedCommand'));
+      setTimeout(() => setCopiedCommand(false), 2000);
     } catch {
       toast.error(t('agents.copyFailed'));
     }
@@ -82,8 +106,18 @@ export function AgentsMdPage() {
       />
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-sm font-semibold tracking-tight">{t('agents.installHeading')}</h3>
+          <Button variant="outline" size="sm" onClick={handleCopyCommand}>
+            {copiedCommand ? <Check className="size-4" /> : <Copy className="size-4" />}
+            {copiedCommand ? t('agents.copied') : t('agents.copyCommand')}
+          </Button>
+        </div>
+        <CodeBlock>{installCommand}</CodeBlock>
+      </section>
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold tracking-tight">AGENTS.md</h3>
+            <h3 className="text-sm font-semibold tracking-tight">{t('agents.previewHeading')}</h3>
             <p className="max-w-measure text-sm text-muted-foreground">
               {t('agents.hint')}
             </p>

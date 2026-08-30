@@ -4,7 +4,8 @@ Otero is a read-only literature API for the AIS Senior Scholars' Basket of Journ
 
 ## Discovery
 
-- Fetch `/api/open/v1/SKILL.md` for the complete live endpoint reference.
+- Install the live skill with `npx skills add https://ais-basket.xyz` (scheme required; a bare host is treated as a GitHub repo). Refresh with `npx skills update`.
+- Fetch `/api/open/v1/SKILL.md` or `/.well-known/agent-skills/otero-open-api/SKILL.md` for the complete live endpoint reference.
 - Call `/api/open/v1/journals` before applying journal filters; journal names are exact.
 - Only non-deleted, top-level items in the 11 Basket journals are visible. Never attempt to access the internal `待归档` bucket.
 

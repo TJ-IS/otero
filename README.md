@@ -93,6 +93,8 @@ S3_CREATE_BUCKET=false
 
 # MinerU
 OTERO_MINERU_TOKEN=
+# OTERO_MINERU_TOKEN_2=          # extra keys; rotate on 429 / quota
+# OTERO_MINERU_TOKENS=tokA,tokB  # or a comma-separated pool
 OTERO_MINERU_MODEL=vlm
 OTERO_MINERU_POLL_MS=15000
 OTERO_MINERU_MAX_CONCURRENT=3
@@ -207,6 +209,17 @@ node scripts/import-downloads-to-db.mjs --dry-run
 | — | `/api/collections` | 集合 CRUD |
 
 写操作需编辑者 JWT（`Authorization: Bearer …`）；未登录可读。
+
+## Agent Skill
+
+外部 Agent 通过 skills CLI 安装只读 Open API skill（必须带协议前缀，裸域名会被当成 GitHub 仓库）：
+
+```bash
+npx skills add https://ais-basket.xyz
+npx skills update
+```
+
+发现索引：`GET /.well-known/agent-skills/index.json`。实时正文：`GET /api/open/v1/SKILL.md`。页面说明见 `/docs/agents`。自托管实例把 origin 换成自己的站点即可。
 
 ## 设计文档
 

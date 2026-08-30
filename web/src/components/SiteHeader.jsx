@@ -1,4 +1,4 @@
-import { BookOpenText, Menu, Moon, Sun } from 'lucide-react';
+import { Menu, Moon, Sun } from 'lucide-react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
@@ -49,12 +49,9 @@ export function SiteHeader({ className, actions }) {
       <div className="mx-auto flex h-14 w-full max-w-page items-center gap-3 px-4 sm:px-6 lg:px-8">
         <Link
           to="/"
-          className="group flex shrink-0 items-center gap-2 text-foreground transition-colors hover:text-brand"
+          className="flex shrink-0 items-center text-foreground transition-colors hover:text-brand"
           aria-label={t('brandHome')}
         >
-          <span className="flex size-7 items-center justify-center rounded-sm bg-brand text-brand-foreground transition-transform duration-200 group-hover:-rotate-3">
-            <BookOpenText className="size-4" strokeWidth={1.8} />
-          </span>
           <span className="font-display text-xl font-semibold">Otero</span>
         </Link>
 

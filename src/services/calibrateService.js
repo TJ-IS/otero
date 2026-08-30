@@ -18,9 +18,9 @@ const ALLOWED_PUBLICATION_TITLES = [...AIS_BASKET_JOURNALS, UNFILED];
  */
 async function allowedFieldsForType(itemTypeName) {
   const rows = await query(`
-    SELECT f."fieldName" FROM itemTypeFields itf
+    SELECT f."fieldName" FROM "itemTypeFields" itf
     JOIN fields f ON f."fieldID" = itf."fieldID"
-    JOIN itemTypes it ON it."itemTypeID" = itf."itemTypeID"
+    JOIN "itemTypes" it ON it."itemTypeID" = itf."itemTypeID"
     WHERE it."typeName" = $1
     ORDER BY itf."orderIndex"
   `, [itemTypeName]);

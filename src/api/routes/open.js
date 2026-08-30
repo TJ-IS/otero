@@ -21,14 +21,9 @@ import {
   getOpenTimeline,
   buildSkillMarkdown,
 } from '../../services/openApiService.js';
+import { requestBaseUrl } from '../../services/pdfAccess.js';
 
 export const openRouter = Router();
-
-function requestBaseUrl(req) {
-  const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
-  const host = req.get('x-forwarded-host') || req.get('host') || 'localhost';
-  return `${proto}://${host}`;
-}
 
 function sendError(res, err) {
   if (err instanceof OpenApiError) {

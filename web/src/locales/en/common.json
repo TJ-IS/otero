@@ -85,7 +85,7 @@
     "docsApiTitle": "Open API | Otero",
     "docsApiDescription": "Otero Open API is a read-only HTTP interface to the AIS Basket literature library: search, metadata, structured full text, citation export, and corpus stats.",
     "docsAgentsTitle": "Agent Skill | Otero",
-    "docsAgentsDescription": "Install Otero's agent skill (SKILL.md) so autonomous agents can discover and call the read-only Open API for AIS Basket literature.",
+    "docsAgentsDescription": "Install Otero's Open API skill with npx skills add https://ais-basket.xyz so agents can search AIS Basket literature.",
     "itemTitle": "{{title}} | Otero",
     "authorTitle": "{{name}} | Otero",
     "authorDescription": "{{name}} — {{count}} AIS Basket paper(s) in Otero."

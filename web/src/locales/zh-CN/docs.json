@@ -51,15 +51,19 @@
   },
   "agents": {
     "answerHeading": "Agent 如何使用 Otero？",
-    "answer": "Otero 提供实时 SKILL.md，供自主 Agent 发现只读 Open API、检索 AIS Basket 文献库、获取条目与全文并导出引用。可复制下方内容，或直接请求 /api/open/v1/SKILL.md。",
-    "hint": "复制下方内容保存为 AGENTS.md 或 SKILL.md，供其他 Agent 访问本站开放数据。",
+    "answer": "用 skills CLI 安装 Otero Open API skill，即可让 Agent 通过只读 Open API 检索 AIS Basket 文献库、获取条目与全文并导出引用。",
+    "installHeading": "用 skills CLI 安装",
+    "copyCommand": "复制命令",
+    "copiedCommand": "已复制安装命令",
+    "previewHeading": "SKILL.md",
+    "hint": "可选：复制下方实时 skill 并保存为 SKILL.md，或直接请求 /api/open/v1/SKILL.md。",
     "copy": "复制",
     "copied": "已复制",
-    "copiedMd": "已复制 AGENTS.md",
+    "copiedMd": "已复制 SKILL.md",
     "copyFailed": "复制失败",
     "rawFile": "原始文件",
     "loading": "加载中…",
     "empty": "（空）",
-    "loadFailed": "加载 AGENTS.md 失败: {{message}}"
+    "loadFailed": "加载 SKILL.md 失败: {{message}}"
   }
 }

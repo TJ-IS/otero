@@ -227,6 +227,75 @@ program
     if (res.fail > 0) process.exitCode = 1;
   });
 
+program
+  .command('repair-metadata')
+  .description('Repair confirmed Basket metadata errors (default: dry-run)')
+  .option('--apply', 'write changes to the database')
+  .option('--dry-run', 'report changes without writing (default)')
+  .option('--phase <n>', '1|2|3|4|all', 'all')
+  .option('--keys <keys>', 'comma-separated item keys to limit the run')
+  .option('--log <path>', 'JSONL log path')
+  .action(async (opts) => {
+    const { repairMetadata } = await import('../services/metadataRepairService.js');
+    await initDb();
+    await runMigrations();
+    try {
+      const apply = !!opts.apply && !opts.dryRun;
+      const keys = opts.keys ? String(opts.keys).split(',').map((k) => k.trim()).filter(Boolean) : null;
+      const res = await repairMetadata({
+        apply,
+        phase: opts.phase,
+        logPath: opts.log || null,
+        keys,
+      });
+      console.log(`\n${apply ? 'Applied' : 'Dry-run'}: ${res.summary.total} rows, `
+        + `${res.summary.applied} changed, ${res.summary.skipped} skipped, ${res.summary.errors} errors`);
+      console.log(`Log: ${res.logPath}`);
+      if (res.summary.errors > 0) process.exitCode = 1;
+    } catch (err) {
+      console.error(`[FAIL] ${err.message}`);
+      process.exitCode = 1;
+    } finally {
+      await closeDb();
+    }
+  });
+
+program
+  .command('extract-abstracts')
+  .description('Fill empty/placeholder abstracts from MinerU text (default: dry-run, no LLM)')
+  .option('--apply', 'write extracted abstracts to the database')
+  .option('--dry-run', 'report extractions without writing (default)')
+  .option('--limit <n>', 'max items to scan', (v) => Number(v))
+  .option('--keys <keys>', 'comma-separated item keys to limit the run')
+  .option('--log <path>', 'JSONL log path')
+  .action(async (opts) => {
+    const { extractAbstracts } = await import('../services/abstractExtractService.js');
+    await initDb();
+    await runMigrations();
+    try {
+      const apply = !!opts.apply && !opts.dryRun;
+      const keys = opts.keys ? String(opts.keys).split(',').map((k) => k.trim()).filter(Boolean) : null;
+      const res = await extractAbstracts({
+        apply,
+        logPath: opts.log || null,
+        limit: opts.limit || null,
+        keys,
+      });
+      console.log(`\n${apply ? 'Applied' : 'Dry-run'}: scanned ${res.summary.scanned}, `
+        + `${res.summary.hit} extracted, ${res.summary.skipped} skipped`);
+      for (const j of res.summary.byJournal) {
+        if (!j.candidates) continue;
+        console.log(`  ${j.journal}: ${j.hit}/${j.candidates} (${j.rate}%)`);
+      }
+      console.log(`Log: ${res.logPath}`);
+    } catch (err) {
+      console.error(`[FAIL] ${err.message}`);
+      process.exitCode = 1;
+    } finally {
+      await closeDb();
+    }
+  });
+
 // Default: print help.
 program.parseAsync(process.argv).catch(err => {
   console.error(err);

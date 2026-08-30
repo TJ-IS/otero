@@ -20,6 +20,7 @@ import { authRouter } from './routes/auth.js';
 import { openRouter } from './routes/open.js';
 import { adminRouter } from './routes/admin.js';
 import { seoRouter, spaSeoFallback } from './routes/seo.js';
+import { wellKnownSkillsRouter } from './routes/wellKnownSkills.js';
 import { canonicalHostRedirect } from './middleware/canonicalHost.js';
 import { optionalAuth, editorWriteGate, requireEditor } from './middleware/auth.js';
 import { activityLogMiddleware } from './middleware/activityLog.js';
@@ -44,6 +45,7 @@ export function buildApp() {
 
   // Machine-readable SEO files (always available, even without a web build).
   app.use(seoRouter);
+  app.use('/.well-known', wellKnownSkillsRouter);
 
   app.use('/api/auth', authRouter);
   app.use('/api', optionalAuth(), editorWriteGate, activityLogMiddleware());
