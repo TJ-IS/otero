@@ -4,6 +4,7 @@
  */
 import { initDb, closeDb, query } from '../src/db/connection.js';
 import { extractItem, applyExtraction } from '../src/services/extractService.js';
+import { JOURNAL_WHITELIST } from '../src/services/journalWhitelist.js';
 
 const CONCURRENCY = Math.max(1, Number(process.argv[2]) || 3);
 
@@ -16,7 +17,7 @@ const rows = await query(`
   JOIN "itemDataValues" j ON j."valueID" = dj."valueID"
   JOIN "itemFullText" ft ON ft."itemID" = i."itemID" AND ft.state = 'done'
   WHERE i.deleted = 0 AND i."parentItemID" IS NULL
-    AND j.value IN ('Information and Organization', 'Information Systems Journal')
+    AND j.value = ANY($1)
     AND NOT EXISTS (
       SELECT 1 FROM "itemData" d
       JOIN fields f ON f."fieldID" = d."fieldID" AND f."fieldName" = 'abstractNote'
@@ -24,7 +25,7 @@ const rows = await query(`
       WHERE d."itemID" = i."itemID" AND btrim(v.value) <> ''
     )
   ORDER BY i."itemID"
-`);
+`, [JOURNAL_WHITELIST]);
 console.log(`extract abstracts for ${rows.length} items (concurrency=${CONCURRENCY})`);
 let next = 0;
 let ok = 0;

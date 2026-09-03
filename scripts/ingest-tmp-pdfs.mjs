@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Ingest tmp/{infoandorg,isj} manifest PDFs: create or attach, Crossref-fill
- * bibliographic fields, MinerU-parse, then extract remaining empty fields.
+ * Ingest tmp/manifest.tsv PDFs: create or attach, Crossref-fill bibliographic
+ * fields, MinerU-parse, then extract remaining empty fields.
  *
  *   node scripts/ingest-tmp-pdfs.mjs
  *   node scripts/ingest-tmp-pdfs.mjs --phase=import
+ *   node scripts/ingest-tmp-pdfs.mjs --phase=enqueue
  *   node scripts/ingest-tmp-pdfs.mjs --phase=parse
  *   node scripts/ingest-tmp-pdfs.mjs --phase=validate
  *   node scripts/ingest-tmp-pdfs.mjs --dry-run
@@ -21,8 +22,11 @@ import { Attachment } from '../src/models/Attachment.js';
 import { generateKey } from '../src/utils/key.js';
 import { normalizeDoi } from '../src/utils/doi.js';
 import { normalizeJournalName } from '../src/services/extractService.js';
+import { JOURNAL_WHITELIST } from '../src/services/journalWhitelist.js';
+import { importPdf } from '../src/services/importService.js';
 import {
   enqueueBatchParse, pollOnce, recoverSubmittingOnStartup, retryFailed,
+  waitForSubmitQueue,
 } from '../src/services/fulltextService.js';
 import { extractItem, applyExtraction } from '../src/services/extractService.js';
 import { backfillFullTextIndex } from '../src/services/fulltextIndexService.js';
@@ -39,9 +43,18 @@ process.on('unhandledRejection', (err) => {
 
 const ROOT = config.projectRoot;
 const SOURCES = [
-  { src: 'I&O', dir: path.join(ROOT, 'tmp/infoandorg') },
-  { src: 'ISJ', dir: path.join(ROOT, 'tmp/isj') },
+  { src: 'batch', dir: path.join(ROOT, 'tmp') },
 ];
+const JOURNAL_CODE_NAME = {
+  IO: 'Information and Organization',
+  'I&O': 'Information and Organization',
+  ISJ: 'Information Systems Journal',
+  JMIS: 'Journal of Management Information Systems',
+  JIT: 'Journal of Information Technology',
+  DSS: 'Decision Support Systems',
+  EJIS: 'European Journal of Information Systems',
+  JAIS: 'Journal of the Association for Information Systems',
+};
 const LOG_PATH = path.join(config.dataDir, 'ingest-tmp-log.jsonl');
 const CORE_FIELDS = ['title', 'DOI', 'publicationTitle', 'date', 'abstractNote', 'volume', 'issue', 'pages'];
 
@@ -67,6 +80,114 @@ function doiAliases(doi) {
   return [...out].filter(Boolean);
 }
 
+function stemName(filename) {
+  return String(filename || '').replace(/\.pdf$/i, '');
+}
+
+function titleFromFilename(filename) {
+  const stem = stemName(filename);
+  const parts = stem.split('_').filter(Boolean);
+  const skip = new Set(['jais', 'jit', 'isj', 'dss', 'ejis', 'jmis', 'io']);
+  const words = [];
+  for (const part of parts) {
+    if (/^\d{4}$/.test(part)) continue;
+    if (/^\d/.test(part) && part.includes('.')) continue;
+    if (/^10[.-]/.test(part)) continue;
+    if (skip.has(part.toLowerCase())) continue;
+    if (/jais-\d+/i.test(part)) continue;
+    words.push(part.replace(/-/g, ' '));
+  }
+  return words.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+/** Infer one or more CrossRef DOI candidates from the batch filename. */
+function doiFromFilename(journal, filename) {
+  const fn = stemName(filename);
+  const code = String(journal || '').toUpperCase();
+  const out = [];
+  const add = (doi) => {
+    const n = normalizeDoi(doi);
+    if (n) out.push(n);
+  };
+
+  const jaisFull = fn.match(/10\.17705[_/]1jais[._](\d+)/i);
+  if (jaisFull) add(`10.17705/1jais.${jaisFull[1]}`);
+  const jaisDash = fn.match(/10-17[70]05-1jais-(\d+)/i);
+  if (jaisDash) add(`10.17705/1jais.${jaisDash[1]}`);
+  const jaisShort = fn.match(/(?:^|_)jais-(\d{5})(?:_|$)/i);
+  if (jaisShort) add(`10.17705/1jais.${jaisShort[1]}`);
+
+  if (/^10\.\d{4,}_/.test(fn) || fn.startsWith('10.')) {
+    add(fn.replace(/_/g, '/'));
+  }
+
+  const io = fn.match(/^\d{4}_infoandorg\.([^_]+)/i);
+  if (io) add(`10.1016/j.infoandorg.${io[1]}`);
+
+  const isjNew = fn.match(/^\d{4}_isj\.(\d+)/i);
+  if (isjNew) add(`10.1111/isj.${isjNew[1]}`);
+  const isjWiley = fn.match(/^\d{4}_(j\.1365-2575\.[^_]+)/i);
+  if (isjWiley) add(`10.1111/${isjWiley[1]}`);
+  const isj1046 = fn.match(/^\d{4}_(1365-2575\.[^_]+)/i);
+  if (isj1046) add(`10.1046/j.${isj1046[1]}`);
+
+  const dssArt = fn.match(/^(\d{4})_dss\.(\d{6})(?:_|$)/i);
+  if (dssArt) {
+    add(`10.1016/j.dss.${dssArt[1]}.${dssArt[2]}`);
+    const prevYear = String(Number(dssArt[1]) - 1);
+    if (/^\d{4}$/.test(prevYear)) add(`10.1016/j.dss.${prevYear}.${dssArt[2]}`);
+    add(`10.1016/j.dss.${dssArt[2]}`);
+  }
+  const dssYm = fn.match(/^(\d{4})_dss\.(\d{2})\.(\d{3})(?:_|$)/i);
+  if (dssYm) {
+    add(`10.1016/j.dss.${dssYm[1]}.${dssYm[2]}.${dssYm[3]}`);
+    const prevYear = String(Number(dssYm[1]) - 1);
+    if (/^\d{4}$/.test(prevYear)) add(`10.1016/j.dss.${prevYear}.${dssYm[2]}.${dssYm[3]}`);
+  }
+  const dssIssn = fn.match(/dss\.0167-9236\.(\d{2})\.(\d+)-(\d+)/i);
+  if (dssIssn) add(`10.1016/0167-9236(${dssIssn[1]})${dssIssn[2]}-${dssIssn[3]}`);
+
+  const jmisTf = fn.match(/^\d{4}_07421222\.(\d{4})\.(\d+)/);
+  if (jmisTf) add(`10.1080/07421222.${jmisTf[1]}.${jmisTf[2]}`);
+  const jmisOld = fn.match(/mis0742-1222(\d+)/i);
+  if (jmisOld) {
+    let rest = jmisOld[1];
+    if (rest.length === 5) rest = `${rest.slice(0, 2)}0${rest.slice(2)}`;
+    add(`10.2753/MIS0742-1222${rest}`);
+  }
+
+  const jit = fn.match(/^(02683962\d+)(?:_jit)?$/i);
+  if (jit) add(`10.1177/${jit[1]}`);
+
+  if (fn.includes('palgrave.ejis')) add(fn.replace(/_/g, '/'));
+
+  if (code === 'JAIS' && !out.length) {
+    const n = fn.match(/(\d{5})/);
+    if (n && n[1].startsWith('00')) add(`10.17705/1jais.${n[1]}`);
+  }
+
+  return [...new Set(out)];
+}
+
+function loadLegacyDoiMap() {
+  const map = new Map();
+  for (const rel of ['tmp/infoandorg/manifest.tsv', 'tmp/isj/manifest.tsv']) {
+    const p = path.join(ROOT, rel);
+    if (!fs.existsSync(p)) continue;
+    const lines = fs.readFileSync(p, 'utf8').split(/\r?\n/).filter(Boolean);
+    const header = lines[0].split('\t');
+    const di = header.indexOf('doi');
+    const fi = header.indexOf('filename');
+    if (di < 0 || fi < 0) continue;
+    for (const line of lines.slice(1)) {
+      const cols = line.split('\t');
+      const doi = normalizeDoi(cols[di]);
+      if (cols[fi] && doi) map.set(cols[fi], doi);
+    }
+  }
+  return map;
+}
+
 function cleanText(s) {
   if (!s) return '';
   return String(s)
@@ -78,17 +199,46 @@ function cleanText(s) {
 }
 
 function loadManifest(dir, src) {
-  const p = path.join(dir, 'manifest.tsv');
+  const candidates = [
+    path.join(dir, 'manifest.tsv'),
+    path.join(dir, 'archives', 'manifest.tsv'),
+  ];
+  const p = candidates.find((f) => fs.existsSync(f));
+  if (!p) throw new Error(`manifest.tsv not found under ${dir}`);
   const text = fs.readFileSync(p, 'utf8');
   const lines = text.split(/\r?\n/).filter(Boolean);
   const header = lines[0].split('\t');
+  const legacy = loadLegacyDoiMap();
+  const pdfDir = fs.existsSync(path.join(dir, 'pdfs'))
+    ? path.join(dir, 'pdfs')
+    : path.join(dir, 'pdfs');
   return lines.slice(1).map((line) => {
     const cols = line.split('\t');
     const row = { src, dir };
     header.forEach((h, i) => { row[h] = cols[i]; });
-    row.pdfPath = path.join(dir, 'pdfs', row.filename);
+    const journal = row.journal || src;
+    row.src = journal;
+    row.journalName = JOURNAL_CODE_NAME[String(journal).toUpperCase()]
+      || JOURNAL_CODE_NAME[journal]
+      || '';
+    const inferred = doiFromFilename(journal, row.filename);
+    const listed = normalizeDoi(row.doi);
+    const shortDss = listed && /^10\.1016\/j\.dss\.\d{6}$/i.test(listed);
+    const yearDss = inferred.find((d) => /^10\.1016\/j\.dss\.\d{4}\.\d{6}$/i.test(d));
+    row.doi = (shortDss && yearDss ? yearDss : listed)
+      || legacy.get(row.filename)
+      || inferred[0]
+      || '';
+    row.doiCandidates = [...new Set([
+      row.doi,
+      listed,
+      legacy.get(row.filename),
+      ...inferred,
+    ].filter(Boolean))];
+    row.title = row.title || titleFromFilename(row.filename);
+    row.pdfPath = path.join(pdfDir, row.filename);
     return row;
-  }).filter((r) => r.doi && r.filename);
+  }).filter((r) => r.filename);
 }
 
 function logJson(obj) {
@@ -194,11 +344,34 @@ async function attachPdf(parent, filePath) {
   return attachment;
 }
 
-async function createFromCrossref(doi, filePath) {
-  const recognized = await fetchByDoi(doi);
-  if (!recognized) throw new Error(`CrossRef miss: ${doi}`);
-  const mapped = mapRecognized(recognized);
-  mapped.fields.DOI = mapped.fields.DOI || doi;
+async function fetchByQuery(q) {
+  if (!q) return null;
+  const url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(q)}&rows=5`;
+  const res = await fetch(url, {
+    headers: { 'User-Agent': config.recognizers.userAgent },
+    signal: AbortSignal.timeout(config.recognizers.timeoutMs),
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  const items = json?.message?.items || [];
+  for (const msg of items) {
+    const pub = msg['container-title']?.[0] || '';
+    if (normalizeJournalName(pub)) return { source: 'crossref', raw: msg };
+  }
+  return items[0] ? { source: 'crossref', raw: items[0] } : null;
+}
+
+function applyJournalHint(mapped, journalName) {
+  if (!journalName) return mapped;
+  const cur = mapped.fields.publicationTitle;
+  const canon = normalizeJournalName(cur) || journalName;
+  mapped.fields.publicationTitle = canon;
+  return mapped;
+}
+
+async function createFromMapped(mapped, filePath, { forceDoi, journalName } = {}) {
+  applyJournalHint(mapped, journalName);
+  mapped.fields.DOI = forceDoi || mapped.fields.DOI;
   if (mapped.fields.title) mapped.fields.title = cleanText(mapped.fields.title);
   if (mapped.fields.abstractNote) mapped.fields.abstractNote = cleanText(mapped.fields.abstractNote);
   if (mapped.fields.publicationTitle) {
@@ -218,40 +391,113 @@ async function createFromCrossref(doi, filePath) {
   return { parent, mapped };
 }
 
+async function createFromPdfFallback(row) {
+  const result = await importPdf(row.pdfPath);
+  const parent = result.parent;
+  if (!parent) throw new Error(`PDF recognize produced no parent: ${row.filename}`);
+  const hinted = row.journalName;
+  if (hinted && !normalizeJournalName(parent.getField('publicationTitle'))) {
+    parent.setField('publicationTitle', hinted);
+  }
+  if (row.doi && !parent.getField('DOI')) parent.setField('DOI', row.doi);
+  await parent.save();
+  return { parent };
+}
+
 async function importOne(row, existing) {
-  const doi = row.doi;
-  const hit = findExisting(existing, doi);
-  if (hit) {
-    const item = await Item.loadByKey(hit.key);
-    if (!item) throw new Error(`stale key ${hit.key}`);
+  const candidates = (row.doiCandidates?.length ? row.doiCandidates : [row.doi]).filter(Boolean);
+  let hit = null;
+  let doi = row.doi || '';
+  for (const cand of candidates.length ? candidates : ['']) {
+    const found = cand ? findExisting(existing, cand) : null;
+    if (found) {
+      hit = found;
+      doi = cand;
+      break;
+    }
+  }
+  async function reuseExisting(found, resolvedDoi) {
+    const item = await Item.loadByKey(found.key);
+    if (!item) throw new Error(`stale key ${found.key}`);
     const dbDoi = item.getField('DOI') || '';
-    const doiFixed = normDoi(dbDoi) !== normDoi(doi);
+    const nextDoi = resolvedDoi || doi;
+    const doiFixed = nextDoi && normDoi(dbDoi) !== normDoi(nextDoi);
     if (doiFixed && !DRY_RUN) {
-      item.setField('DOI', doi);
+      item.setField('DOI', nextDoi);
+      await item.save();
+    }
+    if (row.journalName && !normalizeJournalName(item.getField('publicationTitle')) && !DRY_RUN) {
+      item.setField('publicationTitle', row.journalName);
       await item.save();
     }
     let attached = false;
-    if (!hit.hasPdf) {
+    if (!found.hasPdf) {
       if (!DRY_RUN) await attachPdf(item, row.pdfPath);
-      hit.hasPdf = true;
+      found.hasPdf = true;
       attached = true;
     }
-    for (const alias of doiAliases(doi)) existing.set(alias, { ...hit, key: item.key });
+    for (const alias of doiAliases(nextDoi || item.getField('DOI'))) {
+      existing.set(alias, { ...found, key: item.key });
+    }
     return {
       action: (attached || doiFixed) ? 'updated' : 'exists',
       key: item.key,
-      doi,
+      doi: item.getField('DOI') || nextDoi,
       title: item.getField('title') || row.title || '',
     };
   }
+
+  if (hit) return reuseExisting(hit, doi);
 
   if (DRY_RUN) {
     return { action: 'would-create', key: null, doi, title: row.title || '' };
   }
 
-  const { parent } = await createFromCrossref(doi, row.pdfPath);
+  let parent = null;
+  let lastErr = null;
+  for (const cand of candidates) {
+    try {
+      const recognized = await fetchByDoi(cand);
+      if (!recognized) throw new Error(`CrossRef miss: ${cand}`);
+      const mapped = mapRecognized(recognized);
+      const resolved = mapped.fields.DOI || cand;
+      const exist = findExisting(existing, resolved);
+      if (exist) return reuseExisting(exist, resolved);
+      ({ parent } = await createFromMapped(mapped, row.pdfPath, {
+        forceDoi: resolved,
+        journalName: row.journalName,
+      }));
+      doi = resolved;
+      break;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  if (!parent && row.title) {
+    const recognized = await fetchByQuery(`${row.title} ${row.journalName || ''}`.trim());
+    if (recognized) {
+      const mapped = mapRecognized(recognized);
+      const resolved = mapped.fields.DOI || doi;
+      const exist = resolved ? findExisting(existing, resolved) : null;
+      if (exist) return reuseExisting(exist, resolved);
+      ({ parent } = await createFromMapped(mapped, row.pdfPath, {
+        forceDoi: resolved,
+        journalName: row.journalName,
+      }));
+      doi = parent.getField('DOI') || doi;
+    }
+  }
+  if (!parent) {
+    try {
+      ({ parent } = await createFromPdfFallback(row));
+      doi = parent.getField('DOI') || doi;
+    } catch (err) {
+      throw lastErr || err;
+    }
+  }
+
   const rec = { key: parent.key, itemID: parent.id, doi: normDoi(doi), hasPdf: true, ftState: null };
-  for (const alias of doiAliases(doi)) existing.set(alias, rec);
+  for (const alias of doiAliases(doi || parent.getField('DOI'))) existing.set(alias, rec);
   return {
     action: 'created',
     key: parent.key,
@@ -387,6 +633,9 @@ async function validateOne(key) {
   const doi = item.getField('DOI');
   let applied = [];
   let extracted = [];
+  if (!missingFields(item).length) {
+    return { key, doi, applied, extracted, miss: [], title: item.getField('title') || '' };
+  }
   if (doi) {
     const recognized = await fetchByDoi(doi);
     if (recognized) {
@@ -420,14 +669,17 @@ async function validateOne(key) {
 }
 
 async function collectValidateKeys(importedKeys) {
-  const extra = await query(`
+  const batchJournals = [...new Set(Object.values(JOURNAL_CODE_NAME))];
+  const extra = importedKeys.length
+    ? []
+    : await query(`
     SELECT i.key
     FROM items i
     JOIN "itemData" dj ON dj."itemID" = i."itemID"
     JOIN fields fj ON fj."fieldID" = dj."fieldID" AND fj."fieldName" = 'publicationTitle'
     JOIN "itemDataValues" j ON j."valueID" = dj."valueID"
     WHERE i.deleted = 0 AND i."parentItemID" IS NULL
-      AND j.value IN ('Information and Organization', 'Information Systems Journal')
+      AND j.value = ANY($1)
       AND (
         NOT EXISTS (
           SELECT 1 FROM "itemData" d JOIN fields f ON f."fieldID"=d."fieldID" AND f."fieldName"='abstractNote'
@@ -441,7 +693,7 @@ async function collectValidateKeys(importedKeys) {
           WHERE d."itemID"=i."itemID" AND lower(v.value) LIKE '%/i.infoandorg.%'
         )
       )
-  `);
+  `, [batchJournals]);
   return [...new Set([...importedKeys, ...extra.map((r) => r.key)])];
 }
 
@@ -491,10 +743,15 @@ async function indexPhase() {
 async function keysFromManifest(rows, existing) {
   const keys = [];
   for (const row of rows) {
-    const hit = findExisting(existing, row.doi);
+    const cands = row.doiCandidates?.length ? row.doiCandidates : [row.doi];
+    let hit = null;
+    for (const cand of cands) {
+      hit = findExisting(existing, cand);
+      if (hit) break;
+    }
     if (hit) keys.push(hit.key);
   }
-  return keys;
+  return [...new Set(keys)];
 }
 
 async function main() {
@@ -504,12 +761,23 @@ async function main() {
   fs.appendFileSync(LOG_PATH, `\n# run ${new Date().toISOString()} phase=${PHASE} dry=${DRY_RUN}\n`);
 
   const rows = SOURCES.flatMap((s) => {
-    if (!fs.existsSync(path.join(s.dir, 'manifest.tsv'))) {
+    const hasManifest = fs.existsSync(path.join(s.dir, 'manifest.tsv'))
+      || fs.existsSync(path.join(s.dir, 'archives', 'manifest.tsv'));
+    if (!hasManifest) {
       console.warn(`skip missing manifest: ${s.dir}`);
       return [];
     }
     return loadManifest(s.dir, s.src);
   });
+  const workManifest = path.join(ROOT, 'tmp', 'manifest.tsv');
+  fs.mkdirSync(path.dirname(workManifest), { recursive: true });
+  const workHeader = ['doi', 'journal', 'filename', 'title'];
+  fs.writeFileSync(
+    workManifest,
+    `${workHeader.join('\t')}\n${rows.map((r) => [r.doi || '', r.src || '', r.filename || '', r.title || ''].join('\t')).join('\n')}\n`,
+  );
+  const missingDoi = rows.filter((r) => !r.doi);
+  console.log(`Work manifest: ${workManifest} (${rows.length} rows, ${missingDoi.length} without inferred DOI)`);
   const existing = await loadExistingDois();
   console.log(`DB: ${config.databaseUrl.replace(/:[^:@]+@/, ':***@')}`);
   console.log(`Storage: ${config.storage.type}  MinerU: ${config.mineru.tokens.length ? `${config.mineru.tokens.length} token(s)` : 'NO'}  LLM: ${config.llm.apiKey ? 'yes' : 'NO'}`);
@@ -521,6 +789,22 @@ async function main() {
     importedKeys = r.keys;
   } else {
     importedKeys = await keysFromManifest(rows, existing);
+  }
+
+  if (PHASE === 'enqueue') {
+    const todo = await listKeysNeedingParse(importedKeys);
+    console.log(`\n=== enqueue MinerU (${todo.length}/${importedKeys.length}) ===`);
+    if (DRY_RUN) {
+      console.log(`would enqueue ${todo.length} keys`);
+    } else if (!todo.length) {
+      console.log('nothing to enqueue');
+    } else {
+      if (!config.mineru.tokens.length) throw new Error('OTERO_MINERU_TOKEN is not set');
+      await recoverSubmittingOnStartup();
+      console.log('enqueue', await enqueueBatchParse(todo));
+      await waitForSubmitQueue();
+      console.log('submit queue drained');
+    }
   }
 
   if (PHASE === 'all' || PHASE === 'parse') {

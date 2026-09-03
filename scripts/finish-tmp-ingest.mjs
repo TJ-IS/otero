@@ -1,21 +1,29 @@
 #!/usr/bin/env node
 /**
  * Wait until tmp-manifest items leave the MinerU queue, retry leftovers,
- * then build the FTS index.
+ * then build the FTS index. Does not poll MinerU itself — the API worker must
+ * be running.
  */
 import fs from 'node:fs';
+import path from 'node:path';
 import { initDb, closeDb, query } from '../src/db/connection.js';
 import { enqueueBatchParse } from '../src/services/fulltextService.js';
 import { backfillFullTextIndex } from '../src/services/fulltextIndexService.js';
 
-function load(p) {
-  return fs.readFileSync(p, 'utf8').split(/\r?\n/).slice(1).filter(Boolean).map((l) => l.split('\t')[0].toLowerCase());
+function loadDois(p) {
+  if (!fs.existsSync(p)) return [];
+  const lines = fs.readFileSync(p, 'utf8').split(/\r?\n/).filter(Boolean);
+  const header = lines[0].split('\t');
+  const di = header.indexOf('doi');
+  const idx = di >= 0 ? di : 0;
+  return lines.slice(1).map((l) => String(l.split('\t')[idx] || '').toLowerCase()).filter((d) => d.includes('10.'));
 }
 
-const dois = [
-  ...load('./tmp/infoandorg/manifest.tsv'),
-  ...load('./tmp/isj/manifest.tsv'),
-];
+const dois = loadDois(path.resolve('./tmp/manifest.tsv'));
+if (!dois.length) {
+  console.error('No DOIs in tmp/manifest.tsv — run ingest --phase=import first');
+  process.exit(1);
+}
 
 async function states() {
   return query(`

@@ -154,6 +154,12 @@ export async function parseItem(key, { force = false } = {}) {
 // ---------------------------------------------------------------------------
 const submitQueue = [];
 let submitQueueRunning = false;
+let submitDrainPromise = null;
+
+/** Resolve when the in-process MinerU submit queue is empty. */
+export function waitForSubmitQueue() {
+  return submitDrainPromise || Promise.resolve();
+}
 const SUBMIT_CONCURRENCY = Math.max(1, Math.min(4, Number(config.mineru.submitConcurrency ?? 2)));
 const SUBMIT_INTERVAL_MS = Math.max(0, Number(config.mineru.submitIntervalMs ?? 800));
 const SUBMIT_MAX_RETRIES = Math.max(0, Number(config.mineru.submitMaxRetries ?? 5));
@@ -242,14 +248,18 @@ export async function enqueueBatchParse(keys) {
  * Each item is submitted via submitLocalPdf (single-file MinerU batch).
  */
 async function drainSubmitQueue() {
-  if (submitQueueRunning) return;
+  if (submitQueueRunning) return submitDrainPromise;
   submitQueueRunning = true;
-  try {
-    const workers = Array.from({ length: SUBMIT_CONCURRENCY }, () => runSubmitWorker());
-    await Promise.all(workers);
-  } finally {
-    submitQueueRunning = false;
-  }
+  submitDrainPromise = (async () => {
+    try {
+      const workers = Array.from({ length: SUBMIT_CONCURRENCY }, () => runSubmitWorker());
+      await Promise.all(workers);
+    } finally {
+      submitQueueRunning = false;
+      submitDrainPromise = null;
+    }
+  })();
+  return submitDrainPromise;
 }
 
 async function runSubmitWorker() {
