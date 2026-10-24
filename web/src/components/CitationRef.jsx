@@ -18,10 +18,11 @@ export function scrollToReference(refId, reduceMotion) {
   if (!el) return false;
   const container = el.closest('[data-reader-scroll]');
   if (container) {
-    const top = el.getBoundingClientRect().top
-      - container.getBoundingClientRect().top
-      + container.scrollTop
-      - (container.clientHeight - el.clientHeight) / 2;
+    const top =
+      el.getBoundingClientRect().top -
+      container.getBoundingClientRect().top +
+      container.scrollTop -
+      (container.clientHeight - el.clientHeight) / 2;
     container.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'auto' : 'smooth' });
   } else {
     el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'center' });
@@ -80,15 +81,18 @@ export const CitationRef = memo(function CitationRef({ refs, children, onNavigat
     };
   }, [open, place]);
 
-  const onClick = useCallback((e) => {
-    e.preventDefault();
-    if (!refs?.length) return;
-    if (onNavigate) {
-      onNavigate(refs[0].id);
-      return;
-    }
-    scrollToReference(refs[0].id, reduceMotion);
-  }, [refs, reduceMotion, onNavigate]);
+  const onClick = useCallback(
+    (e) => {
+      e.preventDefault();
+      if (!refs?.length) return;
+      if (onNavigate) {
+        onNavigate(refs[0].id);
+        return;
+      }
+      scrollToReference(refs[0].id, reduceMotion);
+    },
+    [refs, reduceMotion, onNavigate],
+  );
 
   // Defensive: if nothing resolved, render the text untouched (no link/card).
   if (!refs || refs.length === 0) return <>{children}</>;
@@ -108,32 +112,35 @@ export const CitationRef = memo(function CitationRef({ refs, children, onNavigat
       >
         {children}
       </a>
-      {open && createPortal(
-        <div
-          id={cardId}
-          role="tooltip"
-          onMouseEnter={show}
-          onMouseLeave={hideSoon}
-          style={{
-            position: 'fixed',
-            top: coords.top,
-            left: coords.left,
-            width: CARD_WIDTH,
-            maxWidth: 'calc(100vw - 24px)',
-            '--citation-translate': coords.placeAbove ? 'translateY(calc(-100% - 6px))' : 'translateY(6px)',
-            '--citation-origin': coords.placeAbove ? 'bottom left' : 'top left',
-          }}
-          className="citation-tooltip z-50 rounded-sm border bg-popover p-3 text-xs leading-relaxed text-popover-foreground shadow-sm"
-        >
-          {refs.map((r, i) => (
-            <div key={r.id} className={i > 0 ? 'mt-2 pt-2 border-t' : ''}>
-              <p className="text-foreground/90">{r.text}</p>
-            </div>
-          ))}
-          <p className="mt-2 text-[10px] text-muted-foreground">{t('page.citeJump')}</p>
-        </div>,
-        document.body,
-      )}
+      {open &&
+        createPortal(
+          <div
+            id={cardId}
+            role="tooltip"
+            onMouseEnter={show}
+            onMouseLeave={hideSoon}
+            style={{
+              position: 'fixed',
+              top: coords.top,
+              left: coords.left,
+              width: CARD_WIDTH,
+              maxWidth: 'calc(100vw - 24px)',
+              '--citation-translate': coords.placeAbove
+                ? 'translateY(calc(-100% - 6px))'
+                : 'translateY(6px)',
+              '--citation-origin': coords.placeAbove ? 'bottom left' : 'top left',
+            }}
+            className="citation-tooltip z-50 rounded-sm border bg-popover p-3 text-xs leading-relaxed text-popover-foreground shadow-sm"
+          >
+            {refs.map((r, i) => (
+              <div key={r.id} className={i > 0 ? 'mt-2 pt-2 border-t' : ''}>
+                <p className="text-foreground/90">{r.text}</p>
+              </div>
+            ))}
+            <p className="mt-2 text-[10px] text-muted-foreground">{t('page.citeJump')}</p>
+          </div>,
+          document.body,
+        )}
     </>
   );
 });

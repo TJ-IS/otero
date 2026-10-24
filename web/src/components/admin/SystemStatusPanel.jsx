@@ -4,8 +4,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Database, HardDrive, Server, RefreshCw, AlertCircle,
-  CheckCircle2, XCircle, Cpu, FileText, Paperclip,
+  Database,
+  HardDrive,
+  Server,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Cpu,
+  FileText,
+  Paperclip,
 } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
@@ -16,15 +24,33 @@ import { ErrorState } from '@/components/ui/async-states';
 function StatusBadge({ status }) {
   const { t } = useTranslation('admin');
   const map = {
-    connected: { label: t('status.connState.connected'), cls: 'bg-success/15 text-success', icon: CheckCircle2 },
-    not_configured: { label: t('status.connState.not_configured'), cls: 'bg-muted text-muted-foreground', icon: HardDrive },
-    bucket_not_found: { label: t('status.connState.bucket_not_found'), cls: 'bg-warning/15 text-warning', icon: AlertCircle },
-    error: { label: t('status.connState.error'), cls: 'bg-destructive/15 text-destructive', icon: XCircle },
+    connected: {
+      label: t('status.connState.connected'),
+      cls: 'bg-success/15 text-success',
+      icon: CheckCircle2,
+    },
+    not_configured: {
+      label: t('status.connState.not_configured'),
+      cls: 'bg-muted text-muted-foreground',
+      icon: HardDrive,
+    },
+    bucket_not_found: {
+      label: t('status.connState.bucket_not_found'),
+      cls: 'bg-warning/15 text-warning',
+      icon: AlertCircle,
+    },
+    error: {
+      label: t('status.connState.error'),
+      cls: 'bg-destructive/15 text-destructive',
+      icon: XCircle,
+    },
   };
   const s = map[status] || map.error;
   const Icon = s.icon;
   return (
-    <span className={`inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-medium ${s.cls}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs font-medium ${s.cls}`}
+    >
       <Icon className="size-3" /> {s.label}
     </span>
   );
@@ -34,7 +60,9 @@ function Row({ label, value, mono }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1.5 text-sm">
       <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className={`min-w-0 break-all text-right ${mono ? 'font-mono text-xs' : ''}`}>{value ?? '—'}</span>
+      <span className={`min-w-0 break-all text-right ${mono ? 'font-mono text-xs' : ''}`}>
+        {value ?? '—'}
+      </span>
     </div>
   );
 }
@@ -48,12 +76,15 @@ function formatUptime(sec, t) {
     d && t('status.uptimeDays', { n: d }),
     h && t('status.uptimeHours', { n: h }),
     t('status.uptimeMinutes', { n: m }),
-  ].filter(Boolean).join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function formatBytes(bytes) {
   if (!bytes) return '0 B';
-  const k = 1024, sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const k = 1024,
+    sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${Math.round((bytes / Math.pow(k, i)) * 100) / 100} ${sizes[i]}`;
 }
@@ -69,7 +100,10 @@ export function SystemStatusPanel() {
   if (error) {
     return (
       <div className="mx-auto max-w-page px-4 py-8 sm:px-6 lg:px-8">
-        <ErrorState message={t('status.loadFailed', { message: error.message })} onRetry={refresh} />
+        <ErrorState
+          message={t('status.loadFailed', { message: error.message })}
+          onRetry={refresh}
+        />
       </div>
     );
   }
@@ -84,11 +118,12 @@ export function SystemStatusPanel() {
       <PageHeader
         eyebrow={t('common:nav.admin')}
         title={t('status.title')}
-        actions={(
+        actions={
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('status.refresh')}
+            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />{' '}
+            {t('status.refresh')}
           </Button>
-        )}
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -110,29 +145,44 @@ export function SystemStatusPanel() {
                 <Row label={t('status.database')} value={pg.database?.name} />
                 <Row label={t('status.dbSize')} value={pg.database?.size} />
                 <Row label={t('status.schemaVersion')} value={pg.database?.schemaVersion} />
-                <Row label={t('status.serverTime')} value={pg.server?.serverTime && new Date(pg.server.serverTime).toLocaleString()} />
+                <Row
+                  label={t('status.serverTime')}
+                  value={pg.server?.serverTime && new Date(pg.server.serverTime).toLocaleString()}
+                />
                 <Row
                   label={t('status.connections')}
-                  value={pg.connections && t('status.connectionsValue', {
-                    active: pg.connections.active_connections,
-                    idle: pg.connections.idle_connections,
-                    total: pg.connections.total_connections,
-                  })}
+                  value={
+                    pg.connections &&
+                    t('status.connectionsValue', {
+                      active: pg.connections.active_connections,
+                      idle: pg.connections.idle_connections,
+                      total: pg.connections.total_connections,
+                    })
+                  }
                 />
                 <Row
                   label={t('status.pool')}
-                  value={pg.connection?.poolStats && t('status.poolValue', {
-                    total: pg.connection.poolStats.totalCount,
-                    idle: pg.connection.poolStats.idleCount,
-                    waiting: pg.connection.poolStats.waitingCount,
-                  })}
+                  value={
+                    pg.connection?.poolStats &&
+                    t('status.poolValue', {
+                      total: pg.connection.poolStats.totalCount,
+                      idle: pg.connection.poolStats.idleCount,
+                      waiting: pg.connection.poolStats.waitingCount,
+                    })
+                  }
                 />
-                <Row label={t('status.version')} value={pg.server?.version?.split(' ').slice(0, 2).join(' ')} mono />
+                <Row
+                  label={t('status.version')}
+                  value={pg.server?.version?.split(' ').slice(0, 2).join(' ')}
+                  mono
+                />
               </>
             ) : (
               <div className="py-4 text-sm text-destructive">
                 {pg?.error || t('status.cannotConnect')}
-                <div className="mt-1 font-mono text-xs text-muted-foreground">{pg?.connection?.url}</div>
+                <div className="mt-1 font-mono text-xs text-muted-foreground">
+                  {pg?.connection?.url}
+                </div>
               </div>
             )}
           </CardContent>
@@ -147,7 +197,9 @@ export function SystemStatusPanel() {
               </CardTitle>
               <StatusBadge status={r2?.status} />
             </div>
-            <CardDescription>{r2?.storageType === 's3' ? t('status.r2S3') : t('status.r2Local')}</CardDescription>
+            <CardDescription>
+              {r2?.storageType === 's3' ? t('status.r2S3') : t('status.r2Local')}
+            </CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
             {r2?.storageType === 's3' ? (
@@ -155,18 +207,36 @@ export function SystemStatusPanel() {
                 <div className="py-4 text-sm text-destructive">
                   {r2.error}
                   {r2.errorCode && <span className="ml-1 font-mono text-xs">({r2.errorCode})</span>}
-                  <div className="mt-1 font-mono text-xs text-muted-foreground">{r2.endpoint?.url}</div>
+                  <div className="mt-1 font-mono text-xs text-muted-foreground">
+                    {r2.endpoint?.url}
+                  </div>
                 </div>
               ) : (
                 <>
                   <Row label={t('status.endpoint')} value={r2.endpoint?.url} mono />
-                  <Row label={t('status.portSsl')} value={`${r2.endpoint?.port} / ${r2.endpoint?.useSSL ? t('common:yes') : t('common:no')}`} />
+                  <Row
+                    label={t('status.portSsl')}
+                    value={`${r2.endpoint?.port} / ${r2.endpoint?.useSSL ? t('common:yes') : t('common:no')}`}
+                  />
                   <Row label="Region" value={r2.endpoint?.region} />
                   <Row label={t('status.bucket')} value={r2.bucket?.name} mono />
-                  <Row label={t('status.bucketStatus')} value={r2.bucket?.exists ? t('status.bucketExists') : t('status.bucketMissing')} />
-                  <Row label={t('status.bucketAccess')} value={r2.bucket?.exists ? t('status.accessOk') : t('status.accessBad')} />
+                  <Row
+                    label={t('status.bucketStatus')}
+                    value={r2.bucket?.exists ? t('status.bucketExists') : t('status.bucketMissing')}
+                  />
+                  <Row
+                    label={t('status.bucketAccess')}
+                    value={r2.bucket?.exists ? t('status.accessOk') : t('status.accessBad')}
+                  />
                   <Row label="Access Key" value={r2.credentials?.accessKey} mono />
-                  <Row label={t('status.secretKey')} value={r2.credentials?.secretKeySet ? t('status.configured') : t('status.notConfigured')} />
+                  <Row
+                    label={t('status.secretKey')}
+                    value={
+                      r2.credentials?.secretKeySet
+                        ? t('status.configured')
+                        : t('status.notConfigured')
+                    }
+                  />
                 </>
               )
             ) : (
@@ -181,10 +251,29 @@ export function SystemStatusPanel() {
 
       {/* Data + runtime */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatTile icon={<FileText className="size-4" />} label={t('status.activeItems')} value={stats?.items?.active_items ?? '—'} sub={t('status.deletedItems', { count: stats?.items?.deleted_items ?? 0 })} />
-        <StatTile icon={<Paperclip className="size-4" />} label={t('status.attachments')} value={stats?.attachments?.total_attachments ?? '—'} />
-        <StatTile icon={<Cpu className="size-4" />} label="Node" value={sys?.nodeVersion} sub={sys?.platform} />
-        <StatTile icon={<Server className="size-4" />} label={t('status.uptime')} value={formatUptime(sys?.uptime, t)} sub={sys?.memory && t('status.memory', { size: formatBytes(sys.memory.rss) })} />
+        <StatTile
+          icon={<FileText className="size-4" />}
+          label={t('status.activeItems')}
+          value={stats?.items?.active_items ?? '—'}
+          sub={t('status.deletedItems', { count: stats?.items?.deleted_items ?? 0 })}
+        />
+        <StatTile
+          icon={<Paperclip className="size-4" />}
+          label={t('status.attachments')}
+          value={stats?.attachments?.total_attachments ?? '—'}
+        />
+        <StatTile
+          icon={<Cpu className="size-4" />}
+          label="Node"
+          value={sys?.nodeVersion}
+          sub={sys?.platform}
+        />
+        <StatTile
+          icon={<Server className="size-4" />}
+          label={t('status.uptime')}
+          value={formatUptime(sys?.uptime, t)}
+          sub={sys?.memory && t('status.memory', { size: formatBytes(sys.memory.rss) })}
+        />
       </div>
 
       {/* Table sizes */}
@@ -198,7 +287,9 @@ export function SystemStatusPanel() {
               {pg.tables.map((tbl) => (
                 <div key={tbl.tablename} className="flex items-center justify-between py-1.5">
                   <span className="font-mono text-xs">{tbl.tablename}</span>
-                  <Badge variant="secondary" className="font-mono text-xs">{tbl.size}</Badge>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {tbl.size}
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -207,7 +298,9 @@ export function SystemStatusPanel() {
       )}
 
       <p className="text-center text-xs text-muted-foreground">
-        {t('status.collectedAt', { time: data?.timestamp && new Date(data.timestamp).toLocaleString() })}
+        {t('status.collectedAt', {
+          time: data?.timestamp && new Date(data.timestamp).toLocaleString(),
+        })}
       </p>
     </div>
   );
@@ -267,4 +360,3 @@ function StatusSkeleton() {
     </div>
   );
 }
-

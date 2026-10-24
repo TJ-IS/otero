@@ -110,29 +110,23 @@ test('submitLocalPdf throws with status and mineruCode when the API rejects the 
     return jsonResponse({ code: -60012, msg: 'task not found' });
   });
 
-  await assert.rejects(
-    submitLocalPdf({ filePath: SAMPLE_PDF, fileName: 'ITEMKEY.pdf' }),
-    (err) => {
-      assert.match(err.message, /MinerU submit failed/);
-      assert.equal(err.status, 200);
-      assert.equal(err.mineruCode, -60012);
-      return true;
-    },
-  );
+  await assert.rejects(submitLocalPdf({ filePath: SAMPLE_PDF, fileName: 'ITEMKEY.pdf' }), (err) => {
+    assert.match(err.message, /MinerU submit failed/);
+    assert.equal(err.status, 200);
+    assert.equal(err.mineruCode, -60012);
+    return true;
+  });
   assert.equal(callCount, 1, 'a rejected batch must not attempt the upload');
 });
 
 test('submitLocalPdf propagates a non-2xx HTTP status', async () => {
   mockFetch(async () => jsonResponse({}, 429));
 
-  await assert.rejects(
-    submitLocalPdf({ filePath: SAMPLE_PDF, fileName: 'ITEMKEY.pdf' }),
-    (err) => {
-      assert.equal(err.status, 429);
-      assert.equal(err.mineruCode, null);
-      return true;
-    },
-  );
+  await assert.rejects(submitLocalPdf({ filePath: SAMPLE_PDF, fileName: 'ITEMKEY.pdf' }), (err) => {
+    assert.equal(err.status, 429);
+    assert.equal(err.mineruCode, null);
+    return true;
+  });
 });
 
 test('submitLocalPdf throws when the signed-URL upload fails', async () => {
@@ -155,7 +149,9 @@ test('submitLocalPdf throws when the signed-URL upload fails', async () => {
 });
 
 test('submitLocalPdf throws when the API returns no upload URL', async () => {
-  mockFetch(async () => jsonResponse({ code: 0, data: { batch_id: 'batch-empty', file_urls: [] } }));
+  mockFetch(async () =>
+    jsonResponse({ code: 0, data: { batch_id: 'batch-empty', file_urls: [] } }),
+  );
 
   await assert.rejects(
     submitLocalPdf({ filePath: SAMPLE_PDF, fileName: 'ITEMKEY.pdf' }),
@@ -180,20 +176,29 @@ test('submitLocalPdfs validates batch size before touching the network', async (
 test('rewriteAssetPaths rewrites markdown and HTML image references', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'otero-rewrite-'));
   const file = path.join(dir, 'full.md');
-  fs.writeFileSync(file, [
-    '![figure](images/fig1.png)',
-    '![spaced](images/sub dir/fig 2.png)',
-    '<img class="x" src="images/fig3.png">',
-    '![remote](https://example.test/fig4.png)',
-  ].join('\n'));
+  fs.writeFileSync(
+    file,
+    [
+      '![figure](images/fig1.png)',
+      '![spaced](images/sub dir/fig 2.png)',
+      '<img class="x" src="images/fig3.png">',
+      '![remote](https://example.test/fig4.png)',
+    ].join('\n'),
+  );
 
   try {
     await rewriteAssetPaths(file, 'ITEM123');
     const md = fs.readFileSync(file, 'utf8');
 
     assert.match(md, /!\[figure\]\(\/api\/attachments\/ITEM123\/fulltext\/images\/fig1\.png\)/);
-    assert.match(md, /!\[spaced\]\(\/api\/attachments\/ITEM123\/fulltext\/images\/sub%20dir\/fig%202\.png\)/);
-    assert.match(md, /<img class="x" src="\/api\/attachments\/ITEM123\/fulltext\/images\/fig3\.png">/);
+    assert.match(
+      md,
+      /!\[spaced\]\(\/api\/attachments\/ITEM123\/fulltext\/images\/sub%20dir\/fig%202\.png\)/,
+    );
+    assert.match(
+      md,
+      /<img class="x" src="\/api\/attachments\/ITEM123\/fulltext\/images\/fig3\.png">/,
+    );
     assert.match(md, /!\[remote\]\(https:\/\/example\.test\/fig4\.png\)/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

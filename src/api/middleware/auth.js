@@ -1,7 +1,11 @@
 import { getAddress, verifyMessage } from 'viem';
 import { jwtVerify, SignJWT } from 'jose';
 import { config } from '../../config.js';
-import { ensureAccount, isBootstrapAdmin, getBootstrapAddresses } from '../../repositories/accountRepo.js';
+import {
+  ensureAccount,
+  isBootstrapAdmin,
+  getBootstrapAddresses,
+} from '../../repositories/accountRepo.js';
 
 const textEncoder = new TextEncoder();
 const secret = textEncoder.encode(config.auth.secret);
@@ -28,7 +32,7 @@ export async function isEditor(address) {
 }
 
 export function getEditorAddresses() {
-  return getBootstrapAddresses().map(a => a.toLowerCase());
+  return getBootstrapAddresses().map((a) => a.toLowerCase());
 }
 
 export function generateNonce(address) {
@@ -36,9 +40,9 @@ export function generateNonce(address) {
     throw new Error('invalid address');
   }
   const normalized = getAddress(address);
-  const nonce = Array.from({ length: 16 }, () =>
-    Math.floor(Math.random() * 16).toString(16)
-  ).join('');
+  const nonce = Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join(
+    '',
+  );
   const key = `${normalized.toLowerCase()}:${nonce}`;
   nonces.set(key, {
     address: normalized,
@@ -135,7 +139,10 @@ export function editorWriteGate(req, res, next) {
   const url = req.originalUrl || req.url || '';
   const publicWrites = ['/api/auth', '/api/merkle/verify', '/api/activity'];
   const publicWritePatterns = [/^\/api\/items\/[^/]+\/chat(\?.*)?$/];
-  if (publicWrites.some(prefix => url.startsWith(prefix)) || publicWritePatterns.some(re => re.test(url))) {
+  if (
+    publicWrites.some((prefix) => url.startsWith(prefix)) ||
+    publicWritePatterns.some((re) => re.test(url))
+  ) {
     return next();
   }
   return requireEditor(req, res, next);

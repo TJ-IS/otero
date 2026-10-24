@@ -3,7 +3,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import os from 'node:os';
 import { config, ensureDataDirs } from '../config.js';
-import { uploadFile, getObjectStream, deleteObject, objectExists, listObjectNames, deleteObjectsWithPrefix } from './s3Client.js';
+import {
+  uploadFile,
+  getObjectStream,
+  deleteObject,
+  objectExists,
+  listObjectNames,
+  deleteObjectsWithPrefix,
+} from './s3Client.js';
 
 export const useS3 = () => config.storage.type === 's3';
 
@@ -72,7 +79,7 @@ export async function readStoredFile(relPath) {
     const stream = await getObjectStream(relPath);
     return new Promise((resolve, reject) => {
       const chunks = [];
-      stream.on('data', c => chunks.push(c));
+      stream.on('data', (c) => chunks.push(c));
       stream.on('end', () => resolve(Buffer.concat(chunks)));
       stream.on('error', reject);
     });
@@ -98,7 +105,11 @@ export async function deleteStoredFile(relPath) {
     return;
   }
   const abs = resolveStoredPath(relPath);
-  try { fs.unlinkSync(abs); } catch { /* ignore */ }
+  try {
+    fs.unlinkSync(abs);
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Check whether a stored file exists. */
@@ -119,7 +130,10 @@ export async function downloadToTemp(relPath) {
     return resolveStoredPath(relPath);
   }
   const ext = path.extname(relPath) || '.bin';
-  const tmp = path.join(os.tmpdir(), `otero-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  const tmp = path.join(
+    os.tmpdir(),
+    `otero-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`,
+  );
   const stream = await getObjectStream(relPath);
   await new Promise((resolve, reject) => {
     const ws = fs.createWriteStream(tmp);

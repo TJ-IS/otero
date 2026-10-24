@@ -55,7 +55,7 @@ If Sonner still animates `height` under reduce after the above, also force:
 }
 ```
 
-Optional (default path polish, only if feel-check shows 400ms is sluggish for this crisp app): in `sonner.jsx` pass `duration` for toast *lifetime* only if already desired — do **not** confuse lifetime with animation duration. Prefer CSS overrides for enter/exit. If Sonner exposes `toastOptions.classNames` hooks that help, keep changes minimal.
+Optional (default path polish, only if feel-check shows 400ms is sluggish for this crisp app): in `sonner.jsx` pass `duration` for toast _lifetime_ only if already desired — do **not** confuse lifetime with animation duration. Prefer CSS overrides for enter/exit. If Sonner exposes `toastOptions.classNames` hooks that help, keep changes minimal.
 
 Do **not** set toast animation duration above 300ms for UI enter/exit in any override you add for the default (non-reduce) path. If you override default enter, use:
 

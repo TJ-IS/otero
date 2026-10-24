@@ -33,10 +33,7 @@ process.on('unhandledRejection', (err) => {
 });
 
 const DEFAULT_ROOT = path.resolve(config.projectRoot, 'data/downloads');
-const DEFAULT_DIRS = [
-  path.join(DEFAULT_ROOT, 'unpaywall'),
-  path.join(DEFAULT_ROOT, 'scihub'),
-];
+const DEFAULT_DIRS = [path.join(DEFAULT_ROOT, 'unpaywall'), path.join(DEFAULT_ROOT, 'scihub')];
 
 /** Shared across concurrent workers; filled in main() before import starts. */
 let existingDois = new Map();
@@ -44,9 +41,7 @@ let existingDois = new Map();
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const concurrencyIdx = args.indexOf('--concurrency');
-const CONCURRENCY = concurrencyIdx >= 0
-  ? Math.max(1, Number(args[concurrencyIdx + 1]) || 1)
-  : 2;
+const CONCURRENCY = concurrencyIdx >= 0 ? Math.max(1, Number(args[concurrencyIdx + 1]) || 1) : 2;
 const dirIdx = args.indexOf('--dir');
 const DIR_ARG = dirIdx >= 0 ? path.resolve(args[dirIdx + 1] || '') : null;
 
@@ -147,14 +142,20 @@ async function importOne(filePath, sourceDir, doi) {
   await parent.setItemType(mapped.itemType || 'journalArticle');
   for (const [name, value] of Object.entries(mapped.fields)) {
     if (value === null || value === undefined || value === '') continue;
-    try { parent.setField(name, value); }
-    catch { /* skip unknown / disallowed fields */ }
+    try {
+      parent.setField(name, value);
+    } catch {
+      /* skip unknown / disallowed fields */
+    }
   }
   for (const c of mapped.creators) parent.addCreator(c);
   await parent.save();
 
   await execute('UPDATE items SET "parentItemID"=$1 WHERE "itemID"=$2', [parent.id, attachment.id]);
-  await execute('UPDATE "itemAttachments" SET "parentItemID"=$1 WHERE "itemID"=$2', [parent.id, attachment.id]);
+  await execute('UPDATE "itemAttachments" SET "parentItemID"=$1 WHERE "itemID"=$2', [
+    parent.id,
+    attachment.id,
+  ]);
 
   existingDois.set(canonical, parent.key);
   existingDois.set(fileDoi, parent.key);
@@ -179,13 +180,24 @@ async function importOneWithRetry(filePath, sourceDir, doi, attempts = 4) {
     } catch (err) {
       lastErr = err;
       const msg = String(err?.message || err);
-      const transient = /timeout|ECONN|EPIPE|TLS|socket|hang up|terminated|deadlock|40P01|53300|57P01|ECONNRESET/i.test(msg);
+      const transient =
+        /timeout|ECONN|EPIPE|TLS|socket|hang up|terminated|deadlock|40P01|53300|57P01|ECONNRESET/i.test(
+          msg,
+        );
       if (!transient || i === attempts) throw err;
       const waitMs = 2000 * i;
       console.error(`  retry ${i}/${attempts} after ${waitMs}ms: ${msg.slice(0, 120)}`);
       await new Promise((r) => setTimeout(r, waitMs));
-      try { await closeDb(); } catch { /* ignore */ }
-      try { await initDb(); } catch (e) { console.error(`  re-initDb failed: ${e.message}`); }
+      try {
+        await closeDb();
+      } catch {
+        /* ignore */
+      }
+      try {
+        await initDb();
+      } catch (e) {
+        console.error(`  re-initDb failed: ${e.message}`);
+      }
     }
   }
   throw lastErr;
@@ -213,7 +225,9 @@ async function main() {
   const LOG_PATH = logPathFor(dirs);
 
   console.log(`DB: ${config.databaseUrl.replace(/:[^:@]+@/, ':***@')}`);
-  console.log(`Storage: ${config.storage.type} (${config.storage.s3.endpoint}/${config.storage.s3.bucket})`);
+  console.log(
+    `Storage: ${config.storage.type} (${config.storage.s3.endpoint}/${config.storage.s3.bucket})`,
+  );
   console.log(`Dirs: ${dirs.join(', ')}`);
   console.log(`Concurrency: ${CONCURRENCY}${DRY_RUN ? ' (dry-run)' : ''}`);
 
@@ -221,7 +235,10 @@ async function main() {
   for (const dir of dirs) {
     if (!fs.existsSync(dir)) continue;
     const sourceDir = path.basename(dir);
-    for (const f of fs.readdirSync(dir).filter((x) => x.toLowerCase().endsWith('.pdf')).sort()) {
+    for (const f of fs
+      .readdirSync(dir)
+      .filter((x) => x.toLowerCase().endsWith('.pdf'))
+      .sort()) {
       files.push({
         file: f,
         path: path.join(dir, f),
@@ -239,7 +256,8 @@ async function main() {
   console.log(`PDFs: ${files.length}  already in DB: ${skipped}  to import: ${todo.length}`);
   if (DRY_RUN || todo.length === 0) {
     if (DRY_RUN) {
-      for (const f of todo.slice(0, 20)) console.log(`  would import ${f.sourceDir}/${f.file} → ${f.doi}`);
+      for (const f of todo.slice(0, 20))
+        console.log(`  would import ${f.sourceDir}/${f.file} → ${f.doi}`);
       if (todo.length > 20) console.log(`  ... and ${todo.length - 20} more`);
     }
     await closeDb();
@@ -269,7 +287,13 @@ async function main() {
       return r;
     } catch (err) {
       fail++;
-      const r = { ok: false, file: item.file, sourceDir: item.sourceDir, doi: item.doi, error: err.message };
+      const r = {
+        ok: false,
+        file: item.file,
+        sourceDir: item.sourceDir,
+        doi: item.doi,
+        error: err.message,
+      };
       fs.appendFileSync(LOG_PATH, JSON.stringify(r) + '\n');
       console.error(`ERR ${label}: ${err.message}`);
       return r;
@@ -278,7 +302,9 @@ async function main() {
 
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
   console.log('\n=== Done ===');
-  console.log(`  ok=${ok} fail=${fail} skippedFilename=${skipped} skippedCanonical=${skippedAlias} elapsed=${elapsed}s`);
+  console.log(
+    `  ok=${ok} fail=${fail} skippedFilename=${skipped} skippedCanonical=${skippedAlias} elapsed=${elapsed}s`,
+  );
   console.log(`  log=${LOG_PATH}`);
 
   // Verify DOIs now present.
@@ -292,7 +318,8 @@ async function main() {
   console.log(`  verify: ${present}/${files.length} DOIs present in DB`);
   if (stillMissing.length) {
     console.log(`  still missing (${stillMissing.length}):`);
-    for (const f of stillMissing.slice(0, 50)) console.log(`    ${f.sourceDir}/${f.file} (${f.doi})`);
+    for (const f of stillMissing.slice(0, 50))
+      console.log(`    ${f.sourceDir}/${f.file} (${f.doi})`);
     if (stillMissing.length > 50) console.log(`    ... and ${stillMissing.length - 50} more`);
   }
 

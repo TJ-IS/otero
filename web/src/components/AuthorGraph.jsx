@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import {
-  AlertTriangle, BarChart3, Scan, Search, SlidersHorizontal,
-} from 'lucide-react';
+import { AlertTriangle, BarChart3, Scan, Search, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { api } from '@/api/client';
 import { AIS_BASKET_JOURNALS } from '@/lib/items';
@@ -61,7 +63,9 @@ function LoadingGraph() {
 function CompactField({ label, children, className = '' }) {
   return (
     <label className={`grid shrink-0 gap-1 ${className}`}>
-      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+      <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        {label}
+      </span>
       {children}
     </label>
   );
@@ -84,11 +88,12 @@ export function AuthorGraph() {
 
   const yearFrom = parseYear(debouncedFilters.yearFrom);
   const yearTo = parseYear(debouncedFilters.yearTo);
-  const yearError = yearFrom === undefined || yearTo === undefined
-    ? t('authors.yearInvalid')
-    : yearFrom != null && yearTo != null && yearFrom > yearTo
-      ? t('authors.yearOrder')
-      : null;
+  const yearError =
+    yearFrom === undefined || yearTo === undefined
+      ? t('authors.yearInvalid')
+      : yearFrom != null && yearTo != null && yearFrom > yearTo
+        ? t('authors.yearOrder')
+        : null;
 
   useEffect(() => {
     if (yearError) {
@@ -98,14 +103,15 @@ export function AuthorGraph() {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
-    api.getAuthorGraph({
-      minPapers: debouncedFilters.minPapers,
-      minCollaborations: debouncedFilters.minCollaborations,
-      journal: debouncedFilters.journal,
-      yearFrom,
-      yearTo,
-      signal: controller.signal,
-    })
+    api
+      .getAuthorGraph({
+        minPapers: debouncedFilters.minPapers,
+        minCollaborations: debouncedFilters.minCollaborations,
+        journal: debouncedFilters.journal,
+        yearFrom,
+        yearTo,
+        signal: controller.signal,
+      })
       .then((result) => setGraph(result))
       .catch((requestError) => {
         if (requestError.name !== 'AbortError') setError(requestError);
@@ -120,9 +126,7 @@ export function AuthorGraph() {
   const searchMatches = useMemo(() => {
     const normalized = searchQuery.trim().toLocaleLowerCase();
     if (!normalized) return [];
-    return nodes
-      .filter((node) => node.name.toLocaleLowerCase().includes(normalized))
-      .slice(0, 7);
+    return nodes.filter((node) => node.name.toLocaleLowerCase().includes(normalized)).slice(0, 7);
   }, [nodes, searchQuery]);
 
   const updateFilter = useCallback((key, value) => {
@@ -135,9 +139,12 @@ export function AuthorGraph() {
     setFocusToken((token) => token + 1);
   }, []);
 
-  const openAuthor = useCallback((id) => {
-    navigate(`/authors/${id}`);
-  }, [navigate]);
+  const openAuthor = useCallback(
+    (id) => {
+      navigate(`/authors/${id}`);
+    },
+    [navigate],
+  );
 
   const resetFilters = useCallback(() => {
     setFilters(DEFAULT_FILTERS);
@@ -153,16 +160,28 @@ export function AuthorGraph() {
       <header className="shrink-0">
         <div className="flex flex-wrap items-end gap-3 pb-4 pt-6">
           <div className="mr-1 min-w-0 flex-1">
-            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-brand">{t('common:nav.dashboard')}</p>
-            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">{t('authors.graphTitle')}</h1>
-            <p className="mt-1 hidden text-sm text-muted-foreground lg:block">{t('authors.graphSubtitle')}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-brand">
+              {t('common:nav.dashboard')}
+            </p>
+            <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
+              {t('authors.graphTitle')}
+            </h1>
+            <p className="mt-1 hidden text-sm text-muted-foreground lg:block">
+              {t('authors.graphSubtitle')}
+            </p>
           </div>
 
           {meta ? (
             <div className="hidden items-center gap-1.5 pb-1 md:flex">
-              <Badge variant="secondary" className="font-normal tabular-nums">{t('authors.nScholars', { count: meta.nodeCount })}</Badge>
-              <Badge variant="secondary" className="font-normal tabular-nums">{t('authors.nEdges', { count: meta.edgeCount })}</Badge>
-              <Badge variant="outline" className="font-normal tabular-nums">{t('authors.nCommunities', { count: meta.communityCount })}</Badge>
+              <Badge variant="secondary" className="font-normal tabular-nums">
+                {t('authors.nScholars', { count: meta.nodeCount })}
+              </Badge>
+              <Badge variant="secondary" className="font-normal tabular-nums">
+                {t('authors.nEdges', { count: meta.edgeCount })}
+              </Badge>
+              <Badge variant="outline" className="font-normal tabular-nums">
+                {t('authors.nCommunities', { count: meta.communityCount })}
+              </Badge>
             </div>
           ) : null}
         </div>
@@ -192,17 +211,21 @@ export function AuthorGraph() {
             />
             {searchOpen && searchQuery.trim() ? (
               <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-20 overflow-hidden rounded-sm border bg-popover shadow-sm">
-                {searchMatches.length ? searchMatches.map((node) => (
-                  <button
-                    key={node.id}
-                    type="button"
-                    className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-xs last:border-0 hover:bg-muted/60 focus:bg-muted/60 focus:outline-none"
-                    onClick={() => chooseAuthor(node.id)}
-                  >
-                    <span className="min-w-0 truncate">{node.name}</span>
-                    <span className="shrink-0 font-mono tabular-nums text-muted-foreground">{t('authors.nPapersShort', { count: node.paperCount })}</span>
-                  </button>
-                )) : (
+                {searchMatches.length ? (
+                  searchMatches.map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      className="flex w-full items-center justify-between gap-3 border-b px-3 py-2 text-left text-xs last:border-0 hover:bg-muted/60 focus:bg-muted/60 focus:outline-none"
+                      onClick={() => chooseAuthor(node.id)}
+                    >
+                      <span className="min-w-0 truncate">{node.name}</span>
+                      <span className="shrink-0 font-mono tabular-nums text-muted-foreground">
+                        {t('authors.nPapersShort', { count: node.paperCount })}
+                      </span>
+                    </button>
+                  ))
+                ) : (
                   <div className="px-3 py-2 text-xs text-muted-foreground">
                     {t('authors.noMatchScholars')}
                   </div>
@@ -246,7 +269,9 @@ export function AuthorGraph() {
                 <SelectContent>
                   <SelectItem value="all">{t('authors.allBasketJournals')}</SelectItem>
                   {AIS_BASKET_JOURNALS.map((journal) => (
-                    <SelectItem key={journal} value={journal}>{journal}</SelectItem>
+                    <SelectItem key={journal} value={journal}>
+                      {journal}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -277,7 +302,10 @@ export function AuthorGraph() {
               />
             </CompactField>
 
-            <CompactField label={t('authors.minPapers', { count: filters.minPapers })} className="w-36">
+            <CompactField
+              label={t('authors.minPapers', { count: filters.minPapers })}
+              className="w-36"
+            >
               <input
                 type="range"
                 min="1"
@@ -290,7 +318,10 @@ export function AuthorGraph() {
               />
             </CompactField>
 
-            <CompactField label={t('authors.minCollab', { count: filters.minCollaborations })} className="w-36">
+            <CompactField
+              label={t('authors.minCollab', { count: filters.minCollaborations })}
+              className="w-36"
+            >
               <input
                 type="range"
                 min="1"
@@ -310,13 +341,20 @@ export function AuthorGraph() {
                 </SelectTrigger>
                 <SelectContent>
                   {SIZE_METRIC_IDS.map((id) => (
-                    <SelectItem key={id} value={id}>{t(`authors.sizeBy.${id}`)}</SelectItem>
+                    <SelectItem key={id} value={id}>
+                      {t(`authors.sizeBy.${id}`)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </CompactField>
 
-            <Button variant="ghost" size="sm" className="h-8 active:scale-[0.98]" onClick={resetFilters}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 active:scale-[0.98]"
+              onClick={resetFilters}
+            >
               <SlidersHorizontal className="size-4" />
               {t('authors.resetFilters')}
             </Button>
@@ -350,7 +388,11 @@ export function AuthorGraph() {
             <p className="text-sm font-medium">{t('authors.loadFailed')}</p>
             <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setFilters((current) => ({ ...current }))}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFilters((current) => ({ ...current }))}
+          >
             {t('common:retry')}
           </Button>
         </div>
@@ -360,7 +402,9 @@ export function AuthorGraph() {
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <p className="text-sm font-medium">{t('authors.emptyNetwork')}</p>
           <p className="text-xs text-muted-foreground">{t('authors.emptyHint')}</p>
-          <Button variant="outline" size="sm" className="mt-2" onClick={resetFilters}>{t('authors.resetFilters')}</Button>
+          <Button variant="outline" size="sm" className="mt-2" onClick={resetFilters}>
+            {t('authors.resetFilters')}
+          </Button>
         </div>
       ) : null}
 

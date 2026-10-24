@@ -73,7 +73,7 @@ export async function indexFullText(itemId, opts = {}) {
          tsv = to_tsvector('simple', $1),
          "indexedAt" = $2
      WHERE "itemID" = $3`,
-    [plainText, indexedAt, itemId]
+    [plainText, indexedAt, itemId],
   );
   return { ok: true, chars: plainText.length, indexedAt };
 }
@@ -143,7 +143,8 @@ export async function backfillFullTextIndex({
         const r = await indexFullText(row.itemID, { markdownPath: row.markdownPath });
         if (r.ok) ok++;
         else fail++;
-        if (onProgress) onProgress({ ...r, itemKey: row.itemKey, done: ok + fail, total: rows.length });
+        if (onProgress)
+          onProgress({ ...r, itemKey: row.itemKey, done: ok + fail, total: rows.length });
       } catch (err) {
         fail++;
         console.error(`[fulltext-index] ${row.itemKey}:`, err.message);

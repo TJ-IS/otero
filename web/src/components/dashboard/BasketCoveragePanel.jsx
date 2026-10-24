@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,15 +81,16 @@ export function BasketCoveragePanel() {
       <Card>
         <CardHeader>
           <CardTitle>{t('basket.title')}</CardTitle>
-          <CardDescription>
-            {t('basket.desc')}
-          </CardDescription>
+          <CardDescription>{t('basket.desc')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {loading ? (
             <LoadingSkeleton variant="chart" />
           ) : error ? (
-            <ErrorState className="h-48 py-0" message={t('loadFailed', { message: error.message })} />
+            <ErrorState
+              className="h-48 py-0"
+              message={t('loadFailed', { message: error.message })}
+            />
           ) : (
             <>
               <div className="overflow-x-auto border border-border/80">
@@ -91,9 +99,13 @@ export function BasketCoveragePanel() {
                     <tr>
                       <th className="px-3 py-2 font-medium">{t('basket.colJournal')}</th>
                       <th className="px-3 py-2 text-right font-medium">{t('basket.colTarget')}</th>
-                      <th className="px-3 py-2 text-right font-medium">{t('basket.colCollected')}</th>
+                      <th className="px-3 py-2 text-right font-medium">
+                        {t('basket.colCollected')}
+                      </th>
                       <th className="px-3 py-2 text-right font-medium">{t('basket.colMissing')}</th>
-                      <th className="px-3 py-2 text-right font-medium">{t('basket.colCoverage')}</th>
+                      <th className="px-3 py-2 text-right font-medium">
+                        {t('basket.colCoverage')}
+                      </th>
                       <th className="px-3 py-2 font-medium" />
                     </tr>
                   </thead>
@@ -113,11 +125,15 @@ export function BasketCoveragePanel() {
                               className="text-left font-medium hover:underline"
                               onClick={() => setSelectedJournal(active ? null : r.name)}
                             >
-                              <span className="hidden sm:inline">{displayJournalName(r.name, t)}</span>
+                              <span className="hidden sm:inline">
+                                {displayJournalName(r.name, t)}
+                              </span>
                               <span className="sm:hidden">{shortName(r.name, t)}</span>
                             </button>
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{formatCount(r.target, lng)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {formatCount(r.target, lng)}
+                          </td>
                           <td className="px-3 py-2 text-right tabular-nums text-[hsl(var(--chart-good))]">
                             {formatCount(r.collected, lng)}
                           </td>
@@ -137,7 +153,9 @@ export function BasketCoveragePanel() {
                               <span className="h-1 w-16 overflow-hidden rounded-full bg-muted">
                                 <span
                                   className="motion-progress block h-full w-full origin-left rounded-full bg-[hsl(var(--chart-good))]"
-                                  style={{ transform: `scaleX(${Math.min(100, r.coveragePct) / 100})` }}
+                                  style={{
+                                    transform: `scaleX(${Math.min(100, r.coveragePct) / 100})`,
+                                  }}
                                 />
                               </span>
                             </div>
@@ -174,8 +192,16 @@ export function BasketCoveragePanel() {
                   layout="vertical"
                   margin={{ left: 8, right: 16 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                    horizontal={false}
+                  />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    allowDecimals={false}
+                  />
                   <YAxis
                     type="category"
                     dataKey="name"
@@ -215,9 +241,7 @@ export function BasketCoveragePanel() {
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div>
                       <p className="text-sm font-medium">{displayJournalName(selected.name, t)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {t('basket.yearBreakdown')}
-                      </p>
+                      <p className="text-xs text-muted-foreground">{t('basket.yearBreakdown')}</p>
                     </div>
                     <Button
                       type="button"
@@ -230,11 +254,17 @@ export function BasketCoveragePanel() {
                     </Button>
                   </div>
                   {yearChartData.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">{t('basket.noYearSplit')}</p>
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      {t('basket.noYearSplit')}
+                    </p>
                   ) : (
                     <ResponsiveContainer width="100%" height={280}>
                       <BarChart data={yearChartData} margin={{ left: 0, right: 8, top: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke="hsl(var(--border))"
+                          vertical={false}
+                        />
                         <XAxis
                           dataKey="year"
                           tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
@@ -246,9 +276,17 @@ export function BasketCoveragePanel() {
                           allowDecimals={false}
                           width={36}
                         />
-                        <Tooltip content={<ChartTooltip formatter={(v) => formatCount(v, lng)} />} />
+                        <Tooltip
+                          content={<ChartTooltip formatter={(v) => formatCount(v, lng)} />}
+                        />
                         <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
-                        <Bar dataKey="collected" name={t('basket.colCollected')} stackId="y" fill={STATUS_COLORS.good} barSize={14} />
+                        <Bar
+                          dataKey="collected"
+                          name={t('basket.colCollected')}
+                          stackId="y"
+                          fill={STATUS_COLORS.good}
+                          barSize={14}
+                        />
                         <Bar
                           dataKey="missing"
                           name={t('basket.colMissing')}
@@ -268,7 +306,9 @@ export function BasketCoveragePanel() {
                   )}
                 </div>
               ) : (
-                <p className="text-center text-xs text-muted-foreground">{t('basket.clickJournal')}</p>
+                <p className="text-center text-xs text-muted-foreground">
+                  {t('basket.clickJournal')}
+                </p>
               )}
             </>
           )}
@@ -277,7 +317,9 @@ export function BasketCoveragePanel() {
 
       <MissingDoisModal
         open={!!missingFilter}
-        onOpenChange={(open) => { if (!open) setMissingFilter(null); }}
+        onOpenChange={(open) => {
+          if (!open) setMissingFilter(null);
+        }}
         journal={missingFilter?.journal || null}
         year={missingFilter?.year ?? null}
       />

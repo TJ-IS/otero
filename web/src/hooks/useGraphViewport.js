@@ -64,52 +64,58 @@ export function useGraphViewport({ initialView, reducedMotion = false, onDoubleT
     if (reducedMotion) cancelAnimation();
   }, [cancelAnimation, reducedMotion]);
 
-  const animateTo = useCallback((target, { velocity = { x: 0, y: 0, k: 0 } } = {}) => {
-    cancelAnimation();
-    const normalizedTarget = {
-      x: target.x,
-      y: target.y,
-      k: clamp(target.k, GRAPH_MIN_ZOOM, MAX_ZOOM),
-    };
-    if (reducedMotion) {
-      commitView(normalizedTarget);
-      return;
-    }
-
-    const position = { ...viewRef.current };
-    const currentVelocity = { ...velocity };
-    const response = 0.38;
-    const omega = (2 * Math.PI) / response;
-    const stiffness = omega * omega;
-    const damping = 2 * omega;
-    let previousTime = performance.now();
-
-    const step = (time) => {
-      const dt = Math.min(0.032, Math.max(0.001, (time - previousTime) / 1000));
-      previousTime = time;
-      let settled = true;
-
-      for (const key of ['x', 'y', 'k']) {
-        const acceleration = (normalizedTarget[key] - position[key]) * stiffness
-          - currentVelocity[key] * damping;
-        currentVelocity[key] += acceleration * dt;
-        position[key] += currentVelocity[key] * dt;
-        const positionTolerance = key === 'k' ? 0.0005 : 0.15;
-        const velocityTolerance = key === 'k' ? 0.002 : 2;
-        if (Math.abs(normalizedTarget[key] - position[key]) > positionTolerance
-          || Math.abs(currentVelocity[key]) > velocityTolerance) settled = false;
-      }
-
-      if (settled) {
-        animationFrameRef.current = null;
+  const animateTo = useCallback(
+    (target, { velocity = { x: 0, y: 0, k: 0 } } = {}) => {
+      cancelAnimation();
+      const normalizedTarget = {
+        x: target.x,
+        y: target.y,
+        k: clamp(target.k, GRAPH_MIN_ZOOM, MAX_ZOOM),
+      };
+      if (reducedMotion) {
         commitView(normalizedTarget);
         return;
       }
-      commitView(position);
+
+      const position = { ...viewRef.current };
+      const currentVelocity = { ...velocity };
+      const response = 0.38;
+      const omega = (2 * Math.PI) / response;
+      const stiffness = omega * omega;
+      const damping = 2 * omega;
+      let previousTime = performance.now();
+
+      const step = (time) => {
+        const dt = Math.min(0.032, Math.max(0.001, (time - previousTime) / 1000));
+        previousTime = time;
+        let settled = true;
+
+        for (const key of ['x', 'y', 'k']) {
+          const acceleration =
+            (normalizedTarget[key] - position[key]) * stiffness - currentVelocity[key] * damping;
+          currentVelocity[key] += acceleration * dt;
+          position[key] += currentVelocity[key] * dt;
+          const positionTolerance = key === 'k' ? 0.0005 : 0.15;
+          const velocityTolerance = key === 'k' ? 0.002 : 2;
+          if (
+            Math.abs(normalizedTarget[key] - position[key]) > positionTolerance ||
+            Math.abs(currentVelocity[key]) > velocityTolerance
+          )
+            settled = false;
+        }
+
+        if (settled) {
+          animationFrameRef.current = null;
+          commitView(normalizedTarget);
+          return;
+        }
+        commitView(position);
+        animationFrameRef.current = requestAnimationFrame(step);
+      };
       animationFrameRef.current = requestAnimationFrame(step);
-    };
-    animationFrameRef.current = requestAnimationFrame(step);
-  }, [cancelAnimation, commitView, reducedMotion]);
+    },
+    [cancelAnimation, commitView, reducedMotion],
+  );
 
   const startMomentum = useCallback(() => {
     if (reducedMotion || historyRef.current.length < 2) return;
@@ -119,8 +125,16 @@ export function useGraphViewport({ initialView, reducedMotion = false, onDoubleT
     const first = history[0];
     const last = history[history.length - 1];
     const elapsed = Math.max(16, last.time - first.time) / 1000;
-    let velocityX = clamp((last.x - first.x) / elapsed, -MAX_MOMENTUM_VELOCITY, MAX_MOMENTUM_VELOCITY);
-    let velocityY = clamp((last.y - first.y) / elapsed, -MAX_MOMENTUM_VELOCITY, MAX_MOMENTUM_VELOCITY);
+    let velocityX = clamp(
+      (last.x - first.x) / elapsed,
+      -MAX_MOMENTUM_VELOCITY,
+      MAX_MOMENTUM_VELOCITY,
+    );
+    let velocityY = clamp(
+      (last.y - first.y) / elapsed,
+      -MAX_MOMENTUM_VELOCITY,
+      MAX_MOMENTUM_VELOCITY,
+    );
     if (Math.hypot(velocityX, velocityY) < 120) return;
 
     cancelAnimation();
@@ -175,159 +189,183 @@ export function useGraphViewport({ initialView, reducedMotion = false, onDoubleT
     dragMovedRef.current = true;
   }, []);
 
-  const onPointerDown = useCallback((event) => {
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
-    cancelAnimation();
-    markUserInteraction();
-    wheelGestureRef.current = { mode: null, lastTime: 0, ctrlKey: false };
-    // Capture on the original hit target so the eventual click remains
-    // targeted at the node. Pointer moves still bubble to the SVG handler.
-    const captureTarget = typeof event.target?.setPointerCapture === 'function'
-      ? event.target
-      : event.currentTarget;
-    try { captureTarget.setPointerCapture?.(event.pointerId); } catch { /* unsupported target */ }
-    pointersRef.current.set(event.pointerId, {
-      x: event.clientX,
-      y: event.clientY,
-      captureTarget,
-    });
-    setIsInteracting(true);
-
-    if (pointersRef.current.size === 1) {
-      dragMovedRef.current = false;
-      beginPan({ x: event.clientX, y: event.clientY });
-    } else if (pointersRef.current.size === 2) {
-      beginPinch(event.currentTarget);
-    }
-  }, [beginPan, beginPinch, cancelAnimation, markUserInteraction]);
-
-  const onPointerMove = useCallback((event) => {
-    if (!pointersRef.current.has(event.pointerId)) return;
-    event.preventDefault();
-    const previous = pointersRef.current.get(event.pointerId);
-    pointersRef.current.set(event.pointerId, {
-      ...previous,
-      x: event.clientX,
-      y: event.clientY,
-    });
-
-    if (pointersRef.current.size >= 2) {
-      if (gestureRef.current.mode !== 'pinch') beginPinch(event.currentTarget);
-      const points = [...pointersRef.current.values()].slice(0, 2);
-      const a = localPoint(event.currentTarget, points[0].x, points[0].y);
-      const b = localPoint(event.currentTarget, points[1].x, points[1].y);
-      const center = midpoint(a, b);
-      const gesture = gestureRef.current;
-      const k = clamp(
-        gesture.startK * (distance(a, b) / gesture.startDistance),
-        GRAPH_MIN_ZOOM,
-        MAX_ZOOM,
-      );
-      commitView({
-        x: center.x - gesture.worldX * k,
-        y: center.y - gesture.worldY * k,
-        k,
-      });
-      return;
-    }
-
-    const pointer = [...pointersRef.current.values()][0];
-    if (!pointer) return;
-    if (gestureRef.current.mode !== 'pan') beginPan(pointer);
-    const gesture = gestureRef.current;
-    const dx = pointer.x - gesture.startX;
-    const dy = pointer.y - gesture.startY;
-    if (!dragMovedRef.current && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-    dragMovedRef.current = true;
-    commitView({ x: gesture.viewX + dx, y: gesture.viewY + dy, k: viewRef.current.k });
-    const now = performance.now();
-    historyRef.current.push({ x: pointer.x, y: pointer.y, time: now });
-    if (historyRef.current.length > 6) historyRef.current.shift();
-  }, [beginPan, beginPinch, commitView]);
-
-  const finishPointer = useCallback((event, cancelled = false) => {
-    const wasPan = gestureRef.current.mode === 'pan';
-    const pointer = pointersRef.current.get(event.pointerId);
-    pointersRef.current.delete(event.pointerId);
-    try { pointer?.captureTarget?.releasePointerCapture?.(event.pointerId); } catch { /* already released */ }
-
-    if (pointersRef.current.size >= 2) {
-      beginPinch(event.currentTarget);
-      return;
-    }
-    if (pointersRef.current.size === 1) {
-      const pointer = [...pointersRef.current.values()][0];
-      beginPan(pointer);
-      return;
-    }
-
-    gestureRef.current = { mode: null };
-    setIsInteracting(false);
-    if (!cancelled && wasPan && dragMovedRef.current) startMomentum();
-
-    if (!cancelled && event.pointerType === 'touch' && !dragMovedRef.current) {
-      const point = localPoint(event.currentTarget, event.clientX, event.clientY);
-      const previous = lastTapRef.current;
-      const now = performance.now();
-      if (previous && now - previous.time < 300 && distance(previous, point) < 24) {
-        lastTapRef.current = null;
-        onDoubleTap?.(point);
-      } else {
-        lastTapRef.current = { ...point, time: now };
+  const onPointerDown = useCallback(
+    (event) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return;
+      cancelAnimation();
+      markUserInteraction();
+      wheelGestureRef.current = { mode: null, lastTime: 0, ctrlKey: false };
+      // Capture on the original hit target so the eventual click remains
+      // targeted at the node. Pointer moves still bubble to the SVG handler.
+      const captureTarget =
+        typeof event.target?.setPointerCapture === 'function' ? event.target : event.currentTarget;
+      try {
+        captureTarget.setPointerCapture?.(event.pointerId);
+      } catch {
+        /* unsupported target */
       }
-    }
-  }, [beginPan, beginPinch, onDoubleTap, startMomentum]);
+      pointersRef.current.set(event.pointerId, {
+        x: event.clientX,
+        y: event.clientY,
+        captureTarget,
+      });
+      setIsInteracting(true);
+
+      if (pointersRef.current.size === 1) {
+        dragMovedRef.current = false;
+        beginPan({ x: event.clientX, y: event.clientY });
+      } else if (pointersRef.current.size === 2) {
+        beginPinch(event.currentTarget);
+      }
+    },
+    [beginPan, beginPinch, cancelAnimation, markUserInteraction],
+  );
+
+  const onPointerMove = useCallback(
+    (event) => {
+      if (!pointersRef.current.has(event.pointerId)) return;
+      event.preventDefault();
+      const previous = pointersRef.current.get(event.pointerId);
+      pointersRef.current.set(event.pointerId, {
+        ...previous,
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      if (pointersRef.current.size >= 2) {
+        if (gestureRef.current.mode !== 'pinch') beginPinch(event.currentTarget);
+        const points = [...pointersRef.current.values()].slice(0, 2);
+        const a = localPoint(event.currentTarget, points[0].x, points[0].y);
+        const b = localPoint(event.currentTarget, points[1].x, points[1].y);
+        const center = midpoint(a, b);
+        const gesture = gestureRef.current;
+        const k = clamp(
+          gesture.startK * (distance(a, b) / gesture.startDistance),
+          GRAPH_MIN_ZOOM,
+          MAX_ZOOM,
+        );
+        commitView({
+          x: center.x - gesture.worldX * k,
+          y: center.y - gesture.worldY * k,
+          k,
+        });
+        return;
+      }
+
+      const pointer = [...pointersRef.current.values()][0];
+      if (!pointer) return;
+      if (gestureRef.current.mode !== 'pan') beginPan(pointer);
+      const gesture = gestureRef.current;
+      const dx = pointer.x - gesture.startX;
+      const dy = pointer.y - gesture.startY;
+      if (!dragMovedRef.current && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      dragMovedRef.current = true;
+      commitView({ x: gesture.viewX + dx, y: gesture.viewY + dy, k: viewRef.current.k });
+      const now = performance.now();
+      historyRef.current.push({ x: pointer.x, y: pointer.y, time: now });
+      if (historyRef.current.length > 6) historyRef.current.shift();
+    },
+    [beginPan, beginPinch, commitView],
+  );
+
+  const finishPointer = useCallback(
+    (event, cancelled = false) => {
+      const wasPan = gestureRef.current.mode === 'pan';
+      const pointer = pointersRef.current.get(event.pointerId);
+      pointersRef.current.delete(event.pointerId);
+      try {
+        pointer?.captureTarget?.releasePointerCapture?.(event.pointerId);
+      } catch {
+        /* already released */
+      }
+
+      if (pointersRef.current.size >= 2) {
+        beginPinch(event.currentTarget);
+        return;
+      }
+      if (pointersRef.current.size === 1) {
+        const pointer = [...pointersRef.current.values()][0];
+        beginPan(pointer);
+        return;
+      }
+
+      gestureRef.current = { mode: null };
+      setIsInteracting(false);
+      if (!cancelled && wasPan && dragMovedRef.current) startMomentum();
+
+      if (!cancelled && event.pointerType === 'touch' && !dragMovedRef.current) {
+        const point = localPoint(event.currentTarget, event.clientX, event.clientY);
+        const previous = lastTapRef.current;
+        const now = performance.now();
+        if (previous && now - previous.time < 300 && distance(previous, point) < 24) {
+          lastTapRef.current = null;
+          onDoubleTap?.(point);
+        } else {
+          lastTapRef.current = { ...point, time: now };
+        }
+      }
+    },
+    [beginPan, beginPinch, onDoubleTap, startMomentum],
+  );
 
   const onPointerUp = useCallback((event) => finishPointer(event, false), [finishPointer]);
   const onPointerCancel = useCallback((event) => finishPointer(event, true), [finishPointer]);
-  const onLostPointerCapture = useCallback((event) => {
-    if (pointersRef.current.has(event.pointerId)) finishPointer(event, true);
-  }, [finishPointer]);
+  const onLostPointerCapture = useCallback(
+    (event) => {
+      if (pointersRef.current.has(event.pointerId)) finishPointer(event, true);
+    },
+    [finishPointer],
+  );
 
-  const zoomAt = useCallback((point, factor, { animated = false } = {}) => {
-    const current = viewRef.current;
-    const k = clamp(current.k * factor, GRAPH_MIN_ZOOM, MAX_ZOOM);
-    const worldX = (point.x - current.x) / current.k;
-    const worldY = (point.y - current.y) / current.k;
-    const target = { x: point.x - worldX * k, y: point.y - worldY * k, k };
-    if (animated) animateTo(target);
-    else commitView(target);
-  }, [animateTo, commitView]);
-
-  const onWheel = useCallback((event) => {
-    event.preventDefault();
-    // Keep a pointer drag/pinch as one coherent gesture. Mixing a wheel
-    // update into its captured start baseline would cause the next move to jump.
-    if (pointersRef.current.size > 0) return;
-    cancelAnimation();
-    markUserInteraction();
-    const point = localPoint(event.currentTarget, event.clientX, event.clientY);
-    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
-    const now = performance.now();
-    const previousGesture = wheelGestureRef.current;
-    const continuingBurst = now - previousGesture.lastTime < 180
-      && previousGesture.ctrlKey === event.ctrlKey;
-    const mode = event.ctrlKey
-      ? 'zoom'
-      : continuingBurst && previousGesture.mode
-        ? previousGesture.mode
-        : event.deltaMode === 0
-          && (Math.abs(event.deltaX) > 0.5 || Math.abs(event.deltaY) < 40)
-          ? 'pan'
-          : 'zoom';
-    wheelGestureRef.current = { mode, lastTime: now, ctrlKey: event.ctrlKey };
-
-    if (mode === 'pan') {
+  const zoomAt = useCallback(
+    (point, factor, { animated = false } = {}) => {
       const current = viewRef.current;
-      commitView({
-        x: current.x - event.deltaX,
-        y: current.y - event.deltaY,
-        k: current.k,
-      });
-      return;
-    }
-    zoomAt(point, Math.exp(-delta * 0.0012));
-  }, [cancelAnimation, commitView, markUserInteraction, zoomAt]);
+      const k = clamp(current.k * factor, GRAPH_MIN_ZOOM, MAX_ZOOM);
+      const worldX = (point.x - current.x) / current.k;
+      const worldY = (point.y - current.y) / current.k;
+      const target = { x: point.x - worldX * k, y: point.y - worldY * k, k };
+      if (animated) animateTo(target);
+      else commitView(target);
+    },
+    [animateTo, commitView],
+  );
+
+  const onWheel = useCallback(
+    (event) => {
+      event.preventDefault();
+      // Keep a pointer drag/pinch as one coherent gesture. Mixing a wheel
+      // update into its captured start baseline would cause the next move to jump.
+      if (pointersRef.current.size > 0) return;
+      cancelAnimation();
+      markUserInteraction();
+      const point = localPoint(event.currentTarget, event.clientX, event.clientY);
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
+      const now = performance.now();
+      const previousGesture = wheelGestureRef.current;
+      const continuingBurst =
+        now - previousGesture.lastTime < 180 && previousGesture.ctrlKey === event.ctrlKey;
+      const mode = event.ctrlKey
+        ? 'zoom'
+        : continuingBurst && previousGesture.mode
+          ? previousGesture.mode
+          : event.deltaMode === 0 && (Math.abs(event.deltaX) > 0.5 || Math.abs(event.deltaY) < 40)
+            ? 'pan'
+            : 'zoom';
+      wheelGestureRef.current = { mode, lastTime: now, ctrlKey: event.ctrlKey };
+
+      if (mode === 'pan') {
+        const current = viewRef.current;
+        commitView({
+          x: current.x - event.deltaX,
+          y: current.y - event.deltaY,
+          k: current.k,
+        });
+        return;
+      }
+      zoomAt(point, Math.exp(-delta * 0.0012));
+    },
+    [cancelAnimation, commitView, markUserInteraction, zoomAt],
+  );
 
   return {
     view,

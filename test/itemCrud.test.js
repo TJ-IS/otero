@@ -45,10 +45,10 @@ test('Item CRUD: create, load, update, soft delete', async () => {
   const reloaded = await Item.loadByKey(it.key);
   assert.equal(reloaded.getField('date'), '2024-01-01');
 
-  assert.ok((await Items.list()).items.some(x => x.key === it.key));
+  assert.ok((await Items.list()).items.some((x) => x.key === it.key));
   await reloaded.delete();
-  assert.ok(!(await Items.list()).items.some(x => x.key === it.key));
-  assert.ok((await Items.list({ includeDeleted: true })).items.some(x => x.key === it.key));
+  assert.ok(!(await Items.list()).items.some((x) => x.key === it.key));
+  assert.ok((await Items.list({ includeDeleted: true })).items.some((x) => x.key === it.key));
 });
 
 test('Item rejects unknown itemType', async () => {
@@ -75,5 +75,5 @@ test('Collection CRUD and addItem', async () => {
   assert.equal(items[0].key, it.key);
 
   const listed = await Collections.list();
-  assert.ok(listed.some(c => c.key === col.key && c.name === col.name));
+  assert.ok(listed.some((c) => c.key === col.key && c.name === col.name));
 });

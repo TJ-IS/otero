@@ -2,8 +2,16 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useAsync } from '@/hooks/useAsync';
@@ -34,7 +42,10 @@ export function AuthorAnalyticsPanel() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation('dashboard');
   const lng = i18n.language;
-  const { data, loading, error } = useAsync(() => api.getAuthorAnalytics({ topN: 25, coreN: 5 }), []);
+  const { data, loading, error } = useAsync(
+    () => api.getAuthorAnalytics({ topN: 25, coreN: 5 }),
+    [],
+  );
 
   const typeData = useMemo(() => {
     if (!data?.creatorTypes) return [];
@@ -103,7 +114,9 @@ export function AuthorAnalyticsPanel() {
                           {a.name || t('authors.unnamed')}
                         </button>
                       </td>
-                      <td className="px-3 py-1.5 text-right tabular-nums font-medium">{a.paperCount}</td>
+                      <td className="px-3 py-1.5 text-right tabular-nums font-medium">
+                        {a.paperCount}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -164,11 +177,28 @@ export function AuthorAnalyticsPanel() {
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={data.papersPerAuthor} margin={{ left: 0, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
-                  <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} width={32} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    allowDecimals={false}
+                    width={32}
+                  />
                   <Tooltip content={<ChartTooltip formatter={(v) => formatCount(v)} />} />
-                  <Bar dataKey="count" name={t('authors.authorCount')} fill={SINGLE_SERIES_COLOR} radius={[4, 4, 0, 0]} barSize={22} />
+                  <Bar
+                    dataKey="count"
+                    name={t('authors.authorCount')}
+                    fill={SINGLE_SERIES_COLOR}
+                    radius={[4, 4, 0, 0]}
+                    barSize={22}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -185,10 +215,23 @@ export function AuthorAnalyticsPanel() {
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={data.collabSize} margin={{ left: 0, right: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
-              <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} width={40} />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                allowDecimals={false}
+                width={40}
+              />
               <Tooltip content={<ChartTooltip formatter={(v) => formatCount(v)} />} />
-              <Bar dataKey="count" name={t('authors.paperCountSeries')} fill={CATEGORICAL_COLORS[2]} radius={[4, 4, 0, 0]} barSize={28} />
+              <Bar
+                dataKey="count"
+                name={t('authors.paperCountSeries')}
+                fill={CATEGORICAL_COLORS[2]}
+                radius={[4, 4, 0, 0]}
+                barSize={28}
+              />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -221,7 +264,9 @@ export function AuthorAnalyticsPanel() {
                           <span className="mr-1 text-muted-foreground tabular-nums">{i + 1}.</span>
                           {a.name || t('authors.unnamed')}
                         </button>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">{a.paperCount}</span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {a.paperCount}
+                        </span>
                       </li>
                     ))}
                   </ol>

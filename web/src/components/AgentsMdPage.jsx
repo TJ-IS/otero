@@ -72,7 +72,9 @@ export function AgentsMdPage() {
     };
   }, [t]);
 
-  const installCommand = origin ? `npx skills add ${origin}` : 'npx skills add https://ais-basket.xyz';
+  const installCommand = origin
+    ? `npx skills add ${origin}`
+    : 'npx skills add https://ais-basket.xyz';
 
   const handleCopy = async () => {
     if (!agentsMd) return;
@@ -118,9 +120,7 @@ export function AgentsMdPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
             <h3 className="text-sm font-semibold tracking-tight">{t('agents.previewHeading')}</h3>
-            <p className="max-w-measure text-sm text-muted-foreground">
-              {t('agents.hint')}
-            </p>
+            <p className="max-w-measure text-sm text-muted-foreground">{t('agents.hint')}</p>
           </div>
           <div className="flex items-center gap-1.5">
             <Button

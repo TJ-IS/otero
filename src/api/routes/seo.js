@@ -30,10 +30,7 @@ seoRouter.get('/llms.txt', (_req, res) => {
 });
 
 function sendSitemap(res, xml) {
-  res
-    .type('application/xml; charset=utf-8')
-    .set('Cache-Control', 'public, max-age=3600')
-    .send(xml);
+  res.type('application/xml; charset=utf-8').set('Cache-Control', 'public, max-age=3600').send(xml);
 }
 
 seoRouter.get('/sitemap.xml', async (_req, res, next) => {
@@ -83,7 +80,10 @@ export async function spaSeoFallback(req, res, next) {
 
     const result = await renderSpaShellForRequest(req);
     if (!result?.html) return next();
-    res.status(result.status || 200).type('html').send(result.html);
+    res
+      .status(result.status || 200)
+      .type('html')
+      .send(result.html);
   } catch (err) {
     next(err);
   }

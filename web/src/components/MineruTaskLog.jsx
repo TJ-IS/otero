@@ -1,13 +1,25 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  RefreshCw, ExternalLink, Loader2, AlertCircle, CheckCircle2, Clock, ListChecks,
-  RotateCcw, ChevronLeft, ChevronRight,
+  RefreshCw,
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  ListChecks,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
@@ -47,7 +59,10 @@ function StateBadge({ state }) {
   const Icon = STATE_ICONS[state] || STATE_ICONS.idle;
   const pulse = STATE_PULSE.has(state);
   return (
-    <Badge variant={STATE_VARIANTS[state] || 'secondary'} className="inline-flex items-center gap-1 font-normal">
+    <Badge
+      variant={STATE_VARIANTS[state] || 'secondary'}
+      className="inline-flex items-center gap-1 font-normal"
+    >
       <Icon className={`size-3 ${pulse ? 'animate-spin' : ''}`} />
       {t(`fulltextStatus.${state}`, { defaultValue: state })}
     </Badge>
@@ -75,10 +90,14 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
   const viewRef = useRef({ filter, page });
   viewRef.current = { filter, page };
 
-  const filters = useMemo(() => FILTER_IDS.map((id) => ({
-    id,
-    label: t(`mineru.filter${id.charAt(0).toUpperCase()}${id.slice(1)}`),
-  })), [t]);
+  const filters = useMemo(
+    () =>
+      FILTER_IDS.map((id) => ({
+        id,
+        label: t(`mineru.filter${id.charAt(0).toUpperCase()}${id.slice(1)}`),
+      })),
+    [t],
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -105,29 +124,40 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
   useEffect(() => {
     if (!open) return;
     if (activeCount === 0) {
-      if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       return;
     }
     timerRef.current = setInterval(refresh, POLL_MS);
-    return () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [open, activeCount, refresh]);
 
-  const retry = useCallback(async (key) => {
-    if (!canEdit) {
-      toast.error(t('common:connectWhitelistFirst'));
-      return;
-    }
-    setBusyKey(key);
-    try {
-      await api.parseFulltext(key, { force: true });
-      toast.success(t('mineru.resubmitted', { key }));
-      refresh();
-    } catch (err) {
-      toast.error(t('mineru.retryFailed', { message: err.message }));
-    } finally {
-      setBusyKey(null);
-    }
-  }, [refresh, canEdit, t]);
+  const retry = useCallback(
+    async (key) => {
+      if (!canEdit) {
+        toast.error(t('common:connectWhitelistFirst'));
+        return;
+      }
+      setBusyKey(key);
+      try {
+        await api.parseFulltext(key, { force: true });
+        toast.success(t('mineru.resubmitted', { key }));
+        refresh();
+      } catch (err) {
+        toast.error(t('mineru.retryFailed', { message: err.message }));
+      } finally {
+        setBusyKey(null);
+      }
+    },
+    [refresh, canEdit, t],
+  );
 
   const retryAllFailed = useCallback(async () => {
     if (!canEdit) {
@@ -151,18 +181,21 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
     }
   }, [refresh, canEdit, t]);
 
-  const viewItem = useCallback((key) => {
-    onSelectItem?.(key);
-    onOpenChange?.(false);
-  }, [onSelectItem, onOpenChange]);
+  const viewItem = useCallback(
+    (key) => {
+      onSelectItem?.(key);
+      onOpenChange?.(false);
+    },
+    [onSelectItem, onOpenChange],
+  );
 
   const changeFilter = useCallback((f) => {
     setFilter(f);
     setPage(1);
   }, []);
 
-  const goPrev = useCallback(() => setPage(p => Math.max(1, p - 1)), []);
-  const goNext = useCallback(() => setPage(p => Math.min(totalPages, p + 1)), [totalPages]);
+  const goPrev = useCallback(() => setPage((p) => Math.max(1, p - 1)), []);
+  const goNext = useCallback(() => setPage((p) => Math.min(totalPages, p + 1)), [totalPages]);
 
   const filterCount = (id) => {
     if (id === 'all') return total;
@@ -180,15 +213,29 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
           </DialogTitle>
           <DialogDescription>
             {t('mineru.totalTasks', { total })}
-            {activeCount > 0 && <span className="text-brand">{t('mineru.activeCount', { count: activeCount })}</span>}
-            {counts.done > 0 && <span className="text-green-600">{t('mineru.doneCount', { count: counts.done })}</span>}
-            {counts.failed > 0 && <span className="text-red-600">{t('mineru.failedCount', { count: counts.failed })}</span>}
-            {activeCount > 0 && <span className="ml-2 text-xs">{t('mineru.autoRefresh', { seconds: POLL_MS / 1000 })}</span>}
+            {activeCount > 0 && (
+              <span className="text-brand">{t('mineru.activeCount', { count: activeCount })}</span>
+            )}
+            {counts.done > 0 && (
+              <span className="text-green-600">
+                {t('mineru.doneCount', { count: counts.done })}
+              </span>
+            )}
+            {counts.failed > 0 && (
+              <span className="text-red-600">
+                {t('mineru.failedCount', { count: counts.failed })}
+              </span>
+            )}
+            {activeCount > 0 && (
+              <span className="ml-2 text-xs">
+                {t('mineru.autoRefresh', { seconds: POLL_MS / 1000 })}
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center gap-1 px-6 py-2 border-b">
-          {filters.map(f => (
+          {filters.map((f) => (
             <Button
               key={f.id}
               size="sm"
@@ -204,7 +251,9 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
 
         <div className="flex items-center justify-between px-6 py-2 border-b">
           <span className="text-xs text-muted-foreground">
-            {loading ? t('common:loading') : t('mineru.updatedAt', { time: new Date().toLocaleTimeString() })}
+            {loading
+              ? t('common:loading')
+              : t('mineru.updatedAt', { time: new Date().toLocaleTimeString() })}
           </span>
           <div className="flex items-center gap-2">
             {canEdit && counts.failed > 0 && (
@@ -215,13 +264,21 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
                 disabled={bulkRetrying || loading}
                 title={t('mineru.retryAllTitle', { count: counts.failed })}
               >
-                {bulkRetrying
-                  ? <Loader2 className="size-3.5 animate-spin" />
-                  : <RotateCcw className="size-3.5" />}
+                {bulkRetrying ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <RotateCcw className="size-3.5" />
+                )}
                 {t('mineru.retryAll', { count: counts.failed })}
               </Button>
             )}
-            <Button size="sm" variant="outline" onClick={refresh} disabled={loading} title={t('common:refresh')}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={refresh}
+              disabled={loading}
+              title={t('common:refresh')}
+            >
               <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />
               {t('common:refresh')}
             </Button>
@@ -235,69 +292,94 @@ export const MineruTaskLog = memo(function MineruTaskLog({ open, onOpenChange, o
             </div>
           ) : (
             <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-background text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
-                <tr>
-                  <th className="px-4 py-2 font-medium">{t('mineru.colStatus')}</th>
-                  <th className="px-4 py-2 font-medium">{t('mineru.colTitle')}</th>
-                  <th className="px-4 py-2 font-medium w-20">{t('mineru.colModel')}</th>
-                  <th className="px-4 py-2 font-medium w-28">{t('mineru.colProgress')}</th>
-                  <th className="px-4 py-2 font-medium w-40">{t('mineru.colSubmitted')}</th>
-                  <th className="px-4 py-2 font-medium w-40">{t('mineru.colFinished')}</th>
-                  <th className="px-4 py-2 font-medium w-24">{t('mineru.colActions')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(r => {
-                  const isActive = ACTIVE.has(r.state);
-                  return (
-                    <tr key={r.itemKey} className="border-b last:border-0 hover:bg-accent/40 align-top">
-                      <td className="px-4 py-2"><StateBadge state={r.state} /></td>
-                      <td className="px-4 py-2 max-w-[260px]">
-                        <div className="truncate font-medium" title={r.title || t('item:untitled')}>{r.title || t('item:untitled')}</div>
-                        <div className="text-xs text-muted-foreground font-mono">{r.itemKey}</div>
-                        {r.state === 'failed' && r.errMsg && (
-                          <div className="mt-1 text-xs text-destructive line-clamp-2" title={r.errMsg}>{r.errMsg}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-xs text-muted-foreground">{r.modelVersion || '—'}</td>
-                      <td className="px-4 py-2 text-xs text-muted-foreground tabular-nums">
-                        {isActive && r.totalPages ? `${r.extractedPages ?? 0} / ${r.totalPages}` : '—'}
-                      </td>
-                      <td className="px-4 py-2 text-xs text-muted-foreground tabular-nums">{fmtTime(r.submittedAt)}</td>
-                      <td className="px-4 py-2 text-xs text-muted-foreground tabular-nums">{fmtTime(r.completedAt)}</td>
-                      <td className="px-4 py-2">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => viewItem(r.itemKey)}
-                            title={t('mineru.openDetail')}
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-background text-left text-xs uppercase tracking-wider text-muted-foreground border-b">
+                  <tr>
+                    <th className="px-4 py-2 font-medium">{t('mineru.colStatus')}</th>
+                    <th className="px-4 py-2 font-medium">{t('mineru.colTitle')}</th>
+                    <th className="px-4 py-2 font-medium w-20">{t('mineru.colModel')}</th>
+                    <th className="px-4 py-2 font-medium w-28">{t('mineru.colProgress')}</th>
+                    <th className="px-4 py-2 font-medium w-40">{t('mineru.colSubmitted')}</th>
+                    <th className="px-4 py-2 font-medium w-40">{t('mineru.colFinished')}</th>
+                    <th className="px-4 py-2 font-medium w-24">{t('mineru.colActions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const isActive = ACTIVE.has(r.state);
+                    return (
+                      <tr
+                        key={r.itemKey}
+                        className="border-b last:border-0 hover:bg-accent/40 align-top"
+                      >
+                        <td className="px-4 py-2">
+                          <StateBadge state={r.state} />
+                        </td>
+                        <td className="px-4 py-2 max-w-[260px]">
+                          <div
+                            className="truncate font-medium"
+                            title={r.title || t('item:untitled')}
                           >
-                            <ExternalLink className="size-3" />
-                          </Button>
-                          {canEdit && r.state === 'failed' && (
+                            {r.title || t('item:untitled')}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-mono">{r.itemKey}</div>
+                          {r.state === 'failed' && r.errMsg && (
+                            <div
+                              className="mt-1 text-xs text-destructive line-clamp-2"
+                              title={r.errMsg}
+                            >
+                              {r.errMsg}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground">
+                          {r.modelVersion || '—'}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground tabular-nums">
+                          {isActive && r.totalPages
+                            ? `${r.extractedPages ?? 0} / ${r.totalPages}`
+                            : '—'}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground tabular-nums">
+                          {fmtTime(r.submittedAt)}
+                        </td>
+                        <td className="px-4 py-2 text-xs text-muted-foreground tabular-nums">
+                          {fmtTime(r.completedAt)}
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex items-center gap-1">
                             <Button
                               size="sm"
                               variant="ghost"
                               className="h-7 px-2 text-xs"
-                              onClick={() => retry(r.itemKey)}
-                              disabled={busyKey === r.itemKey}
-                              title={t('mineru.retry')}
+                              onClick={() => viewItem(r.itemKey)}
+                              title={t('mineru.openDetail')}
                             >
-                              {busyKey === r.itemKey
-                                ? <Loader2 className="size-3 animate-spin" />
-                                : <RefreshCw className="size-3" />}
+                              <ExternalLink className="size-3" />
                             </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                            {canEdit && r.state === 'failed' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => retry(r.itemKey)}
+                                disabled={busyKey === r.itemKey}
+                                title={t('mineru.retry')}
+                              >
+                                {busyKey === r.itemKey ? (
+                                  <Loader2 className="size-3 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="size-3" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

@@ -5,3 +5,7 @@ deps
 package-lock.json
 web/package-lock.json
 target_dois.txt
+# Vendored agent skill packs, pinned via skills-lock.json. Their formatting is
+# owned upstream; rewriting them here would churn on every skill update.
+.agents
+.claude

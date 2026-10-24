@@ -65,7 +65,11 @@ test('extractAbstractFromBlocks uses text_level headings', () => {
   const blocks = [
     { type: 'text', text_level: 1, text: 'Title here', page_idx: 0 },
     { type: 'text', text_level: 2, text: 'Abstract', page_idx: 0 },
-    { type: 'text', text: 'This paper develops a methodology for analyzing and predicting the impact category of malicious code, particularly email worms, using two frameworks that classify worms by detrimental impact over the short term and the total life cycle.', page_idx: 0 },
+    {
+      type: 'text',
+      text: 'This paper develops a methodology for analyzing and predicting the impact category of malicious code, particularly email worms, using two frameworks that classify worms by detrimental impact over the short term and the total life cycle.',
+      page_idx: 0,
+    },
     { type: 'text', text_level: 2, text: 'Keywords', page_idx: 0 },
     { type: 'text', text: 'Email worms', page_idx: 0 },
   ];
@@ -75,7 +79,8 @@ test('extractAbstractFromBlocks uses text_level headings', () => {
 });
 
 test('extractAbstractFromPlain finds letter-spaced ABSTRACT in flattened text', () => {
-  const plain = 'Relation of CIO background A R T I C L E I N F O Keywords: CIO A B S T R A C T The literature of the past three decades has not provided a consistent picture of payback for IT investment. Firm strategies and infrastructure play a part in determining return on investment in recent years. 1. Introduction Numerous facets of IT have been examined.';
+  const plain =
+    'Relation of CIO background A R T I C L E I N F O Keywords: CIO A B S T R A C T The literature of the past three decades has not provided a consistent picture of payback for IT investment. Firm strategies and infrastructure play a part in determining return on investment in recent years. 1. Introduction Numerous facets of IT have been examined.';
   const abs = extractAbstractFromPlain(plain);
   assert.ok(abs);
   assert.ok(abs.includes('payback for IT investment'));
@@ -83,13 +88,25 @@ test('extractAbstractFromPlain finds letter-spaced ABSTRACT in flattened text', 
 });
 
 test('polishAbstract joins MinerU ligatures and drops Elsevier footer', () => {
-  const raw = 'This paper studies classi fi cation and signi fi cant effects. © 2009 Elsevier B.V. All rights reserved.';
+  const raw =
+    'This paper studies classi fi cation and signi fi cant effects. © 2009 Elsevier B.V. All rights reserved.';
   assert.equal(polishAbstract(raw), 'This paper studies classification and significant effects.');
 });
 
 test('isAcceptableExtract rejects mid-sentence and incomplete endings', () => {
-  const good = 'This paper develops a methodology for analyzing email worms and predicting their impact over the short term and the total life cycle of the infection. Two frameworks classify worms by detrimental impact and are validated statistically and practically against a corpus of observed outbreaks.';
+  const good =
+    'This paper develops a methodology for analyzing email worms and predicting their impact over the short term and the total life cycle of the infection. Two frameworks classify worms by detrimental impact and are validated statistically and practically against a corpus of observed outbreaks.';
   assert.equal(isAcceptableExtract(good), true);
-  assert.equal(isAcceptableExtract('of articles on distance effect in online contexts. Study Distance measure Context'), false);
-  assert.equal(isAcceptableExtract('This paper develops a methodology for analyzing email worms and predicting'), false);
+  assert.equal(
+    isAcceptableExtract(
+      'of articles on distance effect in online contexts. Study Distance measure Context',
+    ),
+    false,
+  );
+  assert.equal(
+    isAcceptableExtract(
+      'This paper develops a methodology for analyzing email worms and predicting',
+    ),
+    false,
+  );
 });

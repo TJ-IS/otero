@@ -15,12 +15,9 @@ export function highlight(text, query) {
   while (k !== -1) {
     if (k > i) parts.push(text.slice(i, k));
     parts.push(
-      <mark
-        key={k}
-        className="rounded-sm bg-brand/15 px-0 text-inherit"
-      >
+      <mark key={k} className="rounded-sm bg-brand/15 px-0 text-inherit">
         {text.slice(k, k + ql.length)}
-      </mark>
+      </mark>,
     );
     i = k + ql.length;
     k = lower.indexOf(ql, i);

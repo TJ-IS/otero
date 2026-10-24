@@ -28,7 +28,13 @@ function buildTree(dois) {
   unique.sort();
 
   if (unique.length === 0) {
-    return { leaves: [], levels: [], root: EMPTY_ROOT, doiToIndex: new Map(), indexToDoi: new Map() };
+    return {
+      leaves: [],
+      levels: [],
+      root: EMPTY_ROOT,
+      doiToIndex: new Map(),
+      indexToDoi: new Map(),
+    };
   }
 
   const leaves = unique.map((doi) => sha256Hex(doi));
@@ -76,7 +82,8 @@ class MerkleTree {
       return this._tree;
     }
 
-    const rows = await query(`
+    const rows = await query(
+      `
       SELECT v.value AS doi
       FROM "itemData" d
       JOIN "itemDataValues" v ON v."valueID" = d."valueID"
@@ -84,7 +91,9 @@ class MerkleTree {
       WHERE d."fieldID" = $1
         AND i.deleted = 0
         AND i."parentItemID" IS NULL
-    `, [fieldId]);
+    `,
+      [fieldId],
+    );
 
     this._tree = buildTree(rows.map((r) => r.doi));
     return this._tree;
@@ -93,7 +102,9 @@ class MerkleTree {
   async _ensureBuilt() {
     if (this._tree) return;
     if (!this._building) {
-      this._building = this.rebuild().finally(() => { this._building = null; });
+      this._building = this.rebuild().finally(() => {
+        this._building = null;
+      });
     }
     await this._building;
   }

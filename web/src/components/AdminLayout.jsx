@@ -21,7 +21,11 @@ export function AdminLayout() {
     return (
       <div className="min-h-[100dvh] bg-background">
         <SiteHeader />
-        <main id="main-content" tabIndex={-1} className="flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="flex min-h-[calc(100dvh-3.5rem)] flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground"
+        >
           <ShieldCheck className="size-10 text-brand/60" />
           <p className="text-sm">{t('forbidden')}</p>
           <Button variant="outline" size="sm" asChild>
@@ -35,7 +39,9 @@ export function AdminLayout() {
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <SiteHeader />
-      <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-auto"><Outlet /></main>
+      <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-auto">
+        <Outlet />
+      </main>
     </div>
   );
 }

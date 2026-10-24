@@ -96,7 +96,8 @@ function basketJoin() {
 }
 
 async function findKeysByBadDois() {
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT i.key, dv.value AS doi
     FROM items i
     ${basketJoin()}
@@ -114,12 +115,15 @@ async function findKeysByBadDois() {
         OR dv.value ~ '10\\.17005/1jais\\.'
         OR dv.value ~ ','
       )
-  `, [journalParams()]);
+  `,
+    [journalParams()],
+  );
   return rows.filter((r) => rewriteDoi(r.doi) !== String(r.doi || '').trim()).map((r) => r.key);
 }
 
 async function findKeysByBrokenCreators() {
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT DISTINCT i.key
     FROM items i
     ${basketJoin()}
@@ -136,12 +140,15 @@ async function findKeysByBrokenCreators() {
         OR COALESCE(c."lastName", '') ~* 't17855'
         OR COALESCE(c."firstName", '') ~* 't17855'
       )
-  `, [journalParams()]);
+  `,
+    [journalParams()],
+  );
   return rows.map((r) => r.key);
 }
 
 async function findKeysByBadTitles() {
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT i.key
     FROM items i
     ${basketJoin()}
@@ -154,12 +161,15 @@ async function findKeysByBadTitles() {
         tv.value ~* '^JAIS Author Template$'
         OR tv.value ~ 'â•|â€|Ã.|�'
       )
-  `, [journalParams()]);
+  `,
+    [journalParams()],
+  );
   return rows.map((r) => r.key);
 }
 
 async function findKeysByBadDates() {
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT i.key
     FROM items i
     ${basketJoin()}
@@ -187,12 +197,15 @@ async function findKeysByBadDates() {
           ) >= 3
         )
       )
-  `, [journalParams()]);
+  `,
+    [journalParams()],
+  );
   return rows.map((r) => r.key);
 }
 
 async function findKeysByPlaceholderAbstracts() {
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT i.key, av.value AS abstract
     FROM items i
     ${basketJoin()}
@@ -208,19 +221,24 @@ async function findKeysByPlaceholderAbstracts() {
         OR av.value ~* 'research (article|note|essay)'
         OR av.value ~* 'corrected proof|accepted manuscript|doi:\\s*10\\.'
       )
-  `, [journalParams()]);
+  `,
+    [journalParams()],
+  );
   return rows.filter((r) => isPlaceholderAbstract(r.abstract)).map((r) => r.key);
 }
 
 async function findEmptyAuthorKeys() {
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT i.key
     FROM items i
     ${basketJoin()}
     WHERE i.deleted = 0 AND i."parentItemID" IS NULL
       AND pv.value = ANY($1)
       AND NOT EXISTS (SELECT 1 FROM "itemCreators" ic WHERE ic."itemID" = i."itemID")
-  `, [journalParams()]);
+  `,
+    [journalParams()],
+  );
   return rows.map((r) => r.key).filter((key) => !SKIP_AUTHOR_KEYS.has(key));
 }
 
@@ -291,7 +309,15 @@ async function repairTestGarbage({ apply, log }) {
     const date = item.getField('date') || '';
     const doi = item.getField('DOI') || '';
     if (!isTestGarbage({ title, date, doi })) {
-      const row = { key, phase: 1, action: 'skip', reason: 'failed safety check', title, date, doi };
+      const row = {
+        key,
+        phase: 1,
+        action: 'skip',
+        reason: 'failed safety check',
+        title,
+        date,
+        doi,
+      };
       log(row);
       results.push(row);
       continue;
@@ -337,7 +363,9 @@ async function repairDois({ apply, log, onlyKeys }) {
       continue;
     }
     const verified = mapped.fields.DOI ? rewriteDoi(mapped.fields.DOI) : rewritten;
-    const changes = [fieldChange('DOI', current, verified, 'doi-rewrite+crossref', `rewrote ${current}`)];
+    const changes = [
+      fieldChange('DOI', current, verified, 'doi-rewrite+crossref', `rewrote ${current}`),
+    ];
     await applyFieldChanges(item, changes, { apply });
     const row = {
       key,
@@ -361,37 +389,47 @@ function planCrossrefChanges(item, mapped, key) {
   }
   const currentTitle = item.getField('title') || '';
   if (fields.title && shouldOverwriteTitle(currentTitle)) {
-    changes.push(fieldChange('title', currentTitle, fields.title, 'crossref', 'template or mojibake'));
+    changes.push(
+      fieldChange('title', currentTitle, fields.title, 'crossref', 'template or mojibake'),
+    );
   }
   const currentDoi = item.getField('DOI') || '';
   if (fields.DOI && !doisEqual(currentDoi, fields.DOI)) {
-    changes.push(fieldChange('DOI', currentDoi, rewriteDoi(fields.DOI), 'crossref', 'normalized DOI'));
+    changes.push(
+      fieldChange('DOI', currentDoi, rewriteDoi(fields.DOI), 'crossref', 'normalized DOI'),
+    );
   }
   const suggestedCreators = mapCrossrefCreators(mapped);
   if (
-    !SKIP_AUTHOR_KEYS.has(key)
-    && suggestedCreators.length > 0
-    && shouldReplaceCreators(item.creators)
+    !SKIP_AUTHOR_KEYS.has(key) &&
+    suggestedCreators.length > 0 &&
+    shouldReplaceCreators(item.creators)
   ) {
-    changes.push(fieldChange(
-      'creators',
-      creatorSnapshot(item.creators),
-      suggestedCreators,
-      'crossref',
-      'broken or missing authors',
-    ));
+    changes.push(
+      fieldChange(
+        'creators',
+        creatorSnapshot(item.creators),
+        suggestedCreators,
+        'crossref',
+        'broken or missing authors',
+      ),
+    );
   }
   const currentAbs = item.getField('abstractNote') || '';
-  if (shouldOverwriteAbstract(currentAbs, fields.abstractNote, {
-    allowEmpty: phase3KeySet().has(key),
-  })) {
-    changes.push(fieldChange(
-      'abstractNote',
-      currentAbs,
-      fields.abstractNote,
-      'crossref',
-      currentAbs ? 'placeholder abstract' : 'empty abstract on confirmed item',
-    ));
+  if (
+    shouldOverwriteAbstract(currentAbs, fields.abstractNote, {
+      allowEmpty: phase3KeySet().has(key),
+    })
+  ) {
+    changes.push(
+      fieldChange(
+        'abstractNote',
+        currentAbs,
+        fields.abstractNote,
+        'crossref',
+        currentAbs ? 'placeholder abstract' : 'empty abstract on confirmed item',
+      ),
+    );
   }
   return changes;
 }
@@ -437,15 +475,15 @@ async function repairFromCrossref({ apply, log, onlyKeys }) {
       key,
       phase: 3,
       action: apply ? 'apply' : 'dry-run',
-      changes: changes.map((ch) => (
+      changes: changes.map((ch) =>
         ch.field === 'creators'
           ? {
               ...ch,
               from: ch.from.map(creatorLabel),
               to: ch.to.map(creatorLabel),
             }
-          : ch
-      )),
+          : ch,
+      ),
     };
     log(row);
     results.push(row);
@@ -473,23 +511,27 @@ async function applyCreatorsFromExtract(item, { apply, log }) {
     fieldMode: c.fieldMode ?? 0,
     orderIndex: i,
   }));
-  const changes = [fieldChange(
-    'creators',
-    creatorSnapshot(item.creators),
-    suggested,
-    'extractItem',
-    'Crossref had no authors',
-  )];
+  const changes = [
+    fieldChange(
+      'creators',
+      creatorSnapshot(item.creators),
+      suggested,
+      'extractItem',
+      'Crossref had no authors',
+    ),
+  ];
   await applyFieldChanges(item, changes, { apply });
   const row = {
     key: item.key,
     phase: 4,
     action: apply ? 'apply' : 'dry-run',
-    changes: [{
-      ...changes[0],
-      from: changes[0].from.map(creatorLabel),
-      to: changes[0].to.map(creatorLabel),
-    }],
+    changes: [
+      {
+        ...changes[0],
+        from: changes[0].from.map(creatorLabel),
+        to: changes[0].to.map(creatorLabel),
+      },
+    ],
   };
   log(row);
   return row;
@@ -521,23 +563,27 @@ async function repairAuthorsFallback({ apply, log, onlyKeys }) {
       const mapped = await fetchMapped(doi).catch(() => null);
       const suggested = mapped ? mapCrossrefCreators(mapped) : [];
       if (suggested.length > 0 && !shouldReplaceCreators(suggested)) {
-        const changes = [fieldChange(
-          'creators',
-          creatorSnapshot(item.creators),
-          suggested,
-          'crossref',
-          'empty authors, Crossref recovered',
-        )];
+        const changes = [
+          fieldChange(
+            'creators',
+            creatorSnapshot(item.creators),
+            suggested,
+            'crossref',
+            'empty authors, Crossref recovered',
+          ),
+        ];
         await applyFieldChanges(item, changes, { apply });
         const row = {
           key,
           phase: 4,
           action: apply ? 'apply' : 'dry-run',
-          changes: [{
-            ...changes[0],
-            from: changes[0].from.map(creatorLabel),
-            to: changes[0].to.map(creatorLabel),
-          }],
+          changes: [
+            {
+              ...changes[0],
+              from: changes[0].from.map(creatorLabel),
+              to: changes[0].to.map(creatorLabel),
+            },
+          ],
         };
         log(row);
         results.push(row);
@@ -572,12 +618,14 @@ export async function repairMetadata({
   logPath = null,
   keys = null,
 } = {}) {
-  const onlyKeys = Array.isArray(keys)
-    ? keys.map((k) => String(k).trim()).filter(Boolean)
-    : [];
-  const phases = phase === 'all' || phase === '0'
-    ? [1, 2, 3, 4]
-    : String(phase).split(',').map((p) => Number(p.trim())).filter((n) => n >= 1 && n <= 4);
+  const onlyKeys = Array.isArray(keys) ? keys.map((k) => String(k).trim()).filter(Boolean) : [];
+  const phases =
+    phase === 'all' || phase === '0'
+      ? [1, 2, 3, 4]
+      : String(phase)
+          .split(',')
+          .map((p) => Number(p.trim()))
+          .filter((n) => n >= 1 && n <= 4);
 
   const lines = [];
   const log = (row) => {
@@ -590,13 +638,23 @@ export async function repairMetadata({
   };
 
   const results = { apply, phases, items: [] };
-  if (phases.includes(1)) results.items.push(...await repairTestGarbage({ apply, log }));
-  if (phases.includes(2)) results.items.push(...await repairDois({ apply, log, onlyKeys }));
-  if (phases.includes(3)) results.items.push(...await repairFromCrossref({ apply, log, onlyKeys }));
-  if (phases.includes(4)) results.items.push(...await repairAuthorsFallback({ apply, log, onlyKeys }));
+  if (phases.includes(1)) results.items.push(...(await repairTestGarbage({ apply, log })));
+  if (phases.includes(2)) results.items.push(...(await repairDois({ apply, log, onlyKeys })));
+  if (phases.includes(3))
+    results.items.push(...(await repairFromCrossref({ apply, log, onlyKeys })));
+  if (phases.includes(4))
+    results.items.push(...(await repairAuthorsFallback({ apply, log, onlyKeys })));
 
-  const applied = results.items.filter((r) => r.action === 'apply' || r.action === 'soft-delete' || r.action === 'would-soft-delete' || r.action === 'dry-run').length;
-  const skipped = results.items.filter((r) => r.action === 'skip' || r.action === 'rollback').length;
+  const applied = results.items.filter(
+    (r) =>
+      r.action === 'apply' ||
+      r.action === 'soft-delete' ||
+      r.action === 'would-soft-delete' ||
+      r.action === 'dry-run',
+  ).length;
+  const skipped = results.items.filter(
+    (r) => r.action === 'skip' || r.action === 'rollback',
+  ).length;
   const errors = results.items.filter((r) => r.action === 'error').length;
   results.summary = {
     total: results.items.length,
@@ -605,12 +663,17 @@ export async function repairMetadata({
     errors,
   };
 
-  const outPath = logPath || path.join(
-    config.dataDir,
-    `repair-metadata-${apply ? 'apply' : 'dry-run'}-${new Date().toISOString().replace(/[:.]/g, '')}.jsonl`,
-  );
+  const outPath =
+    logPath ||
+    path.join(
+      config.dataDir,
+      `repair-metadata-${apply ? 'apply' : 'dry-run'}-${new Date().toISOString().replace(/[:.]/g, '')}.jsonl`,
+    );
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''));
+  fs.writeFileSync(
+    outPath,
+    lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''),
+  );
   results.logPath = outPath;
   return results;
 }

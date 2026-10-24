@@ -23,15 +23,11 @@ export function WalletButton() {
 
   if (!address) {
     return (
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={login}
-        disabled={connecting}
-        className="gap-1.5"
-      >
+      <Button variant="outline" size="sm" onClick={login} disabled={connecting} className="gap-1.5">
         <Wallet className="h-4 w-4" />
-        <span className="hidden sm:inline">{connecting ? t('connecting') : t('connectWallet')}</span>
+        <span className="hidden sm:inline">
+          {connecting ? t('connecting') : t('connectWallet')}
+        </span>
       </Button>
     );
   }
@@ -59,14 +55,18 @@ export function WalletButton() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel className="font-mono text-xs font-normal text-muted-foreground sm:hidden">
-          {shortenAddress(address)}{canEdit ? ` · ${t('editAllowed')}` : ''}
+          {shortenAddress(address)}
+          {canEdit ? ` · ${t('editAllowed')}` : ''}
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="sm:hidden" />
         <DropdownMenuItem onClick={handleCopy} className="gap-2">
           {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
           {copied ? t('copied') : t('copyAddress')}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={logout} className="gap-2 text-destructive focus:text-destructive">
+        <DropdownMenuItem
+          onClick={logout}
+          className="gap-2 text-destructive focus:text-destructive"
+        >
           <LogOut className="h-4 w-4" />
           {t('disconnectWallet')}
         </DropdownMenuItem>

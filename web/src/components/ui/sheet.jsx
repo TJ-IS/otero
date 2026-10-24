@@ -48,7 +48,15 @@ function SheetContent({ className, children, side = 'right', ...props }) {
       >
         {children}
         <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 15 15"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="size-4"
+          >
             <path d="M4 4l7 7M11 4l-7 7" />
           </svg>
           <span className="sr-only">Close</span>
@@ -59,11 +67,21 @@ function SheetContent({ className, children, side = 'right', ...props }) {
 }
 
 function SheetTitle({ className, ...props }) {
-  return <SheetPrimitive.Title className={cn('text-lg font-semibold text-foreground', className)} {...props} />;
+  return (
+    <SheetPrimitive.Title
+      className={cn('text-lg font-semibold text-foreground', className)}
+      {...props}
+    />
+  );
 }
 
 function SheetDescription({ className, ...props }) {
-  return <SheetPrimitive.Description className={cn('text-sm text-muted-foreground', className)} {...props} />;
+  return (
+    <SheetPrimitive.Description
+      className={cn('text-sm text-muted-foreground', className)}
+      {...props}
+    />
+  );
 }
 
 export { Sheet, SheetTrigger, SheetClose, SheetContent, SheetTitle, SheetDescription };

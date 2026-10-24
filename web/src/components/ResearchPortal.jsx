@@ -47,7 +47,10 @@ function PortalError({ message }) {
     <div className="border-y border-brand/30 bg-brand/5 px-4 py-5 text-sm">
       <p className="font-medium text-brand">{t('loadFailed')}</p>
       <p className="mt-1 text-muted-foreground">{message}</p>
-      <Link className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand hover:underline" to="/library">
+      <Link
+        className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-brand hover:underline"
+        to="/library"
+      >
         {t('openLibrary')} <ArrowRight className="size-3.5" />
       </Link>
     </div>
@@ -68,7 +71,11 @@ function PortalTimeline({ years }) {
   const showPeakLabel = peak && peak.year !== start && peak.year !== end;
 
   if (!series.length) {
-    return <p className="mt-5 border-t border-border py-4 text-sm text-muted-foreground">{t('noTimeline')}</p>;
+    return (
+      <p className="mt-5 border-t border-border py-4 text-sm text-muted-foreground">
+        {t('noTimeline')}
+      </p>
+    );
   }
 
   return (
@@ -76,24 +83,28 @@ function PortalTimeline({ years }) {
       <dl className="mt-5 grid grid-cols-3 gap-4 border-t border-border pt-4">
         <div>
           <dt className="text-xs text-muted-foreground">{t('timelineSpan')}</dt>
-          <dd className="mt-1 font-display text-lg font-semibold tabular-nums">{start} – {end}</dd>
+          <dd className="mt-1 font-display text-lg font-semibold tabular-nums">
+            {start} – {end}
+          </dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">{t('timelinePeak')}</dt>
           <dd className="mt-1 font-display text-lg font-semibold tabular-nums">
-            {peak ? t('timelinePeakValue', { year: peak.year, count: peak.count.toLocaleString() }) : '—'}
+            {peak
+              ? t('timelinePeakValue', { year: peak.year, count: peak.count.toLocaleString() })
+              : '—'}
           </dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">{t('timelineDated')}</dt>
-          <dd className="mt-1 font-display text-lg font-semibold tabular-nums">{dated.toLocaleString()}</dd>
+          <dd className="mt-1 font-display text-lg font-semibold tabular-nums">
+            {dated.toLocaleString()}
+          </dd>
         </div>
       </dl>
       <div className="mt-6 flex h-40 items-end gap-px" role="img" aria-label={t('timelineTitle')}>
         {series.map((row) => {
-          const height = row.count > 0 && maxCount
-            ? Math.max((row.count / maxCount) * 100, 6)
-            : 0;
+          const height = row.count > 0 && maxCount ? Math.max((row.count / maxCount) * 100, 6) : 0;
           return (
             <Link
               key={row.year}
@@ -143,36 +154,69 @@ export function ResearchPortal() {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">
       <SiteHeader />
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-page px-4 pb-20 pt-10 sm:px-6 sm:pt-14 lg:px-8">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-page px-4 pb-20 pt-10 sm:px-6 sm:pt-14 lg:px-8"
+      >
         <section className="grid gap-10 border-b border-border pb-12 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] lg:gap-16">
           <div className="max-w-3xl">
             <p className="mb-4 text-xs font-medium text-brand">{t('eyebrow')}</p>
             <h1 className="font-display text-4xl font-semibold leading-[1.08] text-balance sm:text-5xl lg:text-6xl">
-              {t('title')}<span className="ml-2 inline-block size-2.5 rounded-sm bg-brand align-baseline" aria-hidden="true" />
+              {t('title')}
+              <span
+                className="ml-2 inline-block size-2.5 rounded-sm bg-brand align-baseline"
+                aria-hidden="true"
+              />
             </h1>
-            <p className="mt-5 max-w-[50ch] text-base leading-relaxed text-foreground/80 sm:text-lg">{t('intro')}</p>
-            <form action="/search" method="get" className="mt-8 flex max-w-2xl items-center gap-2 border-b border-foreground/30 pb-2 focus-within:border-brand">
+            <p className="mt-5 max-w-[50ch] text-base leading-relaxed text-foreground/80 sm:text-lg">
+              {t('intro')}
+            </p>
+            <form
+              action="/search"
+              method="get"
+              className="mt-8 flex max-w-2xl items-center gap-2 border-b border-foreground/30 pb-2 focus-within:border-brand"
+            >
               <Search className="size-4 shrink-0 text-muted-foreground" />
-              <input name="q" aria-label={t('searchPlaceholder')} placeholder={t('searchPlaceholder')} className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/80" />
-              <button type="submit" className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand transition-transform hover:translate-x-0.5">
+              <input
+                name="q"
+                aria-label={t('searchPlaceholder')}
+                placeholder={t('searchPlaceholder')}
+                className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/80"
+              />
+              <button
+                type="submit"
+                className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand transition-transform hover:translate-x-0.5"
+              >
                 {t('searchAction')} <ArrowRight className="size-3.5" />
               </button>
             </form>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/library" className="inline-flex items-center gap-2 rounded-sm bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-transform hover:-translate-y-0.5 active:translate-y-px">
+              <Link
+                to="/library"
+                className="inline-flex items-center gap-2 rounded-sm bg-brand px-4 py-2 text-sm font-medium text-brand-foreground transition-transform hover:-translate-y-0.5 active:translate-y-px"
+              >
                 {t('openLibrary')} <ArrowRight className="size-3.5" />
               </Link>
-              <Link to="/journals" className="inline-flex items-center gap-2 rounded-sm border border-border px-4 py-2 text-sm font-medium text-foreground/80 transition-colors hover:border-brand hover:text-brand">
+              <Link
+                to="/journals"
+                className="inline-flex items-center gap-2 rounded-sm border border-border px-4 py-2 text-sm font-medium text-foreground/80 transition-colors hover:border-brand hover:text-brand"
+              >
                 {t('viewJournals')} <ArrowRight className="size-3.5" />
               </Link>
-              <Link to="/docs/api" className="inline-flex items-center gap-2 rounded-sm border border-border px-4 py-2 text-sm font-medium text-foreground/80 transition-colors hover:border-brand hover:text-brand">
+              <Link
+                to="/docs/api"
+                className="inline-flex items-center gap-2 rounded-sm border border-border px-4 py-2 text-sm font-medium text-foreground/80 transition-colors hover:border-brand hover:text-brand"
+              >
                 {t('openApi')} <ArrowUpRight className="size-3.5" />
               </Link>
             </div>
           </div>
           <aside className="self-end border-t border-border pt-4 lg:border-t-0 lg:border-l lg:pl-8">
             <p className="text-xs font-medium text-brand">{t('aboutLabel')}</p>
-            <p className="mt-3 max-w-[34ch] text-sm leading-relaxed text-muted-foreground">{t('aboutBody')}</p>
+            <p className="mt-3 max-w-[34ch] text-sm leading-relaxed text-muted-foreground">
+              {t('aboutBody')}
+            </p>
             <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground">
               <BookOpenText className="size-4 text-brand" />
               <span>{t('basketNote')}</span>
@@ -180,7 +224,11 @@ export function ResearchPortal() {
           </aside>
         </section>
 
-        {error && !data ? <div className="pt-6"><PortalError message={error.message} /></div> : null}
+        {error && !data ? (
+          <div className="pt-6">
+            <PortalError message={error.message} />
+          </div>
+        ) : null}
 
         <section className="grid gap-x-8 gap-y-5 border-b border-border py-10 sm:grid-cols-3 lg:grid-cols-5">
           {loading && !data ? (
@@ -190,8 +238,19 @@ export function ResearchPortal() {
               <Stat label={t('stats.items')} value={overview?.totalItems?.toLocaleString()} />
               <Stat label={t('stats.journals')} value={overview?.journalCount} />
               <Stat label={t('stats.authors')} value={overview?.totalCreators?.toLocaleString()} />
-              <Stat label={t('stats.doi')} value={overview?.withDoi?.toLocaleString()} detail={overview ? `${Math.round((overview.withDoi / Math.max(1, overview.totalItems)) * 100)}% ${t('stats.covered')}` : undefined} />
-              <Stat label={t('stats.fulltext')} value={overview?.withAttachment?.toLocaleString()} />
+              <Stat
+                label={t('stats.doi')}
+                value={overview?.withDoi?.toLocaleString()}
+                detail={
+                  overview
+                    ? `${Math.round((overview.withDoi / Math.max(1, overview.totalItems)) * 100)}% ${t('stats.covered')}`
+                    : undefined
+                }
+              />
+              <Stat
+                label={t('stats.fulltext')}
+                value={overview?.withAttachment?.toLocaleString()}
+              />
             </>
           )}
         </section>
@@ -200,17 +259,29 @@ export function ResearchPortal() {
           <div>
             <div className="flex items-baseline justify-between gap-4">
               <h2 className="font-display text-2xl font-semibold">
-                <Link to="/journals" className="transition-colors hover:text-brand">{t('journalsTitle')}</Link>
+                <Link to="/journals" className="transition-colors hover:text-brand">
+                  {t('journalsTitle')}
+                </Link>
               </h2>
-              <Link to="/dashboard/journals" className="text-xs font-medium text-muted-foreground hover:text-brand">{t('fullBreakdown')}</Link>
+              <Link
+                to="/dashboard/journals"
+                className="text-xs font-medium text-muted-foreground hover:text-brand"
+              >
+                {t('fullBreakdown')}
+              </Link>
             </div>
             <ul className="mt-5 divide-y divide-border border-t border-border">
               {JOURNAL_META.map((journal) => {
                 const itemCount = journalCounts.get(journal.name);
                 return (
                   <li key={journal.name}>
-                    <Link to={`/library?journal=${encodeURIComponent(journal.name)}`} className="group flex items-baseline justify-between gap-4 py-3 text-sm">
-                      <span className="min-w-0 truncate font-medium group-hover:text-brand">{journal.name}</span>
+                    <Link
+                      to={`/library?journal=${encodeURIComponent(journal.name)}`}
+                      className="group flex items-baseline justify-between gap-4 py-3 text-sm"
+                    >
+                      <span className="min-w-0 truncate font-medium group-hover:text-brand">
+                        {journal.name}
+                      </span>
                       <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
                         {itemCount?.toLocaleString?.() ?? itemCount ?? '—'}
                       </span>
@@ -223,9 +294,18 @@ export function ResearchPortal() {
           <div>
             <div className="flex items-baseline justify-between gap-4">
               <h2 className="font-display text-2xl font-semibold">{t('timelineTitle')}</h2>
-              <Link to="/dashboard/timeline" className="text-xs font-medium text-muted-foreground hover:text-brand">{t('fullTimeline')}</Link>
+              <Link
+                to="/dashboard/timeline"
+                className="text-xs font-medium text-muted-foreground hover:text-brand"
+              >
+                {t('fullTimeline')}
+              </Link>
             </div>
-            {loading && !data ? <Skeleton className="mt-5 h-56" /> : <PortalTimeline years={years} />}
+            {loading && !data ? (
+              <Skeleton className="mt-5 h-56" />
+            ) : (
+              <PortalTimeline years={years} />
+            )}
           </div>
         </section>
 
@@ -235,7 +315,10 @@ export function ResearchPortal() {
             <h2 className="mt-2 font-display text-2xl font-semibold">{t('apiTitle')}</h2>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{t('apiBody')}</p>
           </div>
-          <Link to="/docs/api" className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-brand hover:underline">
+          <Link
+            to="/docs/api"
+            className="inline-flex shrink-0 items-center gap-2 text-sm font-medium text-brand hover:underline"
+          >
             <Code2 className="size-4" /> {t('readApiDocs')} <ArrowUpRight className="size-3.5" />
           </Link>
         </section>

@@ -21,14 +21,32 @@ const TARGET_VERSION = config.schemaVersion;
  */
 const ADDITIVE_COLUMNS = [
   // v5: MinerU full-text search columns on itemFullText
-  { table: 'itemFullText', column: 'plainText', ddl: 'ALTER TABLE "itemFullText" ADD COLUMN IF NOT EXISTS "plainText" TEXT' },
-  { table: 'itemFullText', column: 'tsv', ddl: 'ALTER TABLE "itemFullText" ADD COLUMN IF NOT EXISTS tsv tsvector' },
-  { table: 'itemFullText', column: 'indexedAt', ddl: 'ALTER TABLE "itemFullText" ADD COLUMN IF NOT EXISTS "indexedAt" TEXT' },
+  {
+    table: 'itemFullText',
+    column: 'plainText',
+    ddl: 'ALTER TABLE "itemFullText" ADD COLUMN IF NOT EXISTS "plainText" TEXT',
+  },
+  {
+    table: 'itemFullText',
+    column: 'tsv',
+    ddl: 'ALTER TABLE "itemFullText" ADD COLUMN IF NOT EXISTS tsv tsvector',
+  },
+  {
+    table: 'itemFullText',
+    column: 'indexedAt',
+    ddl: 'ALTER TABLE "itemFullText" ADD COLUMN IF NOT EXISTS "indexedAt" TEXT',
+  },
 ];
 
 const ADDITIVE_INDEXES = [
-  { name: 'itemFullText_tsv_gin', ddl: 'CREATE INDEX IF NOT EXISTS "itemFullText_tsv_gin" ON "itemFullText" USING GIN (tsv)' },
-  { name: 'itemCreators_creator_idx', ddl: 'CREATE INDEX IF NOT EXISTS "itemCreators_creator_idx" ON "itemCreators"("creatorID")' },
+  {
+    name: 'itemFullText_tsv_gin',
+    ddl: 'CREATE INDEX IF NOT EXISTS "itemFullText_tsv_gin" ON "itemFullText" USING GIN (tsv)',
+  },
+  {
+    name: 'itemCreators_creator_idx',
+    ddl: 'CREATE INDEX IF NOT EXISTS "itemCreators_creator_idx" ON "itemCreators"("creatorID")',
+  },
 ];
 
 const TRGM_INDEXES = [
@@ -61,7 +79,7 @@ async function columnExists(table, column) {
     `SELECT 1 AS ok
      FROM information_schema.columns
      WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
-    [table, column]
+    [table, column],
   );
   return !!row;
 }
@@ -69,7 +87,7 @@ async function columnExists(table, column) {
 async function indexExists(name) {
   const row = await queryOne(
     `SELECT 1 AS ok FROM pg_indexes WHERE schemaname = 'public' AND indexname = $1`,
-    [name]
+    [name],
   );
   return !!row;
 }
@@ -106,15 +124,13 @@ export async function runMigrations() {
     await execute('DROP INDEX IF EXISTS "itemDataValues_short_trgm_idx"');
   }
 
-  const row = await queryOne(
-    'SELECT version FROM "schemaVersion" ORDER BY version DESC LIMIT 1'
-  );
+  const row = await queryOne('SELECT version FROM "schemaVersion" ORDER BY version DESC LIMIT 1');
   const current = row?.version ?? 0;
 
   if (current < TARGET_VERSION) {
     await execute(
       'INSERT INTO "schemaVersion"(version) VALUES ($1) ON CONFLICT (version) DO NOTHING',
-      [TARGET_VERSION]
+      [TARGET_VERSION],
     );
   }
   await seedBootstrapAdmins();

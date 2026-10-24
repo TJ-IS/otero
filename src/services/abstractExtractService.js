@@ -5,7 +5,11 @@ import { config } from '../config.js';
 import { Item } from '../models/Item.js';
 import { JOURNAL_WHITELIST } from './journalWhitelist.js';
 import { isPlaceholderAbstract, shouldOverwriteAbstract } from './metadataRepairRules.js';
-import { extractAbstractFromPlain, isAcceptableExtract, polishAbstract } from './abstractExtractRules.js';
+import {
+  extractAbstractFromPlain,
+  isAcceptableExtract,
+  polishAbstract,
+} from './abstractExtractRules.js';
 
 const APPLY_CONCURRENCY = 8;
 
@@ -20,14 +24,16 @@ function logProgress(message) {
 async function runConcurrent(items, concurrency, worker) {
   let cursor = 0;
   const n = Math.max(1, Math.min(concurrency, items.length || 1));
-  await Promise.all(Array.from({ length: n }, async () => {
-    while (true) {
-      const idx = cursor;
-      cursor += 1;
-      if (idx >= items.length) return;
-      await worker(items[idx], idx);
-    }
-  }));
+  await Promise.all(
+    Array.from({ length: n }, async () => {
+      while (true) {
+        const idx = cursor;
+        cursor += 1;
+        if (idx >= items.length) return;
+        await worker(items[idx], idx);
+      }
+    }),
+  );
 }
 
 async function findCandidates({ journals, limit, keys } = {}) {
@@ -35,7 +41,8 @@ async function findCandidates({ journals, limit, keys } = {}) {
   const keyFilter = keys?.length ? 'AND i.key = ANY($2)' : '';
   const limitSql = limit ? `LIMIT ${Number(limit)}` : '';
   const params = keys?.length ? [pubs, keys] : [pubs];
-  return query(`
+  return query(
+    `
     SELECT
       i.key,
       pv.value AS journal,
@@ -61,7 +68,9 @@ async function findCandidates({ journals, limit, keys } = {}) {
       ${keyFilter}
     ORDER BY pv.value, i."itemID"
     ${limitSql}
-  `, params);
+  `,
+    params,
+  );
 }
 
 export async function extractAbstracts({
@@ -101,11 +110,19 @@ export async function extractAbstracts({
     }
     const extracted = extractAbstractFromPlain(row.excerpt);
     if (!extracted) {
-      lines.push({ key: row.key, journal: row.journal, action: 'skip', reason: 'no Abstract heading in opening text' });
+      lines.push({
+        key: row.key,
+        journal: row.journal,
+        action: 'skip',
+        reason: 'no Abstract heading in opening text',
+      });
       continue;
     }
     const polished = polishAbstract(extracted);
-    if (!isAcceptableExtract(polished) || !shouldOverwriteAbstract(current, polished, { allowEmpty: true })) {
+    if (
+      !isAcceptableExtract(polished) ||
+      !shouldOverwriteAbstract(current, polished, { allowEmpty: true })
+    ) {
       lines.push({ key: row.key, journal: row.journal, action: 'skip', reason: 'quality gate' });
       continue;
     }
@@ -124,7 +141,9 @@ export async function extractAbstracts({
 
   if (apply && pending.length) {
     let wrote = 0;
-    logProgress(`[extract-abstracts] writing ${pending.length} abstracts (${APPLY_CONCURRENCY} concurrent)`);
+    logProgress(
+      `[extract-abstracts] writing ${pending.length} abstracts (${APPLY_CONCURRENCY} concurrent)`,
+    );
     await runConcurrent(pending, APPLY_CONCURRENCY, async ({ rec, polished }) => {
       try {
         const item = await Item.loadByKey(rec.key);
@@ -157,14 +176,24 @@ export async function extractAbstracts({
     })),
   };
 
-  const outPath = logPath || path.join(
-    config.dataDir,
-    `extract-abstracts-${apply ? 'apply' : 'dry-run'}-${new Date().toISOString().replace(/[:.]/g, '')}.jsonl`,
-  );
+  const outPath =
+    logPath ||
+    path.join(
+      config.dataDir,
+      `extract-abstracts-${apply ? 'apply' : 'dry-run'}-${new Date().toISOString().replace(/[:.]/g, '')}.jsonl`,
+    );
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''));
-  return { apply, summary, logPath: outPath, samples: {
-    hits: lines.filter((l) => l.action !== 'skip').slice(0, 8),
-    misses: lines.filter((l) => l.action === 'skip').slice(0, 8),
-  } };
+  fs.writeFileSync(
+    outPath,
+    lines.map((l) => JSON.stringify(l)).join('\n') + (lines.length ? '\n' : ''),
+  );
+  return {
+    apply,
+    summary,
+    logPath: outPath,
+    samples: {
+      hits: lines.filter((l) => l.action !== 'skip').slice(0, 8),
+      misses: lines.filter((l) => l.action === 'skip').slice(0, 8),
+    },
+  };
 }

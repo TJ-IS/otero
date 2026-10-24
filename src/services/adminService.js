@@ -41,7 +41,7 @@ export async function checkDuplicates({ doi, title, author, limit = 50 } = {}) {
          WHERE id."fieldID" = $1 AND LOWER(idv.value) = LOWER($2)
          ORDER BY i."dateAdded" DESC
          LIMIT $3`,
-        [doiField.fieldID, doi, limit]
+        [doiField.fieldID, doi, limit],
       );
       results.byDoi = items;
     }
@@ -61,7 +61,7 @@ export async function checkDuplicates({ doi, title, author, limit = 50 } = {}) {
          HAVING COUNT(*) > 1
          ORDER BY COUNT(*) DESC
          LIMIT $2`,
-        [doiField.fieldID, limit]
+        [doiField.fieldID, limit],
       );
       results.byDoi = duplicates;
       results.statistics.totalDuplicateDois = duplicates.length;
@@ -83,7 +83,7 @@ export async function checkDuplicates({ doi, title, author, limit = 50 } = {}) {
            AND i.deleted = 0
          ORDER BY i."dateAdded" DESC
          LIMIT $3`,
-        [titleField.fieldID, title, limit]
+        [titleField.fieldID, title, limit],
       );
 
       // Fuzzy match using similarity (requires pg_trgm extension)
@@ -99,7 +99,7 @@ export async function checkDuplicates({ doi, title, author, limit = 50 } = {}) {
            AND i.deleted = 0
          ORDER BY similarity_score DESC
          LIMIT $3`,
-        [titleField.fieldID, title, limit]
+        [titleField.fieldID, title, limit],
       ).catch(() => []); // Gracefully handle if pg_trgm not installed
 
       results.byTitle = {
@@ -124,7 +124,7 @@ export async function checkDuplicates({ doi, title, author, limit = 50 } = {}) {
          HAVING COUNT(*) > 1
          ORDER BY COUNT(*) DESC
          LIMIT $2`,
-        [titleField.fieldID, limit]
+        [titleField.fieldID, limit],
       );
       results.byTitle = duplicates;
       results.statistics.totalSimilarTitles = duplicates.length;
@@ -144,7 +144,7 @@ export async function checkDuplicates({ doi, title, author, limit = 50 } = {}) {
          AND i.deleted = 0
        ORDER BY i."dateAdded" DESC
        LIMIT $2`,
-      [`%${author}%`, limit]
+      [`%${author}%`, limit],
     );
     results.byAuthor = items;
   }
@@ -185,7 +185,7 @@ export async function getAllDuplicates() {
        GROUP BY idv.value
        HAVING COUNT(*) > 1
        ORDER BY COUNT(*) DESC`,
-      [doiField.fieldID]
+      [doiField.fieldID],
     );
     result.summary.totalDoiDuplicates = result.duplicateDois.length;
   }
@@ -205,7 +205,7 @@ export async function getAllDuplicates() {
        GROUP BY LOWER(TRIM(idv.value))
        HAVING COUNT(*) > 1
        ORDER BY COUNT(*) DESC`,
-      [titleField.fieldID]
+      [titleField.fieldID],
     );
     result.summary.totalTitleDuplicates = result.duplicateTitles.length;
   }
@@ -383,10 +383,7 @@ export async function getR2Status() {
  * Get combined system status (both PostgreSQL and R2).
  */
 export async function getSystemStatus() {
-  const [postgresSnapshot, r2Status] = await Promise.all([
-    getPostgresSnapshot(),
-    getR2Status(),
-  ]);
+  const [postgresSnapshot, r2Status] = await Promise.all([getPostgresSnapshot(), getR2Status()]);
   const { statistics, ...postgresStatus } = postgresSnapshot;
 
   return {
@@ -417,7 +414,8 @@ export async function getTrash({ page = 1, pageSize = 50 } = {}) {
   const validPageSize = Math.min(100, Math.max(1, Number.parseInt(pageSize, 10) || 50));
   const offset = (validPage - 1) * validPageSize;
 
-  const snapshot = await queryOne(`
+  const snapshot = await queryOne(
+    `
     WITH RECURSIVE item_edges AS (
       SELECT "itemID" AS child, "parentItemID" AS parent
       FROM items WHERE "parentItemID" IS NOT NULL
@@ -467,7 +465,9 @@ export async function getTrash({ page = 1, pageSize = 50 } = {}) {
         (SELECT json_agg(row_to_json(p) ORDER BY p."deletedAt" DESC, p.id DESC) FROM page_rows p),
         '[]'::json
       ) AS items
-  `, [validPageSize, offset]);
+  `,
+    [validPageSize, offset],
+  );
 
   const total = snapshot?.total || 0;
   return {
@@ -492,7 +492,8 @@ export async function emptyTrash() {
 
 /** Transaction body exported for focused, non-destructive unit testing. */
 export async function emptyTrashWithClient(client) {
-  const selection = await queryOne(`
+  const selection = await queryOne(
+    `
       WITH RECURSIVE item_edges AS (
         SELECT "itemID" AS child, "parentItemID" AS parent
         FROM items WHERE "parentItemID" IS NOT NULL
@@ -523,7 +524,10 @@ export async function emptyTrashWithClient(client) {
         (SELECT COUNT(*)::int FROM roots) AS "rootItems",
         COALESCE(array_agg("itemID"), ARRAY[]::integer[]) AS ids
       FROM trash_tree
-    `, [], client);
+    `,
+    [],
+    client,
+  );
 
   const ids = selection?.ids || [];
   if (ids.length === 0) {
@@ -543,22 +547,34 @@ export async function emptyTrashWithClient(client) {
   await execute('DELETE FROM "itemAttachments" WHERE "itemID" = ANY($1::integer[])', [ids], client);
   await execute('DELETE FROM "itemNotes" WHERE "itemID" = ANY($1::integer[])', [ids], client);
   await execute('DELETE FROM "itemAnnotations" WHERE "itemID" = ANY($1::integer[])', [ids], client);
-  const deleted = await execute('DELETE FROM items WHERE "itemID" = ANY($1::integer[])', [ids], client);
+  const deleted = await execute(
+    'DELETE FROM items WHERE "itemID" = ANY($1::integer[])',
+    [ids],
+    client,
+  );
 
   // Item rows cascade into itemCreators/itemData. Remove dictionary values
   // that no remaining item references so the purge also reclaims their space.
-  const creators = await execute(`
+  const creators = await execute(
+    `
       DELETE FROM creators c
       WHERE NOT EXISTS (
         SELECT 1 FROM "itemCreators" ic WHERE ic."creatorID" = c."creatorID"
       )
-    `, [], client);
-  const values = await execute(`
+    `,
+    [],
+    client,
+  );
+  const values = await execute(
+    `
       DELETE FROM "itemDataValues" v
       WHERE NOT EXISTS (
         SELECT 1 FROM "itemData" d WHERE d."valueID" = v."valueID"
       )
-    `, [], client);
+    `,
+    [],
+    client,
+  );
 
   return {
     rootItems: selection?.rootItems || 0,
@@ -577,7 +593,7 @@ const R2_LIST_CONCURRENCY = 8;
 const R2_LIST_RETRIES = 3;
 
 function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Collect one S3 listing stream, retrying transient R2/network failures. */
@@ -588,7 +604,7 @@ async function listR2Entries(prefix, recursive, attempts = R2_LIST_RETRIES) {
     return await new Promise((resolve, reject) => {
       const entries = [];
       const stream = client.listObjectsV2(bucket, prefix, recursive);
-      stream.on('data', entry => entries.push(entry));
+      stream.on('data', (entry) => entries.push(entry));
       stream.on('error', reject);
       stream.on('end', () => resolve(entries));
     });
@@ -618,7 +634,7 @@ async function listAllR2Objects() {
   }
 
   const prefixes = [...partitions];
-  const objects = rootObjects.filter(obj => !partitions.has(obj.name[0]));
+  const objects = rootObjects.filter((obj) => !partitions.has(obj.name[0]));
   let cursor = 0;
   async function worker() {
     while (cursor < prefixes.length) {
@@ -629,9 +645,7 @@ async function listAllR2Objects() {
       }
     }
   }
-  await Promise.all(
-    Array.from({ length: Math.min(R2_LIST_CONCURRENCY, prefixes.length) }, worker)
-  );
+  await Promise.all(Array.from({ length: Math.min(R2_LIST_CONCURRENCY, prefixes.length) }, worker));
   return objects;
 }
 
@@ -730,7 +744,7 @@ function classifyObject(name, { exactPaths, prefixes }) {
 const RECON_LIST_CAP = 1000;
 const RECON_CACHE_TTL_MS = Math.max(
   0,
-  Number(process.env.OTERO_RECON_CACHE_TTL_MS ?? 5 * 60 * 1000)
+  Number(process.env.OTERO_RECON_CACHE_TTL_MS ?? 5 * 60 * 1000),
 );
 let reconciliationCache = null;
 let reconciliationInFlight = null;
@@ -772,7 +786,7 @@ export async function reconcileStorage({ force = false } = {}) {
 async function performStorageReconciliation() {
   const startedAt = Date.now();
   const [refs, objects] = await Promise.all([buildDbReferenceSets(), listAllR2Objects()]);
-  const objectNames = new Set(objects.map(o => o.name));
+  const objectNames = new Set(objects.map((o) => o.name));
 
   // Exact paths (attachments and markdown files) must exist by name.
   const missingInR2 = [];
@@ -816,7 +830,12 @@ async function performStorageReconciliation() {
     if (!presentPrefixes.has(prefix)) {
       missingTotal++;
       if (missingInR2.length < RECON_LIST_CAP) {
-        missingInR2.push({ key: meta.key, path: prefix, deleted: meta.deleted, type: 'fulltext-directory' });
+        missingInR2.push({
+          key: meta.key,
+          path: prefix,
+          deleted: meta.deleted,
+          type: 'fulltext-directory',
+        });
       }
     }
   }
@@ -894,7 +913,10 @@ export async function deleteOrphanObjects(names) {
     try {
       // MinIO/R2 batches this list into the S3 multi-delete API. The previous
       // statObject + removeObject loop cost two serial requests per object.
-      await client.removeObjects(bucket, safeNames.map(name => ({ name })));
+      await client.removeObjects(
+        bucket,
+        safeNames.map((name) => ({ name })),
+      );
       deleted.push(...safeNames);
       if (reconciliationCache) {
         const deletedSet = new Set(safeNames);
@@ -916,7 +938,7 @@ export async function deleteOrphanObjects(names) {
               orphanBytes,
               orphanBytesFormatted: formatBytes(orphanBytes),
             },
-            orphanInR2: (cachedResult.orphanInR2 || []).filter(obj => !deletedSet.has(obj.name)),
+            orphanInR2: (cachedResult.orphanInR2 || []).filter((obj) => !deletedSet.has(obj.name)),
           },
         };
       }
@@ -953,5 +975,5 @@ function formatBytes(bytes) {
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }

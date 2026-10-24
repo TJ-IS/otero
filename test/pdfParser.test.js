@@ -24,12 +24,13 @@ function buildPdf(pageTexts) {
   objects[1] = '<< /Type /Catalog /Pages 2 0 R >>';
   objects[2] = `<< /Type /Pages /Kids [${kids}] /Count ${pageCount} >>`;
   for (let i = 0; i < pageCount; i++) {
-    objects[3 + i] = '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] '
-      + `/Contents ${firstContentObj + i} 0 R `
-      + `/Resources << /Font << /F1 ${fontObj} 0 R >> >> >>`;
+    objects[3 + i] =
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] ' +
+      `/Contents ${firstContentObj + i} 0 R ` +
+      `/Resources << /Font << /F1 ${fontObj} 0 R >> >> >>`;
     const stream = `BT /F1 24 Tf 72 700 Td (${pageTexts[i]}) Tj ET`;
-    objects[firstContentObj + i] = `<< /Length ${Buffer.byteLength(stream)} >>\n`
-      + `stream\n${stream}\nendstream`;
+    objects[firstContentObj + i] =
+      `<< /Length ${Buffer.byteLength(stream)} >>\n` + `stream\n${stream}\nendstream`;
   }
   objects[fontObj] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
 
@@ -44,8 +45,8 @@ function buildPdf(pageTexts) {
   for (let i = 1; i < objects.length; i++) {
     out += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
   }
-  out += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\n`
-    + `startxref\n${xrefStart}\n%%EOF\n`;
+  out +=
+    `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\n` + `startxref\n${xrefStart}\n%%EOF\n`;
   return Buffer.from(out);
 }
 
@@ -81,12 +82,14 @@ test('extractPdf honours maxPages and clamps it to the page count', async () => 
   await withTempPdf(['Page one alpha', 'Page two beta', 'Page three gamma'], async (file) => {
     const defaulted = await extractPdf(file);
     assert.equal(defaulted.numPages, 3);
-    assert.deepEqual(defaulted.pages.map(p => p.page), [1, 2, 3]);
-    assert.deepEqual(defaulted.pages.map(p => p.text), [
-      'Page one alpha',
-      'Page two beta',
-      'Page three gamma',
-    ]);
+    assert.deepEqual(
+      defaulted.pages.map((p) => p.page),
+      [1, 2, 3],
+    );
+    assert.deepEqual(
+      defaulted.pages.map((p) => p.text),
+      ['Page one alpha', 'Page two beta', 'Page three gamma'],
+    );
     assert.equal(defaulted.firstPageText, 'Page one alpha');
 
     const single = await extractPdf(file, { maxPages: 1 });

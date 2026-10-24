@@ -51,12 +51,20 @@ export async function extractPdf(filePath, { maxPages = 3 } = {}) {
   for (let i = 1; i <= limit; i++) {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
-    const text = content.items.map(it => it.str).join(' ').replace(/\s+/g, ' ').trim();
+    const text = content.items
+      .map((it) => it.str)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
     pages.push({ page: i, text });
     if (i === 1) firstPageText = text;
   }
 
-  try { await doc.destroy(); } catch { /* ignore */ }
+  try {
+    await doc.destroy();
+  } catch {
+    /* ignore */
+  }
 
   return { info, firstPageText, pages, numPages };
 }

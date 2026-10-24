@@ -36,7 +36,7 @@ export function TrashPanel() {
   const [actionError, setActionError] = useState(null);
   const { data, error, loading, refresh } = useAsync(
     () => api.getAdminTrash({ page, pageSize: PAGE_SIZE }),
-    [page]
+    [page],
   );
 
   const items = data?.items || [];
@@ -67,7 +67,7 @@ export function TrashPanel() {
         eyebrow={t('common:nav.admin')}
         title={t('trash.title')}
         description={t('trash.desc')}
-        actions={(
+        actions={
           <Button
             variant="destructive"
             size="sm"
@@ -76,7 +76,7 @@ export function TrashPanel() {
           >
             {purging ? t('trash.emptying') : t('trash.emptyTrash')}
           </Button>
-        )}
+        }
       />
 
       <section className="grid gap-4 sm:grid-cols-3">
@@ -108,7 +108,9 @@ export function TrashPanel() {
             <h2 className="font-display text-base font-semibold">{t('trash.deletedList')}</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">{t('trash.deletedListDesc')}</p>
           </div>
-          {loading && data ? <span className="text-xs text-muted-foreground">{t('trash.refreshing')}</span> : null}
+          {loading && data ? (
+            <span className="text-xs text-muted-foreground">{t('trash.refreshing')}</span>
+          ) : null}
         </div>
 
         {items.length === 0 ? (
@@ -134,11 +136,15 @@ export function TrashPanel() {
                     <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
                       {ITEM_TYPE_LABELS[item.itemType] || item.itemType}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums">{item.childCount}</td>
+                    <td className="px-4 py-3 text-right font-mono text-xs tabular-nums">
+                      {item.childCount}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                       {formatDate(item.deletedAt, i18n.language)}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{item.key}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {item.key}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -152,14 +158,19 @@ export function TrashPanel() {
               {t('trash.pageOf', { page: data.page, total: data.totalPages })}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage(p => p - 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => p - 1)}
+              >
                 {t('common:prevPage')}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={page >= data.totalPages || loading}
-                onClick={() => setPage(p => p + 1)}
+                onClick={() => setPage((p) => p + 1)}
               >
                 {t('common:nextPage')}
               </Button>
@@ -176,9 +187,7 @@ export function TrashPanel() {
               <span className="block">
                 {t('trash.confirmDesc', { items: total, children: childItems })}
               </span>
-              <span className="block">
-                {t('trash.confirmNote')}
-              </span>
+              <span className="block">{t('trash.confirmNote')}</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -191,7 +200,9 @@ export function TrashPanel() {
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90 active:translate-y-px"
             >
-              {purging ? t('trash.purgingHard') : t('trash.purgeRecords', { count: total + childItems })}
+              {purging
+                ? t('trash.purgingHard')
+                : t('trash.purgeRecords', { count: total + childItems })}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

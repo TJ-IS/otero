@@ -23,16 +23,22 @@ import { getChatPresets, clearChatHistory, loadChatHistory, saveChatHistory } fr
 
 function messageText(message) {
   return message.parts
-    .filter(p => p.type === 'text')
-    .map(p => p.text)
+    .filter((p) => p.type === 'text')
+    .map((p) => p.text)
     .join('');
 }
 
 function TypingDots() {
   return (
     <span className="inline-flex items-center gap-1 py-1">
-      <span className="motion-typing-dot size-1.5 rounded-full bg-current" style={{ animationDelay: '-0.3s' }} />
-      <span className="motion-typing-dot size-1.5 rounded-full bg-current" style={{ animationDelay: '-0.15s' }} />
+      <span
+        className="motion-typing-dot size-1.5 rounded-full bg-current"
+        style={{ animationDelay: '-0.3s' }}
+      />
+      <span
+        className="motion-typing-dot size-1.5 rounded-full bg-current"
+        style={{ animationDelay: '-0.15s' }}
+      />
       <span className="motion-typing-dot size-1.5 rounded-full bg-current" />
     </span>
   );
@@ -49,7 +55,9 @@ function ChatBubble({ role, text, streaming }) {
       </div>
       <div className="text-sm leading-relaxed text-foreground">
         {isEmpty ? (
-          streaming ? <TypingDots /> : null
+          streaming ? (
+            <TypingDots />
+          ) : null
         ) : isUser ? (
           <span className="whitespace-pre-wrap break-words">{text}</span>
         ) : (
@@ -126,24 +134,33 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
 
   useEffect(() => () => stop(), [stop]);
 
-  const send = useCallback((text) => {
-    const trimmed = text.trim();
-    if (!trimmed || sending) return;
-    sendMessage({ text: trimmed });
-    setInput('');
-  }, [sending, sendMessage]);
+  const send = useCallback(
+    (text) => {
+      const trimmed = text.trim();
+      if (!trimmed || sending) return;
+      sendMessage({ text: trimmed });
+      setInput('');
+    },
+    [sending, sendMessage],
+  );
 
-  const handleSubmit = useCallback((e) => {
-    e.preventDefault();
-    send(input);
-  }, [input, send]);
-
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleSubmit = useCallback(
+    (e) => {
       e.preventDefault();
       send(input);
-    }
-  }, [input, send]);
+    },
+    [input, send],
+  );
+
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        send(input);
+      }
+    },
+    [input, send],
+  );
 
   const handleClear = useCallback(() => {
     clearChatHistory(itemKey);
@@ -205,7 +222,13 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
                 >
                   <Trash2 className="size-3.5" />
                 </Button>
-                <Button variant="ghost" size="icon" className="size-7 text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)} title={t('common:close')}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7 text-muted-foreground hover:text-foreground"
+                  onClick={() => setOpen(false)}
+                  title={t('common:close')}
+                >
                   <X className="size-3.5" />
                 </Button>
               </div>
@@ -252,8 +275,17 @@ export const ChatPanel = memo(function ChatPanel({ itemKey }) {
                   className="min-h-[40px] max-h-28 text-sm resize-none py-2"
                   disabled={sending}
                 />
-                <Button type="submit" size="icon" className="shrink-0" disabled={sending || !input.trim()}>
-                  {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                <Button
+                  type="submit"
+                  size="icon"
+                  className="shrink-0"
+                  disabled={sending || !input.trim()}
+                >
+                  {sending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
                 </Button>
               </form>
             </div>

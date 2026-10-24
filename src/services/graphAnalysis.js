@@ -104,12 +104,9 @@ function detectCommunities(adjacency) {
   for (let source = 0; source < n; source += 1) {
     for (const [target, weight] of adjacency[source]) {
       if (source >= target) continue;
-      graph.addUndirectedEdgeWithKey(
-        `${source}:${target}`,
-        String(source),
-        String(target),
-        { weight },
-      );
+      graph.addUndirectedEdgeWithKey(`${source}:${target}`, String(source), String(target), {
+        weight,
+      });
     }
   }
 
@@ -128,8 +125,9 @@ function detectCommunities(adjacency) {
     if (!membersByCommunity.has(community)) membersByCommunity.set(community, []);
     membersByCommunity.get(community).push(index);
   }
-  const orderedCommunities = [...membersByCommunity.entries()]
-    .sort((a, b) => b[1].length - a[1].length || a[1][0] - b[1][0]);
+  const orderedCommunities = [...membersByCommunity.entries()].sort(
+    (a, b) => b[1].length - a[1].length || a[1][0] - b[1][0],
+  );
   const stableId = new Map(orderedCommunities.map(([oldId], index) => [oldId, index]));
   return {
     communityByIndex: communityByIndex.map((oldId) => stableId.get(oldId)),
@@ -216,18 +214,16 @@ function coreNumbers(adjacency) {
  * All values describe the supplied (usually filtered and capped) graph only.
  */
 export function analyzeUndirectedGraph(nodes = [], edges = []) {
-  const {
-    sortedNodes, adjacency, edgeCount,
-  } = normalizeGraph(nodes, edges);
+  const { sortedNodes, adjacency, edgeCount } = normalizeGraph(nodes, edges);
   const { componentByIndex, componentSizes } = connectedComponents(adjacency);
   const detected = detectCommunities(adjacency);
-  const connectedCommunityIds = [...new Set(
-    detected.communityByIndex.filter((_, index) => adjacency[index].size > 0),
-  )].sort((a, b) => a - b);
+  const connectedCommunityIds = [
+    ...new Set(detected.communityByIndex.filter((_, index) => adjacency[index].size > 0)),
+  ].sort((a, b) => a - b);
   const communityIdMap = new Map(connectedCommunityIds.map((id, index) => [id, index]));
-  const communityByIndex = detected.communityByIndex.map((id, index) => (
-    adjacency[index].size === 0 ? -1 : communityIdMap.get(id)
-  ));
+  const communityByIndex = detected.communityByIndex.map((id, index) =>
+    adjacency[index].size === 0 ? -1 : communityIdMap.get(id),
+  );
   const communityCount = connectedCommunityIds.length;
   const modularity = detected.modularity;
   const betweenness = betweennessCentrality(adjacency);

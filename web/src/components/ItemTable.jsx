@@ -4,7 +4,11 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useInfiniteItems } from '@/hooks/useInfiniteItems';
@@ -14,8 +18,15 @@ import { highlight } from '@/lib/highlight';
 import { AuthorLinks } from '@/components/AuthorLinks';
 import { EmptyState, ErrorState } from '@/components/ui/async-states';
 import {
-  FileText, BookOpen, GraduationCap, BookMarked, Presentation,
-  File, ChevronUp, ChevronDown, ArrowUpDown,
+  FileText,
+  BookOpen,
+  GraduationCap,
+  BookMarked,
+  Presentation,
+  File,
+  ChevronUp,
+  ChevronDown,
+  ArrowUpDown,
 } from 'lucide-react';
 
 const TYPE_ICONS = {
@@ -41,16 +52,24 @@ const SORT_OPTION_KEYS = [
 
 function SortIcon({ field, sortField, sortDir }) {
   if (sortField !== field) return <ChevronDown className="ml-1 size-3 opacity-20" />;
-  return sortDir === 'asc'
-    ? <ChevronUp className="ml-1 size-3 text-brand" />
-    : <ChevronDown className="ml-1 size-3 text-brand" />;
+  return sortDir === 'asc' ? (
+    <ChevronUp className="ml-1 size-3 text-brand" />
+  ) : (
+    <ChevronDown className="ml-1 size-3 text-brand" />
+  );
 }
 
 function journalOf(item) {
   return item?.fields?.publicationTitle || '';
 }
 
-export const ItemTable = memo(function ItemTable({ filter, version, selectedKey, onSelect, onStatusChange }) {
+export const ItemTable = memo(function ItemTable({
+  filter,
+  version,
+  selectedKey,
+  onSelect,
+  onStatusChange,
+}) {
   const { t } = useTranslation(['library', 'common']);
   const isMobile = useIsMobile();
 
@@ -59,7 +78,15 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
   const scrollRef = useRef(null);
   const showJournal = !filter?.journal;
 
-  const { items: sortedItems, total, error, loading, loadingMore, hasMore, loadMore } = useInfiniteItems({
+  const {
+    items: sortedItems,
+    total,
+    error,
+    loading,
+    loadingMore,
+    hasMore,
+    loadMore,
+  } = useInfiniteItems({
     filter,
     sortField,
     sortDir,
@@ -97,21 +124,24 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
     });
   }, []);
 
-  const onKeyDown = useCallback((e) => {
-    if (!sortedItems.length) return;
-    const current = selectedKey != null ? (keyToIndex.get(selectedKey) ?? -1) : -1;
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      const next = Math.min(sortedItems.length - 1, current + 1);
-      onSelect(sortedItems[next].key);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      const prev = Math.max(0, current - 1);
-      onSelect(sortedItems[prev].key);
-    } else if (e.key === 'Enter' && selectedKey) {
-      e.preventDefault();
-    }
-  }, [sortedItems, selectedKey, keyToIndex, onSelect]);
+  const onKeyDown = useCallback(
+    (e) => {
+      if (!sortedItems.length) return;
+      const current = selectedKey != null ? (keyToIndex.get(selectedKey) ?? -1) : -1;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = Math.min(sortedItems.length - 1, current + 1);
+        onSelect(sortedItems[next].key);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prev = Math.max(0, current - 1);
+        onSelect(sortedItems[prev].key);
+      } else if (e.key === 'Enter' && selectedKey) {
+        e.preventDefault();
+      }
+    },
+    [sortedItems, selectedKey, keyToIndex, onSelect],
+  );
 
   useEffect(() => {
     if (selectedKey == null) return;
@@ -133,13 +163,15 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
   const emptyMessage = hasActiveFilter ? t('table.emptyFiltered') : t('table.emptyImport');
   const colCount = 5;
 
-  const thClass = 'px-3 py-3 font-medium cursor-pointer select-none hover:text-foreground transition-colors first:pl-0 last:pr-0';
+  const thClass =
+    'px-3 py-3 font-medium cursor-pointer select-none hover:text-foreground transition-colors first:pl-0 last:pr-0';
   const tdClass = 'px-3 py-3.5 first:pl-0 last:pr-0';
 
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
   const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
-  const paddingBottom = virtualItems.length > 0 ? totalSize - virtualItems[virtualItems.length - 1].end : 0;
+  const paddingBottom =
+    virtualItems.length > 0 ? totalSize - virtualItems[virtualItems.length - 1].end : 0;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -147,14 +179,19 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
         <div className="flex items-center gap-2 border-y border-border/80 py-2">
           <Select
             value={sortField}
-            onValueChange={(v) => { setSortField(v); setSortDir('asc'); }}
+            onValueChange={(v) => {
+              setSortField(v);
+              setSortDir('asc');
+            }}
           >
             <SelectTrigger className="h-8 flex-1 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {SORT_OPTION_KEYS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{t(o.labelKey)}</SelectItem>
+                <SelectItem key={o.value} value={o.value}>
+                  {t(o.labelKey)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -178,9 +215,7 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
         {isMobile ? (
           <div>
             {loading && sortedItems.length === 0 && <CardSkeleton />}
-            {!loading && sortedItems.length === 0 && (
-              <EmptyState title={emptyMessage} />
-            )}
+            {!loading && sortedItems.length === 0 && <EmptyState title={emptyMessage} />}
             {paddingTop > 0 && <div style={{ height: paddingTop }} />}
             {virtualItems.map((virtualRow) => {
               const it = sortedItems[virtualRow.index];
@@ -205,7 +240,9 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     <span className="tabular-nums">{yearOf(it.fields?.date) || '—'}</span>
-                    {showJournal && journalOf(it) ? <span className="truncate">{journalOf(it)}</span> : null}
+                    {showJournal && journalOf(it) ? (
+                      <span className="truncate">{journalOf(it)}</span>
+                    ) : null}
                     <span className="tabular-nums">{volumeIssuePages(it.fields) || '—'}</span>
                     <Badge variant="secondary" className="font-normal">
                       {ITEM_TYPE_LABELS[it.itemType] || it.itemType}
@@ -227,27 +264,34 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
               <tr className="border-y border-border/80 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 <th className={cn(thClass, 'w-auto')} onClick={() => toggleSort('title')}>
                   <span className="inline-flex items-center">
-                    {t('table.title')} <SortIcon field="title" sortField={sortField} sortDir={sortDir} />
+                    {t('table.title')}{' '}
+                    <SortIcon field="title" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
                 <th className={cn(thClass, 'w-52')}>{t('table.authors')}</th>
                 <th className={cn(thClass, 'w-[4.5rem]')} onClick={() => toggleSort('date')}>
                   <span className="inline-flex items-center">
-                    {t('table.year')} <SortIcon field="date" sortField={sortField} sortDir={sortDir} />
+                    {t('table.year')}{' '}
+                    <SortIcon field="date" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
-                <th className={cn(thClass, showJournal ? 'w-56' : 'w-28')} onClick={() => (showJournal ? undefined : toggleSort('vip'))}>
+                <th
+                  className={cn(thClass, showJournal ? 'w-56' : 'w-28')}
+                  onClick={() => (showJournal ? undefined : toggleSort('vip'))}
+                >
                   {showJournal ? (
                     t('table.journal')
                   ) : (
                     <span className="inline-flex items-center">
-                      {t('table.vip')} <SortIcon field="vip" sortField={sortField} sortDir={sortDir} />
+                      {t('table.vip')}{' '}
+                      <SortIcon field="vip" sortField={sortField} sortDir={sortDir} />
                     </span>
                   )}
                 </th>
                 <th className={cn(thClass, 'w-44')} onClick={() => toggleSort('itemType')}>
                   <span className="inline-flex items-center">
-                    {t('table.type')} <SortIcon field="itemType" sortField={sortField} sortDir={sortDir} />
+                    {t('table.type')}{' '}
+                    <SortIcon field="itemType" sortField={sortField} sortDir={sortDir} />
                   </span>
                 </th>
               </tr>
@@ -285,16 +329,29 @@ export const ItemTable = memo(function ItemTable({ filter, version, selectedKey,
                       {highlight(rowTitle, searchQuery)}
                     </td>
                     <td className={cn(tdClass, 'w-52 truncate text-muted-foreground')}>
-                      <AuthorLinks creators={it.creators} query={searchQuery} className="truncate" />
+                      <AuthorLinks
+                        creators={it.creators}
+                        query={searchQuery}
+                        className="truncate"
+                      />
                     </td>
-                    <td className={cn(tdClass, 'w-[4.5rem] font-mono text-muted-foreground tabular-nums')}>
+                    <td
+                      className={cn(
+                        tdClass,
+                        'w-[4.5rem] font-mono text-muted-foreground tabular-nums',
+                      )}
+                    >
                       {yearOf(it.fields?.date) || '—'}
                     </td>
                     <td
-                      className={cn(tdClass, 'truncate text-muted-foreground', showJournal ? 'w-56' : 'w-28 tabular-nums')}
+                      className={cn(
+                        tdClass,
+                        'truncate text-muted-foreground',
+                        showJournal ? 'w-56' : 'w-28 tabular-nums',
+                      )}
                       title={showJournal ? journalOf(it) : volumeIssuePages(it.fields)}
                     >
-                      {showJournal ? (journalOf(it) || '—') : (volumeIssuePages(it.fields) || '—')}
+                      {showJournal ? journalOf(it) || '—' : volumeIssuePages(it.fields) || '—'}
                     </td>
                     <td className={cn(tdClass, 'w-44')}>
                       <Badge variant="secondary" className="gap-1 whitespace-nowrap font-normal">
@@ -330,11 +387,21 @@ function TableSkeleton() {
     <>
       {Array.from({ length: 10 }).map((_, i) => (
         <tr key={i} className="border-b border-border/70">
-          <td className="py-3.5 pr-3"><Skeleton className="h-4 w-[22rem]" /></td>
-          <td className="px-3 py-3.5"><Skeleton className="h-4 w-36" /></td>
-          <td className="px-3 py-3.5"><Skeleton className="h-4 w-10" /></td>
-          <td className="px-3 py-3.5"><Skeleton className="h-4 w-28" /></td>
-          <td className="py-3.5 pl-3"><Skeleton className="h-4 w-20" /></td>
+          <td className="py-3.5 pr-3">
+            <Skeleton className="h-4 w-[22rem]" />
+          </td>
+          <td className="px-3 py-3.5">
+            <Skeleton className="h-4 w-36" />
+          </td>
+          <td className="px-3 py-3.5">
+            <Skeleton className="h-4 w-10" />
+          </td>
+          <td className="px-3 py-3.5">
+            <Skeleton className="h-4 w-28" />
+          </td>
+          <td className="py-3.5 pl-3">
+            <Skeleton className="h-4 w-20" />
+          </td>
         </tr>
       ))}
     </>

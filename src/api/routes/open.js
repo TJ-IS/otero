@@ -99,7 +99,9 @@ openRouter.get('/items/:key/structure', async (req, res) => {
 openRouter.get('/items/:key/export', async (req, res) => {
   try {
     const result = await exportItemByKey(req.params.key, req.query.format);
-    res.type(result.format === 'ris' ? 'application/x-research-info-systems' : 'application/x-bibtex');
+    res.type(
+      result.format === 'ris' ? 'application/x-research-info-systems' : 'application/x-bibtex',
+    );
     res.send(result.content);
   } catch (err) {
     sendError(res, err);
@@ -131,11 +133,17 @@ openRouter.get('/articles', async (req, res) => {
 openRouter.get('/articles/export', async (req, res) => {
   try {
     const filters = parseOpenFilters(req.query);
-    const result = await exportOpenArticles({ q: req.query.q, format: req.query.format, ...filters });
+    const result = await exportOpenArticles({
+      q: req.query.q,
+      format: req.query.format,
+      ...filters,
+    });
     const ext = result.format === 'ris' ? 'ris' : 'bib';
     res.setHeader('X-Export-Count', String(result.count));
     res.setHeader('Content-Disposition', `attachment; filename="otero-open-export.${ext}"`);
-    res.type(result.format === 'ris' ? 'application/x-research-info-systems' : 'application/x-bibtex');
+    res.type(
+      result.format === 'ris' ? 'application/x-research-info-systems' : 'application/x-bibtex',
+    );
     res.send(result.content);
   } catch (err) {
     sendError(res, err);

@@ -33,7 +33,14 @@ after(async () => {
   await closeDb();
 });
 
-async function makeItem({ type = 'journalArticle', title, date, doi, publicationTitle, creators = [] } = {}) {
+async function makeItem({
+  type = 'journalArticle',
+  title,
+  date,
+  doi,
+  publicationTitle,
+  creators = [],
+} = {}) {
   const it = new Item();
   await it.setItemType(type);
   if (title) it.setField('title', title);
@@ -50,7 +57,8 @@ test('getOverviewStats: counts items, distinct creators, DOI and attachment cove
   const before = await getOverviewStats();
   const tag = suffix();
   const p1 = await makeItem({
-    title: `Paper 1 ${tag}`, doi: `10.1/one-${tag}`,
+    title: `Paper 1 ${tag}`,
+    doi: `10.1/one-${tag}`,
     creators: [{ firstName: 'Alice', lastName: `Smith-${tag}`, creatorType: 'author' }],
   });
   await makeItem({
@@ -65,7 +73,12 @@ test('getOverviewStats: counts items, distinct creators, DOI and attachment cove
   att.setParent(p1.id);
   await att.save();
   createdKeys.push(att.key);
-  await insertAttachment({ itemId: att.id, parentItemId: p1.id, linkMode: 0, path: `x-${tag}.pdf` });
+  await insertAttachment({
+    itemId: att.id,
+    parentItemId: p1.id,
+    linkMode: 0,
+    path: `x-${tag}.pdf`,
+  });
 
   const stats = await getOverviewStats();
   assert.equal(stats.totalItems, before.totalItems + 2);
@@ -85,21 +98,21 @@ test('getOverviewStats: returns non-negative counters', async () => {
 
 test('getItemTypeDistribution: groups top-level non-deleted items by type', async () => {
   const before = await getItemTypeDistribution();
-  const beforeMap = Object.fromEntries(before.map(d => [d.itemType, d.count]));
+  const beforeMap = Object.fromEntries(before.map((d) => [d.itemType, d.count]));
   const tag = suffix();
   await makeItem({ type: 'journalArticle', title: `A ${tag}` });
   await makeItem({ type: 'journalArticle', title: `B ${tag}` });
   await makeItem({ type: 'book', title: `C ${tag}` });
 
   const dist = await getItemTypeDistribution();
-  const map = Object.fromEntries(dist.map(d => [d.itemType, d.count]));
+  const map = Object.fromEntries(dist.map((d) => [d.itemType, d.count]));
   assert.equal(map.journalArticle, (beforeMap.journalArticle || 0) + 2);
   assert.equal(map.book, (beforeMap.book || 0) + 1);
 });
 
 test('getPublicationYearHistogram: extracts years and drops implausible outliers', async () => {
   const before = await getPublicationYearHistogram();
-  const beforeMap = Object.fromEntries(before.map(h => [h.year, h.count]));
+  const beforeMap = Object.fromEntries(before.map((h) => [h.year, h.count]));
   const tag = suffix();
   await makeItem({ title: `A ${tag}`, date: '2020-01-01' });
   await makeItem({ title: `B ${tag}`, date: '2020-06-01' });
@@ -108,7 +121,7 @@ test('getPublicationYearHistogram: extracts years and drops implausible outliers
   await makeItem({ title: `E ${tag}`, date: 'Sept 2020' });
 
   const hist = await getPublicationYearHistogram();
-  const map = Object.fromEntries(hist.map(h => [h.year, h.count]));
+  const map = Object.fromEntries(hist.map((h) => [h.year, h.count]));
   assert.equal(map[2020], (beforeMap[2020] || 0) + 3);
   assert.equal(map[2021], (beforeMap[2021] || 0) + 1);
   assert.equal(map[1900], beforeMap[1900]);
@@ -117,19 +130,23 @@ test('getPublicationYearHistogram: extracts years and drops implausible outliers
 test('getJournalBreakdown: matches listJournals() counts and buckets UNFILED', async () => {
   const journalName = JOURNAL_WHITELIST[0];
   const before = await getJournalBreakdown();
-  const beforeTarget = before.find(j => j.name === journalName)?.itemCount || 0;
-  const beforeUnfiled = before.find(j => j.name === UNFILED)?.itemCount || 0;
+  const beforeTarget = before.find((j) => j.name === journalName)?.itemCount || 0;
+  const beforeUnfiled = before.find((j) => j.name === UNFILED)?.itemCount || 0;
   const tag = suffix();
 
   await makeItem({ title: `A ${tag}`, publicationTitle: journalName, date: '2022' });
   await makeItem({ title: `B ${tag}`, publicationTitle: journalName, date: '2023' });
-  await makeItem({ title: `C ${tag}`, publicationTitle: `Some Other Journal ${tag}`, date: '2022' });
+  await makeItem({
+    title: `C ${tag}`,
+    publicationTitle: `Some Other Journal ${tag}`,
+    date: '2022',
+  });
 
   const breakdown = await getJournalBreakdown();
-  const target = breakdown.find(j => j.name === journalName);
+  const target = breakdown.find((j) => j.name === journalName);
   assert.equal(target.itemCount, beforeTarget + 2);
 
-  const unfiled = breakdown.find(j => j.name === UNFILED);
+  const unfiled = breakdown.find((j) => j.name === UNFILED);
   assert.equal(unfiled.itemCount, beforeUnfiled + 1);
 });
 
@@ -150,12 +167,20 @@ test('getIngestionActivity: buckets submitted/completed timestamps by hour', asy
   const tag = suffix();
   const p1 = await makeItem({ title: `A ${tag}` });
   const p2 = await makeItem({ title: `B ${tag}` });
-  await upsertFullText(p1.id, { state: 'done', submittedAt: '2026-07-08 07:05:00', completedAt: '2026-07-08 07:40:00' });
-  await upsertFullText(p2.id, { state: 'done', submittedAt: '2026-07-08 07:50:00', completedAt: '2026-07-08 08:10:00' });
+  await upsertFullText(p1.id, {
+    state: 'done',
+    submittedAt: '2026-07-08 07:05:00',
+    completedAt: '2026-07-08 07:40:00',
+  });
+  await upsertFullText(p2.id, {
+    state: 'done',
+    submittedAt: '2026-07-08 07:50:00',
+    completedAt: '2026-07-08 08:10:00',
+  });
 
   const activity = await getIngestionActivity();
-  const bucket07 = activity.find(a => a.hour === '2026-07-08 07:00');
-  const bucket08 = activity.find(a => a.hour === '2026-07-08 08:00');
+  const bucket07 = activity.find((a) => a.hour === '2026-07-08 07:00');
+  const bucket08 = activity.find((a) => a.hour === '2026-07-08 08:00');
   assert.ok(bucket07);
   assert.ok(bucket07.submitted >= 2);
   assert.ok(bucket07.completed >= 1);
@@ -201,11 +226,10 @@ test('getDoiCoverageBreakdown: per-journal totals reconcile with overall coverag
   const cov = await getDoiCoverageStats();
   assert.equal(breakdown.targetTotal, cov.targetTotal);
   assert.equal(breakdown.collectedTotal, cov.intersection);
-  const journalTarget = breakdown.journals.reduce((s, j) => s + j.target, 0)
-    + (breakdown.unattributed?.target || 0);
+  const journalTarget =
+    breakdown.journals.reduce((s, j) => s + j.target, 0) + (breakdown.unattributed?.target || 0);
   assert.equal(journalTarget, cov.targetTotal);
-  const journalMissing = breakdown.journals.reduce((s, j) => s + j.missing, 0)
-    + (breakdown.unattributed?.missing || 0);
+  const journalMissing =
+    breakdown.journals.reduce((s, j) => s + j.missing, 0) + (breakdown.unattributed?.missing || 0);
   assert.equal(journalMissing, cov.targetOnly);
 });
-

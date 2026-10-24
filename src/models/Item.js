@@ -2,14 +2,22 @@ import { DataObject } from './DataObject.js';
 import { generateKey } from '../utils/key.js';
 import { execute, withTransaction, nowUtc } from '../db/connection.js';
 import {
-  itemTypeIdByName, itemNameById,
+  itemTypeIdByName,
+  itemNameById,
   fieldIdByName,
   isFieldAllowedForType,
-  insertItemRow, getItemRow, getItemByKey,
-  listItems as repoListItems, listItemKeys as repoListItemKeys,
-  setItemField, deleteItemField, getItemFields,
-  setItemCreators, getItemCreators,
-  setItemDeleted, updateItemModifiedDate,
+  insertItemRow,
+  getItemRow,
+  getItemByKey,
+  listItems as repoListItems,
+  listItemKeys as repoListItemKeys,
+  setItemField,
+  deleteItemField,
+  getItemFields,
+  setItemCreators,
+  getItemCreators,
+  setItemDeleted,
+  updateItemModifiedDate,
 } from '../repositories/itemRepo.js';
 
 /**
@@ -30,7 +38,9 @@ export class Item extends DataObject {
     this.fulltextHit = !!opts.fulltextHit;
   }
 
-  get itemType() { return this._itemTypeName; }
+  get itemType() {
+    return this._itemTypeName;
+  }
 
   async setItemType(name) {
     const id = await itemTypeIdByName(name);
@@ -41,8 +51,14 @@ export class Item extends DataObject {
     return this;
   }
 
-  get parentItemID() { return this._parentItemID; }
-  setParent(itemId) { this._parentItemID = itemId; this._changedFields.add('__parent__'); return this; }
+  get parentItemID() {
+    return this._parentItemID;
+  }
+  setParent(itemId) {
+    this._parentItemID = itemId;
+    this._changedFields.add('__parent__');
+    return this;
+  }
 
   getField(name) {
     return this._fieldValues[name] ?? null;
@@ -57,7 +73,9 @@ export class Item extends DataObject {
     return this;
   }
 
-  get creators() { return this._creators.slice(); }
+  get creators() {
+    return this._creators.slice();
+  }
   setCreators(list) {
     this._creators = list.map((c, i) => ({ ...c, orderIndex: c.orderIndex ?? i }));
     this._creatorsChanged = true;
@@ -65,9 +83,21 @@ export class Item extends DataObject {
   }
   addCreator({ firstName, lastName, name, creatorType = 'author', fieldMode, orderIndex }) {
     if (name) {
-      this._creators.push({ firstName: null, lastName: name, fieldMode: 1, creatorType, orderIndex });
+      this._creators.push({
+        firstName: null,
+        lastName: name,
+        fieldMode: 1,
+        creatorType,
+        orderIndex,
+      });
     } else {
-      this._creators.push({ firstName, lastName, fieldMode: fieldMode ?? 0, creatorType, orderIndex });
+      this._creators.push({
+        firstName,
+        lastName,
+        fieldMode: fieldMode ?? 0,
+        creatorType,
+        orderIndex,
+      });
     }
     this._creatorsChanged = true;
     return this;
@@ -82,11 +112,14 @@ export class Item extends DataObject {
       if (isNew) {
         const key = this._key ?? generateKey();
         this._key = key;
-        this._id = await insertItemRow({
-          itemTypeID: this._itemTypeID,
-          key,
-          parentItemID: this._parentItemID,
-        }, client);
+        this._id = await insertItemRow(
+          {
+            itemTypeID: this._itemTypeID,
+            key,
+            parentItemID: this._parentItemID,
+          },
+          client,
+        );
         for (const [name, value] of Object.entries(this._fieldValues)) {
           const fid = await fieldIdByName(name);
           if (fid == null) throw new Error(`Unknown field: ${name}`);
@@ -97,7 +130,7 @@ export class Item extends DataObject {
         await execute(
           `UPDATE items SET "itemTypeID"=$1, "parentItemID"=$2, "dateModified"=$3 WHERE "itemID"=$4`,
           [this._itemTypeID, this._parentItemID, nowUtc(), this._id],
-          client
+          client,
         );
         for (const name of this._changedFields) {
           if (name === '__type__' || name === '__parent__') continue;
@@ -118,7 +151,7 @@ export class Item extends DataObject {
     if (writeCreators) {
       await setItemCreators(
         this._id,
-        this._creators.map((c, i) => ({ ...c, orderIndex: c.orderIndex ?? i }))
+        this._creators.map((c, i) => ({ ...c, orderIndex: c.orderIndex ?? i })),
       );
     }
 
@@ -227,7 +260,13 @@ export const Items = {
     return result.items.map(_bulkRowToItem);
   },
   // Keys of every item matching a filter — for batch actions over the full set.
-  listKeys(opts) { return repoListItemKeys(opts); },
-  loadByKey(key) { return Item.loadByKey(key); },
-  loadById(id) { return Item.loadById(id); },
+  listKeys(opts) {
+    return repoListItemKeys(opts);
+  },
+  loadByKey(key) {
+    return Item.loadByKey(key);
+  },
+  loadById(id) {
+    return Item.loadById(id);
+  },
 };

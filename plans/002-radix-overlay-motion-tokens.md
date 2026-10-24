@@ -19,12 +19,12 @@
 
 ```jsx
 /* web/src/components/ui/dropdown-menu.jsx:54 — DropdownMenuContent animation classes */
-"data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 ..."
+'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 ...';
 ```
 
 ```jsx
 /* web/src/components/ui/select.jsx:17 — SelectTrigger — no motion-press */
-"flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border ..."
+'flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border ...';
 ```
 
 ```css

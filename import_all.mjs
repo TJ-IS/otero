@@ -14,13 +14,18 @@ const PDF_DIR = '/mnt/data_sda1/pdfs';
 const CONCURRENCY = 8;
 const BATCH_LOG = '/mnt/data_sda1/import_log.csv';
 
-let total = 0, ok = 0, fail = 0;
+let total = 0,
+  ok = 0,
+  fail = 0;
 const srcCounts = {};
 const startTime = Date.now();
 
 function statusLine() {
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
-  const src = Object.entries(srcCounts).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}:${v}`).join(' ');
+  const src = Object.entries(srcCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${k}:${v}`)
+    .join(' ');
   return `  ${total} done (ok:${ok} fail:${fail}) ${elapsed}s ${src}`;
 }
 
@@ -42,7 +47,7 @@ async function main() {
   await runMigrations();
   await seed();
 
-  const files = fs.readdirSync(PDF_DIR).filter(f => f.endsWith('.pdf'));
+  const files = fs.readdirSync(PDF_DIR).filter((f) => f.endsWith('.pdf'));
   total = files.length;
 
   fs.writeFileSync(BATCH_LOG, 'file,status,source,title,error\n');
@@ -50,7 +55,7 @@ async function main() {
 
   for (let i = 0; i < total; i += CONCURRENCY) {
     const batch = files.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(batch.map(f => importOne(path.join(PDF_DIR, f))));
+    const results = await Promise.all(batch.map((f) => importOne(path.join(PDF_DIR, f))));
 
     for (const r of results) {
       if (r.ok) {
@@ -85,7 +90,7 @@ async function main() {
   await closeDb();
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error('Fatal:', err);
   process.exitCode = 1;
 });

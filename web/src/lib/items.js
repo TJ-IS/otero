@@ -106,7 +106,7 @@ export function filterTitle(filter, collections) {
     return filter.year ? `${name} · ${filter.year}` : name;
   }
   if (filter.collection) {
-    const c = collections?.find(c => c.key === filter.collection);
+    const c = collections?.find((c) => c.key === filter.collection);
     return c?.name || i18n.t('item:filterLabel.collection');
   }
   if (filter.year) {

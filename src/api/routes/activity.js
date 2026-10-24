@@ -11,10 +11,11 @@ activityRouter.post('/client', (req, res) => {
   recordActivity({
     accountID: req.auth?.accountID || null,
     address: req.auth?.address || null,
-    ip: (req.headers['x-forwarded-for'] || '').toString().split(',')[0].trim()
-      || req.ip
-      || req.socket?.remoteAddress
-      || '',
+    ip:
+      (req.headers['x-forwarded-for'] || '').toString().split(',')[0].trim() ||
+      req.ip ||
+      req.socket?.remoteAddress ||
+      '',
     userAgent: req.get('user-agent'),
     method: 'GET',
     path,

@@ -35,7 +35,12 @@ function bucketCount(buckets, value) {
 }
 
 function emptyCoauthorGraph({
-  minPapers, minCollaborations, maxNodes, journal, yearFrom, yearTo,
+  minPapers,
+  minCollaborations,
+  maxNodes,
+  journal,
+  yearFrom,
+  yearTo,
 } = {}) {
   return {
     nodes: [],
@@ -74,19 +79,28 @@ export async function getCoauthorGraph({
 } = {}) {
   const authorTypeId = await creatorTypeIdByName('author');
   const filterMeta = {
-    minPapers, minCollaborations, maxNodes, journal: journal || null,
-    yearFrom: yearFrom ?? null, yearTo: yearTo ?? null,
+    minPapers,
+    minCollaborations,
+    maxNodes,
+    journal: journal || null,
+    yearFrom: yearFrom ?? null,
+    yearTo: yearTo ?? null,
   };
   if (authorTypeId == null) return emptyCoauthorGraph(filterMeta);
 
   const candidateWhere = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
   const candidateParams = [authorTypeId, minPapers, maxNodes];
   const nextParam = await appendItemScopeFilters(candidateWhere, candidateParams, 4, {
-    journal, yearFrom, yearTo, basketOnly, requireDoiForArticles,
+    journal,
+    yearFrom,
+    yearTo,
+    basketOnly,
+    requireDoiForArticles,
   });
   if (nextParam == null) return emptyCoauthorGraph(filterMeta);
 
-  const candidateRows = await query(`
+  const candidateRows = await query(
+    `
     SELECT c."creatorID" AS id, c."firstName", c."lastName", c."fieldMode",
            COUNT(DISTINCT ic."itemID")::int AS "paperCount",
            COUNT(*) OVER()::int AS "eligibleCount"
@@ -99,7 +113,9 @@ export async function getCoauthorGraph({
     HAVING COUNT(DISTINCT ic."itemID") >= $2
     ORDER BY "paperCount" DESC, c."creatorID" ASC
     LIMIT $3
-  `, candidateParams);
+  `,
+    candidateParams,
+  );
 
   const rawNodes = candidateRows.map((node) => ({
     id: node.id,
@@ -112,10 +128,15 @@ export async function getCoauthorGraph({
   const edgeWhere = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
   const edgeParams = [authorTypeId, candidateIds, minCollaborations];
   const edgeNextParam = await appendItemScopeFilters(edgeWhere, edgeParams, 4, {
-    journal, yearFrom, yearTo, basketOnly, requireDoiForArticles,
+    journal,
+    yearFrom,
+    yearTo,
+    basketOnly,
+    requireDoiForArticles,
   });
   if (edgeNextParam == null) return emptyCoauthorGraph(filterMeta);
-  const edgeRows = await query(`
+  const edgeRows = await query(
+    `
     SELECT ic1."creatorID" AS source, ic2."creatorID" AS target,
            COUNT(DISTINCT ic1."itemID")::int AS weight
     FROM "itemCreators" ic1
@@ -129,7 +150,9 @@ export async function getCoauthorGraph({
     GROUP BY ic1."creatorID", ic2."creatorID"
     HAVING COUNT(DISTINCT ic1."itemID") >= $3
     ORDER BY weight DESC, source ASC, target ASC
-  `, edgeParams);
+  `,
+    edgeParams,
+  );
 
   const paperCountById = new Map(rawNodes.map((node) => [node.id, node.paperCount]));
   const edges = edgeRows.map((edge) => {
@@ -142,9 +165,10 @@ export async function getCoauthorGraph({
       target: edge.target,
       weight,
       jaccard: union > 0 ? Number((weight / union).toFixed(6)) : 0,
-      cosine: sourcePapers > 0 && targetPapers > 0
-        ? Number((weight / Math.sqrt(sourcePapers * targetPapers)).toFixed(6))
-        : 0,
+      cosine:
+        sourcePapers > 0 && targetPapers > 0
+          ? Number((weight / Math.sqrt(sourcePapers * targetPapers)).toFixed(6))
+          : 0,
     };
   });
 
@@ -164,35 +188,40 @@ export async function getCoauthorGraph({
   };
 }
 
-export async function getAuthorDetail(creatorId, { basketOnly = false, requireDoiForArticles = false } = {}) {
+export async function getAuthorDetail(
+  creatorId,
+  { basketOnly = false, requireDoiForArticles = false } = {},
+) {
   const creator = await queryOne(
     'SELECT "creatorID" AS id, "firstName", "lastName", "fieldMode" FROM creators WHERE "creatorID" = $1',
-    [creatorId]
+    [creatorId],
   );
   if (!creator) return null;
 
-  const where = [
-    'ic."creatorID" = $1',
-    'i.deleted = 0',
-    'i."parentItemID" IS NULL',
-  ];
+  const where = ['ic."creatorID" = $1', 'i.deleted = 0', 'i."parentItemID" IS NULL'];
   const params = [creatorId];
-  const next = await appendItemScopeFilters(where, params, 2, { basketOnly, requireDoiForArticles });
+  const next = await appendItemScopeFilters(where, params, 2, {
+    basketOnly,
+    requireDoiForArticles,
+  });
   if (next == null) {
     return { id: creator.id, name: creatorDisplayName(creator), itemIds: [] };
   }
 
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT DISTINCT i."itemID" AS "itemID"
     FROM "itemCreators" ic
     JOIN items i ON i."itemID" = ic."itemID"
     WHERE ${where.join(' AND ')}
-  `, params);
+  `,
+    params,
+  );
 
   return {
     id: creator.id,
     name: creatorDisplayName(creator),
-    itemIds: rows.map(r => r.itemID),
+    itemIds: rows.map((r) => r.itemID),
   };
 }
 
@@ -201,8 +230,15 @@ export async function getAuthorDetail(creatorId, { basketOnly = false, requireDo
  * paperCount reflects the filtered paper set (Basket by default).
  */
 export async function searchAuthors({
-  q, page = 1, pageSize = 20,
-  journal, journals, yearFrom, yearTo, type, basketOnly = true,
+  q,
+  page = 1,
+  pageSize = 20,
+  journal,
+  journals,
+  yearFrom,
+  yearTo,
+  type,
+  basketOnly = true,
   requireDoiForArticles = false,
 } = {}) {
   const validPage = Math.max(1, parseInt(page, 10) || 1);
@@ -212,10 +248,7 @@ export async function searchAuthors({
   const needle = (q || '').trim();
   if (!needle) return empty;
 
-  const where = [
-    'i.deleted = 0',
-    'i."parentItemID" IS NULL',
-  ];
+  const where = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
   const params = [];
   let p = 1;
 
@@ -227,7 +260,12 @@ export async function searchAuthors({
   }
 
   p = await appendItemScopeFilters(where, params, p, {
-    journal, journals, yearFrom, yearTo, basketOnly, requireDoiForArticles,
+    journal,
+    journals,
+    yearFrom,
+    yearTo,
+    basketOnly,
+    requireDoiForArticles,
   });
   if (p == null) return empty;
 
@@ -242,7 +280,8 @@ export async function searchAuthors({
 
   const itemWhere = where.join(' AND ');
 
-  const countRow = await queryOne(`
+  const countRow = await queryOne(
+    `
     SELECT COUNT(*)::int AS cnt FROM (
       SELECT c."creatorID"
       FROM creators c
@@ -251,14 +290,17 @@ export async function searchAuthors({
       WHERE ${itemWhere} AND ${nameMatch}
       GROUP BY c."creatorID"
     ) t
-  `, params);
+  `,
+    params,
+  );
   const total = countRow?.cnt || 0;
   if (total === 0) return empty;
 
   const offset = (validPage - 1) * validPageSize;
   const limitParam = p++;
   const offsetParam = p++;
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT c."creatorID" AS id, c."firstName", c."lastName", c."fieldMode",
            COUNT(*)::int AS "paperCount"
     FROM creators c
@@ -268,7 +310,9 @@ export async function searchAuthors({
     GROUP BY c."creatorID"
     ORDER BY "paperCount" DESC, c."lastName" ASC, c."firstName" ASC
     LIMIT $${limitParam} OFFSET $${offsetParam}
-  `, [...params, validPageSize, offset]);
+  `,
+    [...params, validPageSize, offset],
+  );
 
   return {
     items: rows.map((r) => ({
@@ -288,8 +332,15 @@ export async function searchAuthors({
  * Returns item IDs + author meta; caller loads Item JSON.
  */
 export async function listAuthorItems({
-  creatorId, page = 1, pageSize = 20,
-  journal, journals, yearFrom, yearTo, type, basketOnly = true,
+  creatorId,
+  page = 1,
+  pageSize = 20,
+  journal,
+  journals,
+  yearFrom,
+  yearTo,
+  type,
+  basketOnly = true,
   requireDoiForArticles = false,
 } = {}) {
   const validPage = Math.max(1, parseInt(page, 10) || 1);
@@ -297,7 +348,7 @@ export async function listAuthorItems({
 
   const creator = await queryOne(
     'SELECT "creatorID" AS id, "firstName", "lastName", "fieldMode" FROM creators WHERE "creatorID" = $1',
-    [creatorId]
+    [creatorId],
   );
   if (!creator) return null;
 
@@ -311,11 +362,7 @@ export async function listAuthorItems({
     totalPages: 0,
   };
 
-  const where = [
-    'i.deleted = 0',
-    'i."parentItemID" IS NULL',
-    'ic."creatorID" = $1',
-  ];
+  const where = ['i.deleted = 0', 'i."parentItemID" IS NULL', 'ic."creatorID" = $1'];
   const params = [creatorId];
   let p = 2;
 
@@ -327,17 +374,25 @@ export async function listAuthorItems({
   }
 
   p = await appendItemScopeFilters(where, params, p, {
-    journal, journals, yearFrom, yearTo, basketOnly, requireDoiForArticles,
+    journal,
+    journals,
+    yearFrom,
+    yearTo,
+    basketOnly,
+    requireDoiForArticles,
   });
   if (p == null) return emptyResult;
 
   const itemWhere = where.join(' AND ');
-  const countRow = await queryOne(`
+  const countRow = await queryOne(
+    `
     SELECT COUNT(DISTINCT i."itemID")::int AS cnt
     FROM "itemCreators" ic
     JOIN items i ON i."itemID" = ic."itemID"
     WHERE ${itemWhere}
-  `, params);
+  `,
+    params,
+  );
   const total = countRow?.cnt || 0;
   if (total === 0) return emptyResult;
 
@@ -352,7 +407,8 @@ export async function listAuthorItems({
     const limitParam = p++;
     const offsetParam = p++;
     listParams.push(validPageSize, offset);
-    rows = await query(`
+    rows = await query(
+      `
       SELECT i."itemID" AS "itemID"
       FROM items i
       JOIN "itemCreators" ic ON ic."itemID" = i."itemID"
@@ -363,12 +419,15 @@ export async function listAuthorItems({
       ORDER BY SUBSTRING(COALESCE(v_date.value, ''), 1, 4) DESC NULLS LAST,
                i."dateModified" DESC, i."itemID" DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}
-    `, listParams);
+    `,
+      listParams,
+    );
   } else {
     const limitParam = p++;
     const offsetParam = p++;
     listParams.push(validPageSize, offset);
-    rows = await query(`
+    rows = await query(
+      `
       SELECT i."itemID" AS "itemID"
       FROM items i
       JOIN "itemCreators" ic ON ic."itemID" = i."itemID"
@@ -376,7 +435,9 @@ export async function listAuthorItems({
       GROUP BY i."itemID", i."dateModified"
       ORDER BY i."dateModified" DESC, i."itemID" DESC
       LIMIT $${limitParam} OFFSET $${offsetParam}
-    `, listParams);
+    `,
+      listParams,
+    );
   }
 
   return {
@@ -395,11 +456,19 @@ export async function listAuthorItems({
  * top authors, creator-type mix, productivity histogram, collaboration-size
  * histogram, and per-Basket-journal core authors.
  */
-export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = false, requireDoiForArticles = false } = {}) {
+export async function getAuthorAnalytics({
+  topN = 25,
+  coreN = 5,
+  basketOnly = false,
+  requireDoiForArticles = false,
+} = {}) {
   const authorTypeId = await creatorTypeIdByName('author');
   const itemWhere = ['i.deleted = 0', 'i."parentItemID" IS NULL'];
   const itemParams = [];
-  const next = await appendItemScopeFilters(itemWhere, itemParams, 1, { basketOnly, requireDoiForArticles });
+  const next = await appendItemScopeFilters(itemWhere, itemParams, 1, {
+    basketOnly,
+    requireDoiForArticles,
+  });
   if (next == null) {
     return {
       authorTotal: 0,
@@ -412,7 +481,8 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = fa
   }
   const itemSql = itemWhere.join(' AND ');
 
-  const typeRows = await query(`
+  const typeRows = await query(
+    `
     SELECT ct."creatorType" AS type, COUNT(*)::int AS count
     FROM "itemCreators" ic
     JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
@@ -420,7 +490,9 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = fa
     WHERE ${itemSql}
     GROUP BY ct."creatorType"
     ORDER BY count DESC
-  `, itemParams);
+  `,
+    itemParams,
+  );
 
   let topAuthors = [];
   let papersPerAuthor = PAPER_BUCKETS.map((b) => ({ id: b.id, label: b.label, count: 0 }));
@@ -428,7 +500,8 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = fa
   let collabSize = COLLAB_BUCKETS.map((b) => ({ id: b.id, label: b.label, count: 0 }));
 
   if (authorTypeId != null) {
-    const authorRows = await query(`
+    const authorRows = await query(
+      `
       SELECT c."creatorID" AS id, c."firstName" AS "firstName", c."lastName" AS "lastName",
              c."fieldMode" AS "fieldMode", COUNT(*)::int AS "paperCount"
       FROM "itemCreators" ic
@@ -438,7 +511,9 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = fa
         AND ${itemSql}
       GROUP BY c."creatorID"
       ORDER BY "paperCount" DESC, c."lastName" ASC
-    `, [...itemParams, authorTypeId]);
+    `,
+      [...itemParams, authorTypeId],
+    );
 
     authorTotal = authorRows.length;
     topAuthors = authorRows.slice(0, topN).map((r) => ({
@@ -458,7 +533,8 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = fa
       count: paperHist[b.id] || 0,
     }));
 
-    const sizeRows = await query(`
+    const sizeRows = await query(
+      `
       SELECT authors, COUNT(*)::int AS papers
       FROM (
         SELECT ic."itemID", COUNT(DISTINCT ic."creatorID")::int AS authors
@@ -470,7 +546,9 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = fa
       ) t
       GROUP BY authors
       ORDER BY authors
-    `, [...itemParams, authorTypeId]);
+    `,
+      [...itemParams, authorTypeId],
+    );
 
     const collabHist = Object.fromEntries(COLLAB_BUCKETS.map((b) => [b.id, 0]));
     for (const r of sizeRows) {
@@ -487,8 +565,10 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = fa
   const pubFieldId = await fieldIdByName('publicationTitle');
   let journalCores = [];
   if (authorTypeId != null && pubFieldId) {
-    journalCores = await Promise.all(JOURNAL_WHITELIST.map(async (journal) => {
-      const rows = await query(`
+    journalCores = await Promise.all(
+      JOURNAL_WHITELIST.map(async (journal) => {
+        const rows = await query(
+          `
         SELECT c."creatorID" AS id, c."firstName" AS "firstName", c."lastName" AS "lastName",
                c."fieldMode" AS "fieldMode", COUNT(*)::int AS "paperCount"
         FROM "itemCreators" ic
@@ -503,17 +583,20 @@ export async function getAuthorAnalytics({ topN = 25, coreN = 5, basketOnly = fa
         GROUP BY c."creatorID"
         ORDER BY "paperCount" DESC, c."lastName" ASC
         LIMIT $4
-      `, [pubFieldId, authorTypeId, journal, coreN]);
+      `,
+          [pubFieldId, authorTypeId, journal, coreN],
+        );
 
-      return {
-        journal,
-        authors: rows.map((r) => ({
-          id: r.id,
-          name: creatorDisplayName(r),
-          paperCount: r.paperCount,
-        })),
-      };
-    }));
+        return {
+          journal,
+          authors: rows.map((r) => ({
+            id: r.id,
+            name: creatorDisplayName(r),
+            paperCount: r.paperCount,
+          })),
+        };
+      }),
+    );
   }
 
   return {

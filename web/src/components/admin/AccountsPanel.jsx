@@ -30,7 +30,7 @@ export function AccountsPanel() {
   const [draftQ, setDraftQ] = useState('');
   const { data, error, loading, refresh } = useAsync(
     () => api.getAdminAccounts({ page, pageSize: PAGE_SIZE, q }),
-    [page, q]
+    [page, q],
   );
 
   const accounts = data?.accounts || [];
@@ -69,10 +69,17 @@ export function AccountsPanel() {
           placeholder={t('accounts.searchPh')}
           className="max-w-xs"
         />
-        <Button type="submit" size="sm" variant="outline">{t('common:nav.search')}</Button>
+        <Button type="submit" size="sm" variant="outline">
+          {t('common:nav.search')}
+        </Button>
       </form>
 
-      {error ? <ErrorState message={t('accounts.loadFailed', { message: error.message })} onRetry={refresh} /> : null}
+      {error ? (
+        <ErrorState
+          message={t('accounts.loadFailed', { message: error.message })}
+          onRetry={refresh}
+        />
+      ) : null}
 
       <section className="overflow-hidden border border-border/80">
         {loading && !data ? (
@@ -96,7 +103,9 @@ export function AccountsPanel() {
                     <td className="px-4 py-3 font-mono text-xs">
                       {account.address}
                       {account.bootstrap ? (
-                        <span className="ml-2 text-[10px] uppercase text-muted-foreground">{t('accounts.bootstrap')}</span>
+                        <span className="ml-2 text-[10px] uppercase text-muted-foreground">
+                          {t('accounts.bootstrap')}
+                        </span>
                       ) : null}
                     </td>
                     <td className="px-4 py-3">
@@ -128,12 +137,24 @@ export function AccountsPanel() {
         )}
         {totalPages > 1 ? (
           <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-xs text-muted-foreground">{t('accounts.pageOf', { page, total: totalPages })}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('accounts.pageOf', { page, total: totalPages })}
+            </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage(p => p - 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => p - 1)}
+              >
                 {t('common:prevPage')}
               </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => p + 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >
                 {t('common:nextPage')}
               </Button>
             </div>

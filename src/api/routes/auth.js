@@ -34,42 +34,48 @@ router.get('/nonce', (req, res) => {
   }
 });
 
-router.post('/verify', asyncHandler(async (req, res) => {
-  const { address, nonce, signature } = req.body || {};
-  if (!address || !isAddress(address)) {
-    return res.status(400).json({ error: 'invalid address' });
-  }
-  if (!nonce || typeof nonce !== 'string' || !signature || typeof signature !== 'string') {
-    return res.status(400).json({ error: 'nonce and signature are required' });
-  }
-  const normalized = await verifyWalletSignature(address, nonce, signature);
-  if (!normalized) {
-    return res.status(401).json({ error: 'invalid signature' });
-  }
-  const account = await recordLogin(normalized);
-  const token = await signToken(account.address);
-  recordActivity({
-    accountID: account.accountID,
-    address: account.address,
-    method: 'POST',
-    path: '/api/auth/verify',
-    statusCode: 200,
-    action: 'auth.verify',
-  });
-  res.json({ ...publicAuth(account), token });
-}));
+router.post(
+  '/verify',
+  asyncHandler(async (req, res) => {
+    const { address, nonce, signature } = req.body || {};
+    if (!address || !isAddress(address)) {
+      return res.status(400).json({ error: 'invalid address' });
+    }
+    if (!nonce || typeof nonce !== 'string' || !signature || typeof signature !== 'string') {
+      return res.status(400).json({ error: 'nonce and signature are required' });
+    }
+    const normalized = await verifyWalletSignature(address, nonce, signature);
+    if (!normalized) {
+      return res.status(401).json({ error: 'invalid signature' });
+    }
+    const account = await recordLogin(normalized);
+    const token = await signToken(account.address);
+    recordActivity({
+      accountID: account.accountID,
+      address: account.address,
+      method: 'POST',
+      path: '/api/auth/verify',
+      statusCode: 200,
+      action: 'auth.verify',
+    });
+    res.json({ ...publicAuth(account), token });
+  }),
+);
 
-router.get('/me', asyncHandler(async (req, res) => {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
-  const auth = await verifyToken(token);
-  if (!auth) {
-    return res.status(401).json({ error: 'invalid token' });
-  }
-  res.json(publicAuth(auth));
-}));
+router.get(
+  '/me',
+  asyncHandler(async (req, res) => {
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    const auth = await verifyToken(token);
+    if (!auth) {
+      return res.status(401).json({ error: 'invalid token' });
+    }
+    res.json(publicAuth(auth));
+  }),
+);
 
 export { router as authRouter };

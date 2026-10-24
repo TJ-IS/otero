@@ -8,8 +8,15 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import {
-  Search, GitBranch, RefreshCw, ShieldX,
-  Hash, ArrowRight, Check, X, CheckCircle2,
+  Search,
+  GitBranch,
+  RefreshCw,
+  ShieldX,
+  Hash,
+  ArrowRight,
+  Check,
+  X,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -76,8 +83,12 @@ export function MerkleTreeView() {
   return (
     <div className="relative mx-auto flex h-full w-full max-w-page flex-col overflow-hidden bg-background px-4 sm:px-6 lg:px-8">
       <div className="shrink-0 pb-4 pt-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-brand">{t('common:nav.dashboard')}</p>
-        <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">{t('nav.merkle')}</h1>
+        <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-brand">
+          {t('common:nav.dashboard')}
+        </p>
+        <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight">
+          {t('nav.merkle')}
+        </h1>
       </div>
       <header className="flex shrink-0 items-center gap-2 border-y border-border/80 py-3">
         <div className="relative flex h-8 flex-1 max-w-md min-w-[160px] items-center">
@@ -104,7 +115,10 @@ export function MerkleTreeView() {
 
         <div className="ml-auto flex items-center gap-1.5">
           {rootInfo && (
-            <Badge variant="outline" className="hidden font-mono text-xs font-normal md:inline-flex">
+            <Badge
+              variant="outline"
+              className="hidden font-mono text-xs font-normal md:inline-flex"
+            >
               Root {shortHash(rootInfo.root)} · {rootInfo.leafCount} DOIs
             </Badge>
           )}
@@ -142,7 +156,9 @@ export function MerkleTreeView() {
             <div className="rounded-sm border border-destructive/40 bg-destructive/5 px-4 py-10 text-center">
               <ShieldX className="mx-auto mb-3 size-10 text-destructive" />
               <p className="font-medium text-destructive">{t('merkle.notInDb')}</p>
-              <code className="mt-1 block break-all text-xs text-muted-foreground">{result.doi}</code>
+              <code className="mt-1 block break-all text-xs text-muted-foreground">
+                {result.doi}
+              </code>
             </div>
           )}
 
@@ -168,7 +184,9 @@ function ProofResult({ doi, proof, clientVerification }) {
   return (
     <div className="space-y-3">
       {/* Summary block */}
-      <div className={`rounded-sm border px-4 py-3 ${fullyVerified ? 'border-success/40 bg-success/5' : 'bg-background'}`}>
+      <div
+        className={`rounded-sm border px-4 py-3 ${fullyVerified ? 'border-success/40 bg-success/5' : 'bg-background'}`}
+      >
         <div className="flex items-center gap-3">
           {fullyVerified ? (
             <div className="flex size-8 items-center justify-center rounded-full bg-success/15">
@@ -191,22 +209,30 @@ function ProofResult({ doi, proof, clientVerification }) {
         <div className="mt-3 space-y-1.5 text-sm">
           <div className="flex items-center gap-2">
             <span className="w-20 shrink-0 text-xs text-muted-foreground">DOI</span>
-            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{doi}</code>
+            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+              {doi}
+            </code>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-20 shrink-0 text-xs text-muted-foreground">Leaf Hash</span>
-            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{proof.leafHash}</code>
+            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+              {proof.leafHash}
+            </code>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-20 shrink-0 text-xs text-muted-foreground">Merkle Root</span>
-            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{proof.root}</code>
+            <code className="break-all rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+              {proof.root}
+            </code>
           </div>
         </div>
       </div>
 
       {/* Verification status */}
       {clientVerification && (
-        <div className={`rounded-sm border px-4 py-3 text-sm ${fullyVerified ? 'border-success/40 bg-success/5' : 'border-destructive/40 bg-destructive/5'}`}>
+        <div
+          className={`rounded-sm border px-4 py-3 text-sm ${fullyVerified ? 'border-success/40 bg-success/5' : 'border-destructive/40 bg-destructive/5'}`}
+        >
           <div className="flex items-center gap-2 font-medium">
             {fullyVerified ? (
               <CheckCircle2 className="size-4 text-success" />
@@ -221,7 +247,9 @@ function ProofResult({ doi, proof, clientVerification }) {
               {t('merkle.stepHash', {
                 status: allStepsVerified ? t('merkle.stepsMatch') : t('merkle.stepsMismatch'),
               })}
-              <span className="text-xs">{t('merkle.stepsCount', { count: clientVerification.steps.length })}</span>
+              <span className="text-xs">
+                {t('merkle.stepsCount', { count: clientVerification.steps.length })}
+              </span>
             </li>
             <li className="flex items-center gap-2 text-muted-foreground">
               <StepStatus verified={rootVerified} />
@@ -241,12 +269,7 @@ function ProofResult({ doi, proof, clientVerification }) {
         </h2>
 
         <div className="space-y-1">
-          <PathStep
-            label="Leaf"
-            subtitle="hash(DOI)"
-            hash={proof.leafHash}
-            highlight
-          />
+          <PathStep label="Leaf" subtitle="hash(DOI)" hash={proof.leafHash} highlight />
 
           <PathConnector />
 
@@ -292,16 +315,25 @@ function StepStatus({ verified }) {
   );
 }
 
-function PathStep({ label, subtitle, hash, highlight, isRoot, siblingHash, siblingSide, clientVerified }) {
+function PathStep({
+  label,
+  subtitle,
+  hash,
+  highlight,
+  isRoot,
+  siblingHash,
+  siblingSide,
+  clientVerified,
+}) {
   const { t } = useTranslation('dashboard');
   return (
-    <div className={`rounded-sm border p-3 ${highlight ? (isRoot ? 'border-primary bg-primary/5' : 'border-accent bg-accent/5') : 'border-border bg-muted/30'}`}>
+    <div
+      className={`rounded-sm border p-3 ${highlight ? (isRoot ? 'border-primary bg-primary/5' : 'border-accent bg-accent/5') : 'border-border bg-muted/30'}`}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{label}</span>
-          {clientVerified !== undefined && (
-            <StepStatus verified={clientVerified} />
-          )}
+          {clientVerified !== undefined && <StepStatus verified={clientVerified} />}
         </div>
         <span className="text-xs text-muted-foreground">{subtitle}</span>
       </div>
@@ -309,11 +341,15 @@ function PathStep({ label, subtitle, hash, highlight, isRoot, siblingHash, sibli
       {siblingHash && (
         <div className="mt-2 border-t pt-2">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className={`rounded-sm px-1.5 py-0.5 font-medium ${siblingSide === 'left' ? 'bg-brand/10 text-brand' : 'bg-warning/15 text-warning'}`}>
+            <span
+              className={`rounded-sm px-1.5 py-0.5 font-medium ${siblingSide === 'left' ? 'bg-brand/10 text-brand' : 'bg-warning/15 text-warning'}`}
+            >
               {siblingSide === 'left' ? t('merkle.leftSibling') : t('merkle.rightSibling')}
             </span>
           </div>
-          <code className="mt-1 block break-all font-mono text-xs text-muted-foreground">{siblingHash}</code>
+          <code className="mt-1 block break-all font-mono text-xs text-muted-foreground">
+            {siblingHash}
+          </code>
         </div>
       )}
     </div>

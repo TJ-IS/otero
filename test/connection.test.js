@@ -9,15 +9,12 @@ test('new database clients explicitly select the public schema', async () => {
 
   await initializeClient(client);
 
-  assert.deepEqual(queries, [
-    'SET search_path TO public',
-    'SET random_page_cost = 1.1',
-  ]);
+  assert.deepEqual(queries, ['SET search_path TO public', 'SET random_page_cost = 1.1']);
 });
 
 test('sslmode=require keeps the current verify-full behavior explicitly', () => {
   const options = databaseConnectionOptions(
-    'postgresql://user:pass@db.example/app?sslmode=require&channel_binding=require'
+    'postgresql://user:pass@db.example/app?sslmode=require&channel_binding=require',
   );
   const url = new URL(options.connectionString);
 
@@ -27,7 +24,7 @@ test('sslmode=require keeps the current verify-full behavior explicitly', () => 
 
 test('libpq compatibility mode is left unchanged', () => {
   const options = databaseConnectionOptions(
-    'postgresql://user:pass@db.example/app?uselibpqcompat=true&sslmode=require'
+    'postgresql://user:pass@db.example/app?uselibpqcompat=true&sslmode=require',
   );
   const url = new URL(options.connectionString);
 

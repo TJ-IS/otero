@@ -17,7 +17,8 @@ import { extractIsbn } from '../../utils/isbn.js';
  */
 export async function recognize(extraction) {
   const text = [extraction.info?.title, extraction.info?.subject, extraction.firstPageText]
-    .filter(Boolean).join('\n');
+    .filter(Boolean)
+    .join('\n');
 
   // 1. arXiv ID
   const arxivId = extraction.info?.raw?.arXivID ?? extractArxivId(text);

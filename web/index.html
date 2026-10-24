@@ -3,13 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics." />
+    <meta
+      name="description"
+      content="Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics."
+    />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://ais-basket.xyz/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Otero" />
     <meta property="og:title" content="Otero | AIS Basket Literature API" />
-    <meta property="og:description" content="Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics." />
+    <meta
+      property="og:description"
+      content="Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics."
+    />
     <meta property="og:url" content="https://ais-basket.xyz/" />
     <meta property="og:image" content="https://ais-basket.xyz/og.png" />
     <meta property="og:image:width" content="1200" />
@@ -18,7 +24,10 @@
     <meta property="og:locale:alternate" content="zh_CN" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Otero | AIS Basket Literature API" />
-    <meta name="twitter:description" content="Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics." />
+    <meta
+      name="twitter:description"
+      content="Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics."
+    />
     <meta name="twitter:image" content="https://ais-basket.xyz/og.png" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>Otero | AIS Basket Literature API</title>
@@ -79,12 +88,21 @@
         margin-top: 28px;
       }
       @keyframes sk-pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.55; }
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.55;
+        }
       }
       @media (prefers-reduced-motion: reduce) {
-        #app-skeleton { transition: none; }
-        #app-skeleton .sk-bar { animation: none; }
+        #app-skeleton {
+          transition: none;
+        }
+        #app-skeleton .sk-bar {
+          animation: none;
+        }
       }
     </style>
   </head>
@@ -117,9 +135,10 @@
       (function () {
         try {
           var stored = localStorage.getItem('theme');
-          var dark = stored === 'dark'
-            || ((!stored || stored === 'system')
-              && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var dark =
+            stored === 'dark' ||
+            ((!stored || stored === 'system') &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
           if (dark) {
             document.getElementById('app-skeleton').setAttribute('data-theme', 'dark');
           }

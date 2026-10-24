@@ -1,8 +1,5 @@
 import { Router } from 'express';
-import {
-  buildAgentSkillsIndex,
-  buildSkillMarkdown,
-} from '../../services/openApiService.js';
+import { buildAgentSkillsIndex, buildSkillMarkdown } from '../../services/openApiService.js';
 import { requestBaseUrl } from '../../services/pdfAccess.js';
 
 export const wellKnownSkillsRouter = Router();
@@ -16,9 +13,9 @@ function sendSkillMarkdown(req, res) {
 }
 
 function sendSkillIndex(req, res) {
-  res.type('application/json; charset=utf-8').json(
-    buildAgentSkillsIndex({ markdown: skillMarkdownFor(req) }),
-  );
+  res
+    .type('application/json; charset=utf-8')
+    .json(buildAgentSkillsIndex({ markdown: skillMarkdownFor(req) }));
 }
 
 const prefixes = ['/agent-skills', '/skills'];

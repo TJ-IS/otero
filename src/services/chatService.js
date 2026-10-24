@@ -71,9 +71,10 @@ export async function buildPaperContext(key) {
   const ft = await getFullText(key);
   let fulltextBlock = '（全文尚未解析，仅有摘要/元数据可用）';
   if (ft.state === 'done' && ft.markdown) {
-    const markdown = ft.markdown.length > config.chat.maxMarkdownChars
-      ? ft.markdown.slice(0, config.chat.maxMarkdownChars) + '\n\n[...全文过长，已截断...]'
-      : ft.markdown;
+    const markdown =
+      ft.markdown.length > config.chat.maxMarkdownChars
+        ? ft.markdown.slice(0, config.chat.maxMarkdownChars) + '\n\n[...全文过长，已截断...]'
+        : ft.markdown;
     fulltextBlock = markdown;
   } else if (fields.abstractNote) {
     fulltextBlock = `（全文尚未解析，仅提供摘要）\n${fields.abstractNote}`;
@@ -96,7 +97,7 @@ ${fulltextBlock}
  */
 export function trimHistory(history) {
   return Array.isArray(history)
-    ? history.slice(-config.chat.maxHistoryMessages).map(m => ({
+    ? history.slice(-config.chat.maxHistoryMessages).map((m) => ({
         role: m.role === 'assistant' ? 'assistant' : 'user',
         content: String(m.content || ''),
       }))

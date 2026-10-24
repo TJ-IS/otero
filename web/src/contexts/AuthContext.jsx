@@ -46,7 +46,9 @@ export function AuthProvider({ children }) {
       setRole(me.role || (me.canEdit ? 'admin' : 'user'));
     } catch {
       setAuthToken(null);
-      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
     } finally {
       setReady(true);
     }
@@ -84,7 +86,9 @@ export function AuthProvider({ children }) {
       const result = await api.verifyWallet(account, message.split('Nonce: ').pop(), signature);
       const normalized = getAddress(result.address);
       setAuthToken(result.token);
-      try { localStorage.setItem(STORAGE_KEY, result.token); } catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, result.token);
+      } catch {}
       setAddress(normalized);
       setCanEdit(Boolean(result.canEdit));
       setRole(result.role || (result.canEdit ? 'admin' : 'user'));
@@ -96,7 +100,9 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     setAuthToken(null);
-    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
     setAddress(null);
     setCanEdit(false);
     setRole(null);

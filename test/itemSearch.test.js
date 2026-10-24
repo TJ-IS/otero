@@ -13,7 +13,13 @@ const tag = `srch-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const uniqueToken = `zxqwv${tag.replace(/[^a-z0-9]/gi, '')}`;
 let app;
 
-async function makeItem({ title, journal = JOURNAL_WHITELIST[0], date = '2024', doi, creator } = {}) {
+async function makeItem({
+  title,
+  journal = JOURNAL_WHITELIST[0],
+  date = '2024',
+  doi,
+  creator,
+} = {}) {
   const item = new Item();
   await item.setItemType('journalArticle');
   item.setField('title', title || tag);
@@ -36,7 +42,7 @@ async function indexPlainText(itemId, plainText) {
          tsv = to_tsvector('simple', $1),
          "indexedAt" = $2
      WHERE "itemID" = $3`,
-    [plainText, nowUtc(), itemId]
+    [plainText, nowUtc(), itemId],
   );
 }
 
@@ -125,10 +131,7 @@ test('open articles browse by date and search stay consistent', async () => {
   assert.ok(keys.includes(older.key));
   assert.ok(keys.includes(newer.key));
 
-  const noQ = await request(app)
-    .get('/api/open/v1/articles')
-    .query({ pageSize: 5 })
-    .expect(200);
+  const noQ = await request(app).get('/api/open/v1/articles').query({ pageSize: 5 }).expect(200);
   assert.ok(noQ.body.total > 0);
   assert.ok(noQ.body.items.length <= 5);
   assert.ok(noQ.body.items.every((it) => it.key && it.fields));

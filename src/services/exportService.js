@@ -17,7 +17,7 @@ function toBibtexId(item) {
 
 function formatAuthorsBibtex(creators) {
   return (creators || [])
-    .map(c => {
+    .map((c) => {
       if (c.fieldMode === 1 || !c.firstName) return c.lastName || c.name || '';
       return `${c.lastName || ''}, ${c.firstName || ''}`;
     })
@@ -27,7 +27,7 @@ function formatAuthorsBibtex(creators) {
 
 function formatAuthorsRis(creators) {
   return (creators || [])
-    .map(c => {
+    .map((c) => {
       const last = c.lastName || c.name || '';
       const first = c.firstName || '';
       return `AU  - ${last}${first ? ', ' + first : ''}`;

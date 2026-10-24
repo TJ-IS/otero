@@ -4,7 +4,11 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { Copy, Check, Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +39,8 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
     setError(null);
     setQuery('');
     setCopied(false);
-    api.getStatsDoiCoverageMissing({ journal, year })
+    api
+      .getStatsDoiCoverageMissing({ journal, year })
       .then((res) => {
         if (cancelled) return;
         setDois(res.dois || []);
@@ -50,7 +55,9 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, journal, year, t]);
 
   const filtered = useMemo(() => {
@@ -71,9 +78,11 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      toast.success(t('missingDois.copiedCount', {
-        count: formatCount(deferredQuery ? filtered.length : dois.length, lng),
-      }));
+      toast.success(
+        t('missingDois.copiedCount', {
+          count: formatCount(deferredQuery ? filtered.length : dois.length, lng),
+        }),
+      );
       setTimeout(() => setCopied(false), 1800);
     } catch {
       toast.error(t('common:copyFailed'));
@@ -135,7 +144,9 @@ export function MissingDoisModal({ open, onOpenChange, journal = null, year = nu
               <Loader2 className="size-4 animate-spin" /> {t('loading')}
             </div>
           ) : error ? (
-            <div className="flex h-72 items-center justify-center text-sm text-destructive">{error}</div>
+            <div className="flex h-72 items-center justify-center text-sm text-destructive">
+              {error}
+            </div>
           ) : filtered.length === 0 ? (
             <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
               {dois.length === 0 ? t('missingDois.empty') : t('missingDois.noMatch')}

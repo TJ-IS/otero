@@ -4,9 +4,8 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]'
 
 function requestHost(req) {
   const forwarded = req.headers['x-forwarded-host'];
-  const raw = (typeof forwarded === 'string' && forwarded.split(',')[0].trim())
-    || req.headers.host
-    || '';
+  const raw =
+    (typeof forwarded === 'string' && forwarded.split(',')[0].trim()) || req.headers.host || '';
   return String(raw).split(':')[0].toLowerCase();
 }
 

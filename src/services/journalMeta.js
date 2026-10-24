@@ -77,8 +77,8 @@ export const JOURNAL_META = [
 
 const metaNames = JOURNAL_META.map((j) => j.name);
 if (
-  metaNames.length !== JOURNAL_WHITELIST.length
-  || metaNames.some((name, i) => name !== JOURNAL_WHITELIST[i])
+  metaNames.length !== JOURNAL_WHITELIST.length ||
+  metaNames.some((name, i) => name !== JOURNAL_WHITELIST[i])
 ) {
   throw new Error('JOURNAL_META must list every JOURNAL_WHITELIST entry in the same order');
 }

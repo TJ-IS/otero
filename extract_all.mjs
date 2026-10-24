@@ -51,7 +51,10 @@ function parseArgs(argv) {
   }
   return out;
 }
-function clamp01(n) { if (Number.isNaN(n)) return 0; return Math.max(0, Math.min(1, n)); }
+function clamp01(n) {
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
 
 // ---- CSV helper -------------------------------------------------------------
 function csvCell(s) {
@@ -59,16 +62,30 @@ function csvCell(s) {
   if (/[",\n\r]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
   return v;
 }
-function csvRow(cells) { return cells.map(csvCell).join(',') + '\n'; }
+function csvRow(cells) {
+  return cells.map(csvCell).join(',') + '\n';
+}
 
 const CSV_HEADER = [
-  'key', 'currentTitle', 'extractedTitle', 'extractedJournal', 'suggestedType',
-  'typeConfidence', 'overallConfidence', 'typeChanged',
-  'appliedFields', 'skippedFields', 'appliedCreators', 'error',
+  'key',
+  'currentTitle',
+  'extractedTitle',
+  'extractedJournal',
+  'suggestedType',
+  'typeConfidence',
+  'overallConfidence',
+  'typeChanged',
+  'appliedFields',
+  'skippedFields',
+  'appliedCreators',
+  'error',
 ];
 
 // ---- main -------------------------------------------------------------------
-let processed = 0, okCount = 0, skipCount = 0, failCount = 0;
+let processed = 0,
+  okCount = 0,
+  skipCount = 0,
+  failCount = 0;
 const startTime = Date.now();
 
 function progressLine(total) {
@@ -77,9 +94,15 @@ function progressLine(total) {
 }
 
 async function processOne({ key, title }, total) {
-  let extractedTitle = '', extractedJournal = '', suggestedType = '';
-  let typeConf = '', overallConf = '', typeChanged = '';
-  let appliedFields = [], skippedFields = [], appliedCreators = false;
+  let extractedTitle = '',
+    extractedJournal = '',
+    suggestedType = '';
+  let typeConf = '',
+    overallConf = '',
+    typeChanged = '';
+  let appliedFields = [],
+    skippedFields = [],
+    appliedCreators = false;
   let error = '';
 
   try {
@@ -87,8 +110,8 @@ async function processOne({ key, title }, total) {
     suggestedType = result.suggestedItemType;
     typeConf = result.itemTypeConfidence?.toFixed(2) ?? '';
     overallConf = result.overallConfidence?.toFixed(2) ?? '';
-    extractedTitle = result.fields.find(f => f.field === 'title')?.value || '';
-    extractedJournal = result.fields.find(f => f.field === 'publicationTitle')?.value || '';
+    extractedTitle = result.fields.find((f) => f.field === 'title')?.value || '';
+    extractedJournal = result.fields.find((f) => f.field === 'publicationTitle')?.value || '';
 
     if (!DRY_RUN) {
       const apply = await applyExtraction(key, result, {
@@ -98,18 +121,20 @@ async function processOne({ key, title }, total) {
         overwrite: OVERWRITE,
       });
       typeChanged = apply.typeChanged ? 'yes' : 'no';
-      appliedFields = apply.appliedFields.map(f => f.field);
-      skippedFields = apply.skippedFields.map(f => `${f.field}(${(f.confidence||0).toFixed(2)})`);
+      appliedFields = apply.appliedFields.map((f) => f.field);
+      skippedFields = apply.skippedFields.map(
+        (f) => `${f.field}(${(f.confidence || 0).toFixed(2)})`,
+      );
       appliedCreators = apply.appliedCreators;
       okCount++;
     } else {
       typeChanged = 'dry-run';
       appliedFields = result.fields
-        .filter(f => f.confidence >= THRESHOLD && f.value)
-        .map(f => f.field);
+        .filter((f) => f.confidence >= THRESHOLD && f.value)
+        .map((f) => f.field);
       skippedFields = result.fields
-        .filter(f => f.confidence < THRESHOLD || !f.value)
-        .map(f => `${f.field}(${(f.confidence||0).toFixed(2)})`);
+        .filter((f) => f.confidence < THRESHOLD || !f.value)
+        .map((f) => `${f.field}(${(f.confidence || 0).toFixed(2)})`);
       okCount++;
     }
   } catch (err) {
@@ -120,9 +145,17 @@ async function processOne({ key, title }, total) {
   }
 
   const line = csvRow([
-    key, title || '', extractedTitle, extractedJournal, suggestedType,
-    typeConf, overallConf, typeChanged,
-    appliedFields.join(' '), skippedFields.join(' '), appliedCreators ? 'yes' : 'no',
+    key,
+    title || '',
+    extractedTitle,
+    extractedJournal,
+    suggestedType,
+    typeConf,
+    overallConf,
+    typeChanged,
+    appliedFields.join(' '),
+    skippedFields.join(' '),
+    appliedCreators ? 'yes' : 'no',
     error,
   ]);
   fs.appendFileSync(LOG_PATH, line);
@@ -153,14 +186,16 @@ async function main() {
 
   const targets = LIMIT > 0 ? all.slice(0, LIMIT) : all;
   console.log(`待归档 + 全文已解析条目：${all.length} 条`);
-  console.log(`本次处理：${targets.length} 条 (concurrency=${CONCURRENCY}, threshold=${THRESHOLD}, typeThreshold=${TYPE_THRESHOLD}, dryRun=${DRY_RUN}, overwrite=${OVERWRITE})`);
+  console.log(
+    `本次处理：${targets.length} 条 (concurrency=${CONCURRENCY}, threshold=${THRESHOLD}, typeThreshold=${TYPE_THRESHOLD}, dryRun=${DRY_RUN}, overwrite=${OVERWRITE})`,
+  );
   console.log(`CSV 日志：${LOG_PATH}\n`);
 
   fs.writeFileSync(LOG_PATH, csvRow(CSV_HEADER));
 
   for (let i = 0; i < targets.length; i += CONCURRENCY) {
     const batch = targets.slice(i, i + CONCURRENCY);
-    await Promise.all(batch.map(t => processOne(t, targets.length)));
+    await Promise.all(batch.map((t) => processOne(t, targets.length)));
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -169,7 +204,9 @@ async function main() {
   console.log(`  OK:        ${okCount}`);
   console.log(`  Skipped:   ${skipCount}`);
   console.log(`  Failed:    ${failCount}`);
-  console.log(`  Time:      ${elapsed}s  (avg ${(processed ? elapsed / processed : 0).toFixed(2)}s/item)`);
+  console.log(
+    `  Time:      ${elapsed}s  (avg ${(processed ? elapsed / processed : 0).toFixed(2)}s/item)`,
+  );
   console.log(`  Log:       ${LOG_PATH}`);
 
   await closeDb();
@@ -178,5 +215,9 @@ async function main() {
 main().catch(async (err) => {
   console.error('Fatal:', err);
   process.exitCode = 1;
-  try { await closeDb(); } catch { /* ignore */ }
+  try {
+    await closeDb();
+  } catch {
+    /* ignore */
+  }
 });

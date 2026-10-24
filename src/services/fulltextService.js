@@ -5,15 +5,31 @@ import { config } from '../config.js';
 import { Item } from '../models/Item.js';
 import { Attachment } from '../models/Attachment.js';
 import {
-  resolveStoredPath, storedFileExists, downloadToTemp, useS3,
-  uploadDir, deleteStoredPrefix, listStoredPrefix, readStoredFile, getStoredFileStream,
+  resolveStoredPath,
+  storedFileExists,
+  downloadToTemp,
+  useS3,
+  uploadDir,
+  deleteStoredPrefix,
+  listStoredPrefix,
+  readStoredFile,
+  getStoredFileStream,
 } from './storageService.js';
 import {
-  getFullTextRowByKey, getFullTextRow, upsertFullText,
-  listPendingFullText, listSubmittingFullText, listFailedFullText, listAllFullText, deleteFullTextRow,
+  getFullTextRowByKey,
+  getFullTextRow,
+  upsertFullText,
+  listPendingFullText,
+  listSubmittingFullText,
+  listFailedFullText,
+  listAllFullText,
+  deleteFullTextRow,
 } from '../repositories/fulltextRepo.js';
 import {
-  submitLocalPdf, getBatchResult, downloadAndExtract, rewriteAssetPaths,
+  submitLocalPdf,
+  getBatchResult,
+  downloadAndExtract,
+  rewriteAssetPaths,
 } from './mineruService.js';
 
 /**
@@ -42,15 +58,19 @@ function fulltextPrefixFor(key) {
 async function pruneUnusedMineruFiles(dir) {
   for await (const p of walk(dir)) {
     let st;
-    try { st = await fs.promises.stat(p); } catch { continue; }
+    try {
+      st = await fs.promises.stat(p);
+    } catch {
+      continue;
+    }
     if (!st.isFile()) continue;
     const base = path.basename(p);
-    if (
-      base.endsWith('_origin.pdf')
-      || base === 'layout.json'
-      || base.endsWith('_model.json')
-    ) {
-      try { await fs.promises.unlink(p); } catch { /* ignore */ }
+    if (base.endsWith('_origin.pdf') || base === 'layout.json' || base.endsWith('_model.json')) {
+      try {
+        await fs.promises.unlink(p);
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
@@ -61,9 +81,9 @@ async function pruneUnusedMineruFiles(dir) {
  * shallowest first; fall back to a "*_content_list.json" (non-_v2) match.
  */
 export function pickContentListObjectName(names) {
-  const depth = n => n.split('/').length;
-  const isPrimary = n => n.split('/').pop() === 'content_list.json';
-  const isSecondary = n => {
+  const depth = (n) => n.split('/').length;
+  const isPrimary = (n) => n.split('/').pop() === 'content_list.json';
+  const isSecondary = (n) => {
     const b = n.split('/').pop();
     return b.endsWith('_content_list.json') && !b.endsWith('_v2.json');
   };
@@ -81,7 +101,7 @@ export function pickContentListObjectName(names) {
  */
 async function findPdfRelPath(item) {
   const atts = await Attachment.listByParent(item.id);
-  const pdf = atts.find(a => (a.contentType || '').includes('pdf'));
+  const pdf = atts.find((a) => (a.contentType || '').includes('pdf'));
   if (!pdf || !pdf.path) return null;
   const exists = await storedFileExists(pdf.path);
   return exists ? pdf.path : null;
@@ -117,9 +137,18 @@ export async function parseItem(key, { force = false } = {}) {
   const isTemp = filePath !== resolveStoredPath(pdfRelPath);
   let batchId;
   try {
-    ({ batchId } = await submitLocalPdf({ filePath, fileName, modelVersion: config.mineru.modelVersion }));
+    ({ batchId } = await submitLocalPdf({
+      filePath,
+      fileName,
+      modelVersion: config.mineru.modelVersion,
+    }));
   } finally {
-    if (isTemp) try { await fs.promises.unlink(filePath); } catch { /* ignore */ }
+    if (isTemp)
+      try {
+        await fs.promises.unlink(filePath);
+      } catch {
+        /* ignore */
+      }
   }
 
   // Clean any prior extracted assets so a re-parse starts fresh.
@@ -165,7 +194,7 @@ const SUBMIT_INTERVAL_MS = Math.max(0, Number(config.mineru.submitIntervalMs ?? 
 const SUBMIT_MAX_RETRIES = Math.max(0, Number(config.mineru.submitMaxRetries ?? 5));
 
 function sleep(ms) {
-  return new Promise(r => setTimeout(r, ms));
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /**
@@ -201,18 +230,28 @@ export async function enqueueBatchParse(keys) {
     while (queue.length) {
       const key = queue.shift();
       const item = await Item.loadByKey(key);
-      if (!item) { notFound++; continue; }
+      if (!item) {
+        notFound++;
+        continue;
+      }
 
       const existing = await getFullTextRow(item.id);
       if (existing) {
-        if (existing.state === 'done') { skippedDone++; continue; }
+        if (existing.state === 'done') {
+          skippedDone++;
+          continue;
+        }
         if (['submitting', 'pending', 'running', 'converting'].includes(existing.state)) {
-          skippedRunning++; continue;
+          skippedRunning++;
+          continue;
         }
       }
 
       const pdfRelPath = await findPdfRelPath(item);
-      if (!pdfRelPath) { noPdf++; continue; }
+      if (!pdfRelPath) {
+        noPdf++;
+        continue;
+      }
 
       // Record immediately so the item is visible in the task log.
       await cleanupAssets(key);
@@ -302,8 +341,13 @@ async function submitOne({ itemId, key, pdfRelPath }) {
       if (isTransient && attempt < SUBMIT_MAX_RETRIES) {
         const delay = backoffDelay(attempt);
         attempt++;
-        console.warn(`[fulltext] submit ${key} throttled (HTTP ${status}); retry ${attempt}/${SUBMIT_MAX_RETRIES} after ${delay}ms`);
-        await upsertFullText(itemId, { state: 'submitting', errMsg: `rate-limited, retry ${attempt}/${SUBMIT_MAX_RETRIES}` });
+        console.warn(
+          `[fulltext] submit ${key} throttled (HTTP ${status}); retry ${attempt}/${SUBMIT_MAX_RETRIES} after ${delay}ms`,
+        );
+        await upsertFullText(itemId, {
+          state: 'submitting',
+          errMsg: `rate-limited, retry ${attempt}/${SUBMIT_MAX_RETRIES}`,
+        });
         await sleep(delay);
         continue;
       }
@@ -315,7 +359,12 @@ async function submitOne({ itemId, key, pdfRelPath }) {
       console.error(`[fulltext] submit failed for ${key}: ${err.message}`);
       return;
     } finally {
-      if (isTemp) try { await fs.promises.unlink(filePath); } catch { /* ignore */ }
+      if (isTemp)
+        try {
+          await fs.promises.unlink(filePath);
+        } catch {
+          /* ignore */
+        }
     }
   }
 }
@@ -348,8 +397,9 @@ export async function recoverSubmittingOnStartup() {
  */
 export async function retryFailed() {
   const failed = await listFailedFullText();
-  const keys = failed.map(r => r.itemKey).filter(Boolean);
-  if (keys.length === 0) return { queued: 0, skippedDone: 0, skippedRunning: 0, noPdf: 0, notFound: 0, total: 0 };
+  const keys = failed.map((r) => r.itemKey).filter(Boolean);
+  if (keys.length === 0)
+    return { queued: 0, skippedDone: 0, skippedRunning: 0, noPdf: 0, notFound: 0, total: 0 };
   return enqueueBatchParse(keys);
 }
 
@@ -387,7 +437,7 @@ export async function pollOnce() {
         const data = await getBatchResult(batchId);
         const results = data.extract_result || [];
         // Index results by file_name for O(1) lookup.
-        const byName = new Map(results.map(r => [r.file_name, r]));
+        const byName = new Map(results.map((r) => [r.file_name, r]));
         for (const row of rows) {
           const expectedName = `${row.itemKey}.pdf`;
           const r = byName.get(expectedName);
@@ -416,7 +466,12 @@ export async function pollOnce() {
         //   a different token, or the result TTL elapsed). These won't ever
         //   resolve — mark failed so the user can retry with the current token.
         // A0202/A0211: invalid/expired token — same treatment.
-        if (mineruCode === -60012 || mineruCode === '-60012' || mineruCode === 'A0202' || mineruCode === 'A0211') {
+        if (
+          mineruCode === -60012 ||
+          mineruCode === '-60012' ||
+          mineruCode === 'A0202' ||
+          mineruCode === 'A0211'
+        ) {
           // -60012 is also returned for a few seconds after submit, before
           // MinerU has registered the batch. Only fail rows whose submission
           // is old enough that "not found" really means expired.
@@ -441,14 +496,21 @@ export async function pollOnce() {
             marked++;
           }
           if (marked) {
-            console.warn(`[fulltext] batch ${batchId} unreachable (code ${mineruCode}); marked ${marked} item(s) as failed`);
+            console.warn(
+              `[fulltext] batch ${batchId} unreachable (code ${mineruCode}); marked ${marked} item(s) as failed`,
+            );
           }
           if (deferred) {
-            console.warn(`[fulltext] batch ${batchId} not registered yet (code ${mineruCode}); retrying ${deferred} item(s) next tick`);
+            console.warn(
+              `[fulltext] batch ${batchId} not registered yet (code ${mineruCode}); retrying ${deferred} item(s) next tick`,
+            );
           }
         } else {
           // Transient network errors: leave state as-is for next tick.
-          console.error(`[fulltext] poll error for batch ${batchId} (${rows.length} items):`, err.message);
+          console.error(
+            `[fulltext] poll error for batch ${batchId} (${rows.length} items):`,
+            err.message,
+          );
         }
       }
     }
@@ -484,12 +546,15 @@ async function finalizeDone(row, zipUrl) {
     const relMd = path.relative(localDir, fullMdPath).replace(/\\/g, '/');
     markdownPath = `${prefix}/${relMd}`;
     assetDir = prefix;
-    try { await fs.promises.rm(localDir, { recursive: true, force: true }); } catch { /* ignore */ }
+    try {
+      await fs.promises.rm(localDir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   } else {
     markdownPath = relToStorage(fullMdPath);
     assetDir = relToStorage(localDir);
   }
-
 
   await upsertFullText(row.itemID, {
     state: 'done',
@@ -509,7 +574,9 @@ async function finalizeDone(row, zipUrl) {
     try {
       const buf = await readStoredFile(markdownPath);
       markdown = buf.toString('utf8');
-    } catch { /* indexFullText will re-read if needed */ }
+    } catch {
+      /* indexFullText will re-read if needed */
+    }
     await indexFullText(row.itemID, { markdown, markdownPath });
   } catch (err) {
     console.error(`[fulltext-index] post-parse index failed itemID=${row.itemID}:`, err.message);
@@ -539,17 +606,26 @@ const DOI_RE = /https?:\/\/(?:dx\.)?doi\.org\/(10\.\d{4,9}\/[^\s)"']+)|\b(10\.\d
 async function findContentList(dir) {
   try {
     for (const f of await fs.promises.readdir(dir)) {
-      if (f === 'content_list.json' || (f.endsWith('_content_list.json') && !f.endsWith('_v2.json'))) {
+      if (
+        f === 'content_list.json' ||
+        (f.endsWith('_content_list.json') && !f.endsWith('_v2.json'))
+      ) {
         return path.join(dir, f);
       }
     }
-  } catch { /* dir missing */ }
+  } catch {
+    /* dir missing */
+  }
   return null;
 }
 
 async function* walk(dir) {
   let ents;
-  try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
+  try {
+    ents = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
   for (const e of ents) {
     const p = path.join(dir, e.name);
     yield p;
@@ -562,7 +638,11 @@ async function findContentListRecursive(dir) {
   if (direct) return direct;
   for await (const p of walk(dir)) {
     let st;
-    try { st = await fs.promises.stat(p); } catch { continue; }
+    try {
+      st = await fs.promises.stat(p);
+    } catch {
+      continue;
+    }
     if (st.isDirectory()) {
       const found = await findContentList(p);
       if (found) return found;
@@ -583,8 +663,8 @@ export async function getContentListBlocks(key) {
     const prefix = fulltextPrefixFor(key);
     const names = await listStoredPrefix(prefix);
     const relNames = names
-      .filter(n => n.startsWith(`${prefix}/`))
-      .map(n => n.slice(prefix.length + 1));
+      .filter((n) => n.startsWith(`${prefix}/`))
+      .map((n) => n.slice(prefix.length + 1));
     const picked = pickContentListObjectName(relNames);
     if (!picked) return null;
     try {
@@ -592,7 +672,9 @@ export async function getContentListBlocks(key) {
       const blocks = JSON.parse(buf.toString('utf8'));
       if (!Array.isArray(blocks)) return null;
       return { blocks, listDirRel: path.posix.dirname(picked) };
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   const dir = fulltextDirFor(key);
@@ -604,7 +686,9 @@ export async function getContentListBlocks(key) {
     if (!Array.isArray(blocks)) return null;
     const listDirRel = path.relative(dir, path.dirname(contentListPath)).replace(/\\/g, '/');
     return { blocks, listDirRel };
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -635,8 +719,8 @@ export async function getFullTextStructure(key) {
   const { blocks, listDirRel } = found;
 
   const maxPage = blocks
-    .map(b => b.page_idx)
-    .filter(n => typeof n === 'number' && n >= 0)
+    .map((b) => b.page_idx)
+    .filter((n) => typeof n === 'number' && n >= 0)
     .reduce((a, b) => Math.max(a, b), -1);
   base.pageCount = maxPage + 1;
 
@@ -654,7 +738,12 @@ export async function getFullTextStructure(key) {
     const pageIdx = typeof b.page_idx === 'number' ? b.page_idx : 0;
 
     if (type === 'text' && b.text_level != null && b.text) {
-      base.outline.push({ id: `o${id++}`, level: Number(b.text_level) || 1, text: String(b.text).trim(), pageIdx });
+      base.outline.push({
+        id: `o${id++}`,
+        level: Number(b.text_level) || 1,
+        text: String(b.text).trim(),
+        pageIdx,
+      });
     } else if (['header', 'footer', 'page_header', 'page_footer'].includes(type)) {
       const text = (b.text || '').trim();
       if (!text || pageIdx > 1) continue;
@@ -720,7 +809,11 @@ async function cleanupAssets(key) {
     return;
   }
   const dir = fulltextDirFor(key);
-  try { await fs.promises.rm(dir, { recursive: true, force: true }); } catch { /* ignore */ }
+  try {
+    await fs.promises.rm(dir, { recursive: true, force: true });
+  } catch {
+    /* ignore */
+  }
 }
 
 function nowStr() {
@@ -753,7 +846,9 @@ export async function listAll() {
  */
 export async function resolveFullTextAsset(key, subPath) {
   if (useS3()) {
-    const clean = path.posix.normalize(String(subPath || '').replace(/\\/g, '/')).replace(/^\/+/, '');
+    const clean = path.posix
+      .normalize(String(subPath || '').replace(/\\/g, '/'))
+      .replace(/^\/+/, '');
     if (!clean || clean === '.' || clean.startsWith('..') || clean.includes('/../')) return null;
     const objectName = `${fulltextPrefixFor(key)}/${clean}`;
     const exists = await storedFileExists(objectName);
@@ -765,6 +860,10 @@ export async function resolveFullTextAsset(key, subPath) {
   if (abs !== rootResolved && !abs.startsWith(rootResolved + path.sep)) {
     return null;
   }
-  try { await fs.promises.access(abs); } catch { return null; }
+  try {
+    await fs.promises.access(abs);
+  } catch {
+    return null;
+  }
   return abs;
 }

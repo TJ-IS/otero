@@ -16,7 +16,10 @@ function loadDois(p) {
   const header = lines[0].split('\t');
   const di = header.indexOf('doi');
   const idx = di >= 0 ? di : 0;
-  return lines.slice(1).map((l) => String(l.split('\t')[idx] || '').toLowerCase()).filter((d) => d.includes('10.'));
+  return lines
+    .slice(1)
+    .map((l) => String(l.split('\t')[idx] || '').toLowerCase())
+    .filter((d) => d.includes('10.'));
 }
 
 const dois = loadDois(path.resolve('./tmp/manifest.tsv'));
@@ -26,7 +29,8 @@ if (!dois.length) {
 }
 
 async function states() {
-  return query(`
+  return query(
+    `
     SELECT COALESCE(ft.state,'idle') AS state, COUNT(*)::int AS n
     FROM items i
     JOIN "itemData" d ON d."itemID"=i."itemID"
@@ -35,7 +39,9 @@ async function states() {
     LEFT JOIN "itemFullText" ft ON ft."itemID"=i."itemID"
     WHERE i.deleted=0 AND i."parentItemID" IS NULL AND lower(v.value)=ANY($1)
     GROUP BY 1 ORDER BY 1
-  `, [dois]);
+  `,
+    [dois],
+  );
 }
 
 function inFlight(rows) {
@@ -44,7 +50,8 @@ function inFlight(rows) {
 }
 
 async function keysIn(state) {
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT i.key
     FROM items i
     JOIN "itemData" d ON d."itemID"=i."itemID"
@@ -53,7 +60,9 @@ async function keysIn(state) {
     JOIN "itemFullText" ft ON ft."itemID"=i."itemID"
     WHERE i.deleted=0 AND i."parentItemID" IS NULL
       AND lower(v.value)=ANY($1) AND ft.state=$2
-  `, [dois, state]);
+  `,
+    [dois, state],
+  );
   return rows.map((r) => r.key);
 }
 
@@ -78,7 +87,9 @@ if (failed.length) {
   console.log(await enqueueBatchParse(failed));
   for (let i = 0; i < 80; i++) {
     const rows = await states();
-    console.log(`retry-wait ${i} ${JSON.stringify(Object.fromEntries(rows.map((r) => [r.state, r.n])))}`);
+    console.log(
+      `retry-wait ${i} ${JSON.stringify(Object.fromEntries(rows.map((r) => [r.state, r.n])))}`,
+    );
     if (inFlight(rows) === 0) break;
     await new Promise((r) => setTimeout(r, 15000));
   }

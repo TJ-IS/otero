@@ -90,9 +90,7 @@ export async function enrichFromCrossref(key, opts = {}) {
   for (const name of COMPARE_FIELDS) {
     const suggested = mapped.fields[name];
     if (suggested == null || suggested === '') continue;
-    const current = draftFields
-      ? (draftFields[name] ?? '')
-      : (item.getField(name) || '');
+    const current = draftFields ? (draftFields[name] ?? '') : item.getField(name) || '';
     const curN = normKey(current);
     const sugN = normKey(suggested);
     let status;
@@ -107,7 +105,7 @@ export async function enrichFromCrossref(key, opts = {}) {
     });
   }
 
-  const currentCreators = Array.isArray(opts.creators) ? opts.creators : (item.creators || []);
+  const currentCreators = Array.isArray(opts.creators) ? opts.creators : item.creators || [];
   const suggestedCreators = (mapped.creators || []).map((c, i) => ({
     firstName: c.firstName || '',
     lastName: c.lastName || c.name || '',
@@ -124,10 +122,7 @@ export async function enrichFromCrossref(key, opts = {}) {
     creatorsStatus = 'match';
   } else if (curKeys.length === 0) {
     creatorsStatus = 'missing';
-  } else if (
-    curKeys.length !== sugKeys.length
-    || curKeys.some((k, i) => k !== sugKeys[i])
-  ) {
+  } else if (curKeys.length !== sugKeys.length || curKeys.some((k, i) => k !== sugKeys[i])) {
     creatorsStatus = 'conflict';
   }
 
@@ -152,9 +147,9 @@ export async function enrichFromCrossref(key, opts = {}) {
   };
 
   const summary = {
-    match: fields.filter(f => f.status === 'match').length,
-    missing: fields.filter(f => f.status === 'missing').length,
-    conflict: fields.filter(f => f.status === 'conflict').length,
+    match: fields.filter((f) => f.status === 'match').length,
+    missing: fields.filter((f) => f.status === 'missing').length,
+    conflict: fields.filter((f) => f.status === 'conflict').length,
     creatorsStatus,
   };
 

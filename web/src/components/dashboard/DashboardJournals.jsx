@@ -1,8 +1,17 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  BarChart, Bar, LineChart, Line, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { useAsync } from '@/hooks/useAsync';
@@ -25,7 +34,7 @@ export function DashboardJournals() {
   const chartData = useMemo(() => {
     if (!journals) return [];
     return journals
-      .map(j => ({
+      .map((j) => ({
         name: displayJournalName(j.name, t),
         count: j.itemCount,
         isUnfiled: j.name === UNFILED,
@@ -36,7 +45,7 @@ export function DashboardJournals() {
   // Journals to show in the year trend (excluding the UNFILED catchall)
   const trendJournals = useMemo(() => {
     if (!journals) return [];
-    return journals.filter(j => j.name !== UNFILED);
+    return journals.filter((j) => j.name !== UNFILED);
   }, [journals]);
 
   // Pivot to wide format: [{year, "MIS Quarterly": N, "ISR": M, ...}]
@@ -47,10 +56,10 @@ export function DashboardJournals() {
       for (const y of j.years) yearSet.add(y.year);
     }
     const years = [...yearSet].sort((a, b) => a - b);
-    return years.map(year => {
+    return years.map((year) => {
       const row = { year };
       for (const j of trendJournals) {
-        const entry = j.years.find(y => y.year === year);
+        const entry = j.years.find((y) => y.year === year);
         row[j.name] = entry ? entry.count : 0;
       }
       return row;
@@ -63,9 +72,7 @@ export function DashboardJournals() {
     <div className="mx-auto w-full max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
       <PageHeader eyebrow={t('common:nav.dashboard')} title={t('nav.journals')} />
       {loading && <LoadingSkeleton variant="chart" className="py-8" />}
-      {error && (
-        <ErrorState message={t('loadFailed', { message: error.message })} />
-      )}
+      {error && <ErrorState message={t('loadFailed', { message: error.message })} />}
 
       {!loading && !error && <BasketCoveragePanel />}
 
@@ -79,15 +86,27 @@ export function DashboardJournals() {
             <CardContent>
               <ResponsiveContainer width="100%" height={barHeight}>
                 <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 24 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                    horizontal={false}
+                  />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                    allowDecimals={false}
+                  />
                   <YAxis
                     type="category"
                     dataKey="name"
                     width={220}
                     tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
                   />
-                  <Tooltip content={<ChartTooltip sort yearLabel={(y) => t('journals.yearLabel', { year: y })} />} />
+                  <Tooltip
+                    content={
+                      <ChartTooltip sort yearLabel={(y) => t('journals.yearLabel', { year: y })} />
+                    }
+                  />
                   <Bar dataKey="count" name={t('itemCount')} radius={[0, 4, 4, 0]} barSize={18}>
                     {chartData.map((d) => (
                       <Cell
@@ -109,7 +128,7 @@ export function DashboardJournals() {
                     </tr>
                   </thead>
                   <tbody>
-                    {chartData.map(d => (
+                    {chartData.map((d) => (
                       <tr key={d.name} className="border-b last:border-0 hover:bg-accent/40">
                         <td className="px-4 py-2">{d.name}</td>
                         <td className="px-4 py-2 text-right tabular-nums">{d.count}</td>
@@ -132,20 +151,37 @@ export function DashboardJournals() {
               ) : (
                 <ResponsiveContainer width="100%" height={360}>
                   <LineChart data={trendData} margin={{ left: 0, right: 16, top: 8, bottom: 8 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="hsl(var(--border))"
+                      vertical={false}
+                    />
                     <XAxis
                       dataKey="year"
                       tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
                       interval="preserveStartEnd"
                       minTickGap={20}
                     />
-                    <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} width={40} />
-                    <Tooltip content={<ChartTooltip sort yearLabel={(y) => t('journals.yearLabel', { year: y })} />} />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                      allowDecimals={false}
+                      width={40}
+                    />
+                    <Tooltip
+                      content={
+                        <ChartTooltip
+                          sort
+                          yearLabel={(y) => t('journals.yearLabel', { year: y })}
+                        />
+                      }
+                    />
                     <Legend
                       iconType="circle"
                       wrapperStyle={{ fontSize: 11 }}
                       formatter={(value) => (
-                        <span className="text-muted-foreground" style={{ fontSize: 11 }}>{value}</span>
+                        <span className="text-muted-foreground" style={{ fontSize: 11 }}>
+                          {value}
+                        </span>
                       )}
                     />
                     {trendJournals.map((j, i) => (

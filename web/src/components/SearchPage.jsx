@@ -9,8 +9,12 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-s
 import { useInfiniteItems } from '@/hooks/useInfiniteItems';
 import { usePageMeta } from '@/hooks/usePageMeta';
 import {
-  ITEM_TYPE_LABELS, creatorsList, yearOf, itemTitle,
-  AIS_BASKET_JOURNALS, UNFILED,
+  ITEM_TYPE_LABELS,
+  creatorsList,
+  yearOf,
+  itemTitle,
+  AIS_BASKET_JOURNALS,
+  UNFILED,
 } from '@/lib/items';
 import { highlight, snippetAround } from '@/lib/highlight';
 import { cn } from '@/lib/utils';
@@ -49,8 +53,15 @@ function matchInfo(item, q) {
   const fulltextHit = !!item.fulltextHit;
   const fulltextSnippet = item.fulltextSnippet || null;
   return {
-    titleHit, doiHit, journalHit, abstractHit, authorsHit, authors, abstract,
-    fulltextHit, fulltextSnippet,
+    titleHit,
+    doiHit,
+    journalHit,
+    abstractHit,
+    authorsHit,
+    authors,
+    abstract,
+    fulltextHit,
+    fulltextSnippet,
   };
 }
 
@@ -76,20 +87,24 @@ function ResultCard({ item, query, onSelect }) {
   else if (m?.doiHit) snippet = doi || null;
 
   return (
-    <article
-      className="group border-b border-border/80 px-1 py-4 transition-colors hover:bg-accent/40 sm:px-2"
-    >
+    <article className="group border-b border-border/80 px-1 py-4 transition-colors hover:bg-accent/40 sm:px-2">
       <div className="flex items-baseline gap-2">
         <span className="text-xs text-muted-foreground tabular-nums shrink-0">
           {ITEM_TYPE_LABELS[item.itemType] || item.itemType}
         </span>
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-          <button type="button" onClick={() => onSelect(item.key)} className="max-w-full truncate text-left transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+          <button
+            type="button"
+            onClick={() => onSelect(item.key)}
+            className="max-w-full truncate text-left transition-colors hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
             {highlight(title, query)}
           </button>
         </h3>
         {snippetFromFulltext ? (
-          <Badge variant="secondary" className="shrink-0 font-normal">{t('search.fulltextBadge')}</Badge>
+          <Badge variant="secondary" className="shrink-0 font-normal">
+            {t('search.fulltextBadge')}
+          </Badge>
         ) : null}
       </div>
 
@@ -101,7 +116,9 @@ function ResultCard({ item, query, onSelect }) {
 
       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {year && <span className="tabular-nums">{year}</span>}
-        <Badge variant={jBadge.variant} className="font-normal">{journalLabel}</Badge>
+        <Badge variant={jBadge.variant} className="font-normal">
+          {journalLabel}
+        </Badge>
         {doi && (
           <span className={cn('truncate', m?.doiHit && 'text-foreground')}>
             {m?.doiHit ? highlight(doi, query) : doi}
@@ -177,10 +194,13 @@ export const SearchPage = memo(function SearchPage() {
     enabled: Boolean(submitted),
   });
 
-  const onSubmit = useCallback((e) => {
-    e?.preventDefault?.();
-    setSubmitted(input.trim());
-  }, [input]);
+  const onSubmit = useCallback(
+    (e) => {
+      e?.preventDefault?.();
+      setSubmitted(input.trim());
+    },
+    [input],
+  );
 
   const clearQuery = useCallback(() => {
     setInput('');
@@ -188,15 +208,20 @@ export const SearchPage = memo(function SearchPage() {
     inputRef.current?.focus();
   }, []);
 
-  const onSelect = useCallback((key) => {
-    if (key === selectedKey) return;
-    if (detailDirty) {
-      toast.message(t('common:unsavedChangesToast'), { description: t('common:unsavedSwitchToastDesc') });
-      return;
-    }
-    setSelectedKey(key);
-    setDetailOpen(true);
-  }, [selectedKey, detailDirty, t]);
+  const onSelect = useCallback(
+    (key) => {
+      if (key === selectedKey) return;
+      if (detailDirty) {
+        toast.message(t('common:unsavedChangesToast'), {
+          description: t('common:unsavedSwitchToastDesc'),
+        });
+        return;
+      }
+      setSelectedKey(key);
+      setDetailOpen(true);
+    },
+    [selectedKey, detailDirty, t],
+  );
 
   const onItemDeleted = useCallback(() => {
     setSelectedKey(null);
@@ -218,11 +243,14 @@ export const SearchPage = memo(function SearchPage() {
   const hasQuery = Boolean(submitted);
 
   // Load the next page when the user scrolls near the bottom of the results.
-  const onResultsScroll = useCallback((e) => {
-    const el = e.currentTarget;
-    if (!hasMore || loadingMore || loading) return;
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) loadMore();
-  }, [hasMore, loadingMore, loading, loadMore]);
+  const onResultsScroll = useCallback(
+    (e) => {
+      const el = e.currentTarget;
+      if (!hasMore || loadingMore || loading) return;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 600) loadMore();
+    },
+    [hasMore, loadingMore, loading, loadMore],
+  );
 
   return (
     <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-background">
@@ -249,7 +277,7 @@ export const SearchPage = memo(function SearchPage() {
               ref={inputRef}
               placeholder={t('search.placeholder')}
               value={input}
-              onChange={e => setInput(e.target.value)}
+              onChange={(e) => setInput(e.target.value)}
               className="h-full min-w-0 flex-1 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
             />
             {input ? (
@@ -262,7 +290,10 @@ export const SearchPage = memo(function SearchPage() {
                 <X className="size-3.5" />
               </button>
             ) : null}
-            <button type="submit" className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand hover:underline">
+            <button
+              type="submit"
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand hover:underline"
+            >
               {t('search.label')}
             </button>
           </form>
@@ -272,7 +303,11 @@ export const SearchPage = memo(function SearchPage() {
           {error ? (
             <ErrorState message={t('search.failed', { message: error.message })} />
           ) : !hasQuery ? (
-            <EmptyState icon={FileText} title={t('search.emptyPrompt')} description={t('search.emptyHint')} />
+            <EmptyState
+              icon={FileText}
+              title={t('search.emptyPrompt')}
+              description={t('search.emptyHint')}
+            />
           ) : loading && items.length === 0 ? (
             <ResultsSkeleton />
           ) : resultCount === 0 ? (
@@ -280,10 +315,12 @@ export const SearchPage = memo(function SearchPage() {
           ) : (
             <>
               <div className="mb-3 text-xs text-muted-foreground tabular-nums">
-                {t('search.foundApprox')} <span className="text-foreground font-medium">{resultCount}</span> {t('search.results')}
+                {t('search.foundApprox')}{' '}
+                <span className="text-foreground font-medium">{resultCount}</span>{' '}
+                {t('search.results')}
               </div>
               <div className="divide-y divide-border border-t border-border/80">
-                {items.map(it => (
+                {items.map((it) => (
                   <ResultCard key={it.key} item={it} query={submitted} onSelect={onSelect} />
                 ))}
               </div>

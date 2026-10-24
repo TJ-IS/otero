@@ -16,9 +16,12 @@ test('parseMineruTokens collects primary, numbered, and list vars without duplic
 
 test('parseMineruTokens ignores empty values', () => {
   assert.deepEqual(parseMineruTokens({}), []);
-  assert.deepEqual(parseMineruTokens({
-    OTERO_MINERU_TOKEN: '',
-    OTERO_MINERU_TOKENS: '  , ; ',
-    OTERO_MINERU_TOKEN_2: '""',
-  }), []);
+  assert.deepEqual(
+    parseMineruTokens({
+      OTERO_MINERU_TOKEN: '',
+      OTERO_MINERU_TOKENS: '  , ; ',
+      OTERO_MINERU_TOKEN_2: '""',
+    }),
+    [],
+  );
 });

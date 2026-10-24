@@ -18,20 +18,19 @@ const NAMED_ENTITIES = {
 };
 
 function decodeEntities(value) {
-  return value
-    .replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (_, entity) => {
-      const key = entity.toLowerCase();
-      if (NAMED_ENTITIES[key]) return NAMED_ENTITIES[key];
-      if (key.startsWith('#x')) {
-        const code = Number.parseInt(key.slice(2), 16);
-        return Number.isFinite(code) ? String.fromCodePoint(code) : '';
-      }
-      if (key.startsWith('#')) {
-        const code = Number.parseInt(key.slice(1), 10);
-        return Number.isFinite(code) ? String.fromCodePoint(code) : '';
-      }
-      return '';
-    });
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (_, entity) => {
+    const key = entity.toLowerCase();
+    if (NAMED_ENTITIES[key]) return NAMED_ENTITIES[key];
+    if (key.startsWith('#x')) {
+      const code = Number.parseInt(key.slice(2), 16);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
+    }
+    if (key.startsWith('#')) {
+      const code = Number.parseInt(key.slice(1), 10);
+      return Number.isFinite(code) ? String.fromCodePoint(code) : '';
+    }
+    return '';
+  });
 }
 
 export function cleanRichText(raw) {
@@ -50,14 +49,15 @@ function isDoiUrl(url, doi) {
 }
 
 function venueValue(fields, t) {
-  const raw = fields.publicationTitle
-    || fields.bookTitle
-    || fields.conferenceName
-    || fields.proceedingsTitle
-    || fields.repository
-    || fields.university
-    || fields.publisher
-    || '';
+  const raw =
+    fields.publicationTitle ||
+    fields.bookTitle ||
+    fields.conferenceName ||
+    fields.proceedingsTitle ||
+    fields.repository ||
+    fields.university ||
+    fields.publisher ||
+    '';
   if (!raw) return null;
   if (raw === UNFILED) return t('common:unfiled');
   return raw;
@@ -84,7 +84,9 @@ export const ItemPublicCard = memo(function ItemPublicCard({ item }) {
     f.volume && `Vol. ${f.volume}`,
     f.issue && `No. ${f.issue}`,
     f.pages && `pp. ${f.pages}`,
-  ].filter(Boolean).join(' · ');
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const citation = [venue, locator].filter(Boolean).join('  ·  ');
   const abstract = cleanRichText(f.abstractNote);
 
@@ -97,7 +99,9 @@ export const ItemPublicCard = memo(function ItemPublicCard({ item }) {
               {typeLabel}
             </p>
             {year ? (
-              <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{year}</span>
+              <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                {year}
+              </span>
             ) : null}
           </div>
           <h2 className="mt-3 font-display text-[1.65rem] font-semibold leading-[1.2] tracking-tight text-balance sm:text-[1.85rem]">

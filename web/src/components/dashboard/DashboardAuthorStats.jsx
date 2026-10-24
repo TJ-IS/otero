@@ -13,14 +13,14 @@ export function DashboardAuthorStats() {
       <div className="mx-auto max-w-page px-4 pt-8 sm:px-6 lg:px-8">
         <PageHeader
           title={t('authors.statsTitle')}
-          actions={(
+          actions={
             <Button type="button" variant="outline" size="sm" asChild>
               <Link to="/dashboard/authors">
                 <ArrowLeft className="size-4" />
                 {t('authors.backToGraph')}
               </Link>
             </Button>
-          )}
+          }
         />
       </div>
       <AuthorAnalyticsPanel />

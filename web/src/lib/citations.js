@@ -144,7 +144,7 @@ export function tokenizeCitations(text, index) {
       const refs = resolve(index, cm[1], cm[2]);
       if (!refs) continue;
       const start = groupStart + cm.index;
-      spans.push({ start, end: start + cm[0].length, refIds: refs.map(r => r.id) });
+      spans.push({ start, end: start + cm[0].length, refIds: refs.map((r) => r.id) });
     }
   }
 
@@ -154,7 +154,7 @@ export function tokenizeCitations(text, index) {
   while ((nm = NARRATIVE_RE.exec(text)) !== null) {
     const refs = resolve(index, nm[1], nm[2]);
     if (!refs) continue;
-    spans.push({ start: nm.index, end: nm.index + nm[0].length, refIds: refs.map(r => r.id) });
+    spans.push({ start: nm.index, end: nm.index + nm[0].length, refIds: refs.map((r) => r.id) });
   }
 
   if (spans.length === 0) return [{ type: 'text', value: text }];
@@ -190,7 +190,7 @@ function hasKatexClass(node) {
   const cls = node?.properties?.className;
   if (!cls) return false;
   const list = Array.isArray(cls) ? cls : [cls];
-  return list.some(c => String(c).startsWith('katex'));
+  return list.some((c) => String(c).startsWith('katex'));
 }
 
 /**
@@ -238,9 +238,7 @@ export function rehypeCitations(index) {
           }
         } else {
           if (child.type === 'element') {
-            const skipChild = inSkip
-              || SKIP_TAGS.has(child.tagName)
-              || hasKatexClass(child);
+            const skipChild = inSkip || SKIP_TAGS.has(child.tagName) || hasKatexClass(child);
             walk(child, skipChild);
           }
           next.push(child);

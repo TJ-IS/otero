@@ -4,20 +4,22 @@ import { cva } from 'class-variance-authority';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const NavigationMenu = React.forwardRef(({ className, children, viewport = true, ...props }, ref) => (
-  <NavigationMenuPrimitive.Root
-    ref={ref}
-    data-viewport={viewport}
-    className={cn(
-      'group/navigation-menu relative z-10 flex max-w-max flex-1 items-center justify-center',
-      className,
-    )}
-    {...props}
-  >
-    {children}
-    {viewport ? <NavigationMenuViewport /> : null}
-  </NavigationMenuPrimitive.Root>
-));
+const NavigationMenu = React.forwardRef(
+  ({ className, children, viewport = true, ...props }, ref) => (
+    <NavigationMenuPrimitive.Root
+      ref={ref}
+      data-viewport={viewport}
+      className={cn(
+        'group/navigation-menu relative z-10 flex max-w-max flex-1 items-center justify-center',
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      {viewport ? <NavigationMenuViewport /> : null}
+    </NavigationMenuPrimitive.Root>
+  ),
+);
 NavigationMenu.displayName = NavigationMenuPrimitive.Root.displayName;
 
 const NavigationMenuList = React.forwardRef(({ className, ...props }, ref) => (
@@ -30,11 +32,7 @@ const NavigationMenuList = React.forwardRef(({ className, ...props }, ref) => (
 NavigationMenuList.displayName = NavigationMenuPrimitive.List.displayName;
 
 const NavigationMenuItem = React.forwardRef(({ className, ...props }, ref) => (
-  <NavigationMenuPrimitive.Item
-    ref={ref}
-    className={cn('relative', className)}
-    {...props}
-  />
+  <NavigationMenuPrimitive.Item ref={ref} className={cn('relative', className)} {...props} />
 ));
 NavigationMenuItem.displayName = 'NavigationMenuItem';
 

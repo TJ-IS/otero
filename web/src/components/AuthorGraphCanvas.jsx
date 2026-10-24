@@ -94,8 +94,8 @@ const GraphScene = memo(function GraphScene({
           const source = positions.get(edge.source);
           const target = positions.get(edge.target);
           if (!source || !target) return null;
-          const dimmed = neighborIds
-            && !(neighborIds.has(edge.source) && neighborIds.has(edge.target));
+          const dimmed =
+            neighborIds && !(neighborIds.has(edge.source) && neighborIds.has(edge.target));
           return (
             <line
               key={`${edge.source}-${edge.target}`}
@@ -120,8 +120,8 @@ const GraphScene = memo(function GraphScene({
           const isKeyboardTarget = keyboardFocusId === node.id;
           const isMatched = matchedIds?.has(node.id);
           const dimmedByFocus = neighborIds && !neighborIds.has(node.id);
-          const dimmedBySearch = !neighborIds && matchedIds && matchedIds.size > 0
-            && !isMatched && !isSelected;
+          const dimmedBySearch =
+            !neighborIds && matchedIds && matchedIds.size > 0 && !isMatched && !isSelected;
           const dimmed = dimmedByFocus || dimmedBySearch;
           const fill = communityColor(node.community);
           const mutedCommunity = node.community < 0 || node.community >= MAX_COLORED_COMMUNITIES;
@@ -135,7 +135,11 @@ const GraphScene = memo(function GraphScene({
               role="button"
               tabIndex={isKeyboardTarget ? 0 : -1}
               data-node-id={node.id}
-              aria-label={t('authors.nodeAria', { name: displayName, papers: node.paperCount, degree })}
+              aria-label={t('authors.nodeAria', {
+                name: displayName,
+                papers: node.paperCount,
+                degree,
+              })}
               onMouseEnter={() => onHover(node.id)}
               onMouseLeave={() => onHover((current) => (current === node.id ? null : current))}
               onFocus={() => {
@@ -197,7 +201,9 @@ const GraphScene = memo(function GraphScene({
               <circle
                 r={position.radius}
                 fill={fill}
-                fillOpacity={dimmed ? 0.07 : isHovered || isSelected ? 0.88 : mutedCommunity ? 0.38 : 0.62}
+                fillOpacity={
+                  dimmed ? 0.07 : isHovered || isSelected ? 0.88 : mutedCommunity ? 0.38 : 0.62
+                }
                 stroke={fill}
                 strokeOpacity={dimmed ? 0.15 : 0.95}
                 strokeWidth={isHovered || isSelected ? 2 : 1}
@@ -217,7 +223,9 @@ const GraphScene = memo(function GraphScene({
                   {graphLabel(node.name, unnamedLabel)}
                 </text>
               ) : null}
-              <title>{t('authors.nodeTitle', { name: displayName, papers: node.paperCount })}</title>
+              <title>
+                {t('authors.nodeTitle', { name: displayName, papers: node.paperCount })}
+              </title>
             </g>
           );
         })}
@@ -242,10 +250,18 @@ function AuthorDetails({ node, neighbors, onClose, onOpenAuthor }) {
               ? t('authors.communityN', { n: node.community + 1 })
               : t('authors.unconnected')}
           </div>
-          <h2 className="truncate text-sm font-semibold" title={node.name}>{node.name}</h2>
+          <h2 className="truncate text-sm font-semibold" title={node.name}>
+            {node.name}
+          </h2>
           <p className="mt-1 text-xs text-muted-foreground">{t('authors.metricsNote')}</p>
         </div>
-        <Button variant="ghost" size="icon" className="size-9 shrink-0" onClick={onClose} title={t('authors.closeDetail')}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-9 shrink-0"
+          onClick={onClose}
+          title={t('authors.closeDetail')}
+        >
           <X className="size-4" />
         </Button>
       </div>
@@ -257,11 +273,15 @@ function AuthorDetails({ node, neighbors, onClose, onOpenAuthor }) {
         </div>
         <div className="pl-3">
           <dt className="text-muted-foreground">{t('authors.metricDegree')}</dt>
-          <dd className="mt-1 font-mono text-base font-semibold tabular-nums">{node.metrics?.degree || 0}</dd>
+          <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
+            {node.metrics?.degree || 0}
+          </dd>
         </div>
         <div className="mt-3 border-r pr-3">
           <dt className="text-muted-foreground">{t('authors.metricStrength')}</dt>
-          <dd className="mt-1 font-mono text-base font-semibold tabular-nums">{node.metrics?.weightedDegree || 0}</dd>
+          <dd className="mt-1 font-mono text-base font-semibold tabular-nums">
+            {node.metrics?.weightedDegree || 0}
+          </dd>
         </div>
         <div className="mt-3 pl-3">
           <dt className="text-muted-foreground">{t('authors.metricBetweenness')}</dt>
@@ -299,7 +319,11 @@ function AuthorDetails({ node, neighbors, onClose, onOpenAuthor }) {
         )}
       </div>
 
-      <Button className="mt-4 w-full active:scale-[0.98]" size="sm" onClick={() => onOpenAuthor(node.id)}>
+      <Button
+        className="mt-4 w-full active:scale-[0.98]"
+        size="sm"
+        onClick={() => onOpenAuthor(node.id)}
+      >
         {t('authors.viewAuthorPapers')}
         <ArrowUpRight className="size-4" />
       </Button>
@@ -326,10 +350,13 @@ export function AuthorGraphCanvas({
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [hoveredId, setHoveredId] = useState(null);
   const [keyboardFocusId, setKeyboardFocusId] = useState(nodes[0]?.id ?? null);
-  const [coarsePointer, setCoarsePointer] = useState(() => (
-    window.matchMedia?.('(any-pointer: coarse)').matches ?? false
-  ));
-  const { positions, settled, reducedMotion } = useForceLayout(nodes, edges, { ...size, sizeMetric });
+  const [coarsePointer, setCoarsePointer] = useState(
+    () => window.matchMedia?.('(any-pointer: coarse)').matches ?? false,
+  );
+  const { positions, settled, reducedMotion } = useForceLayout(nodes, edges, {
+    ...size,
+    sizeMetric,
+  });
   const viewportApiRef = useRef(null);
   const handleDoubleTap = useCallback((point) => {
     viewportApiRef.current?.zoomAt(point, 1.55, { animated: true });
@@ -364,9 +391,7 @@ export function AuthorGraphCanvas({
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.id, node])), [nodes]);
   const fitInsets = useMemo(() => {
     if (selectedId == null || !nodeById.has(selectedId)) return {};
-    return size.width >= 768
-      ? { rightInset: 332 }
-      : { bottomInset: size.height * 0.44 + 12 };
+    return size.width >= 768 ? { rightInset: 332 } : { bottomInset: size.height * 0.44 + 12 };
   }, [nodeById, selectedId, size.height, size.width]);
   const fittedView = useCallback(
     () => fitView(positions, size, fitInsets),
@@ -381,7 +406,8 @@ export function AuthorGraphCanvas({
       map.get(source.id).push({ node: target, weight: edge.weight });
       map.get(target.id).push({ node: source, weight: edge.weight });
     }
-    for (const list of map.values()) list.sort((a, b) => b.weight - a.weight || a.node.name.localeCompare(b.node.name));
+    for (const list of map.values())
+      list.sort((a, b) => b.weight - a.weight || a.node.name.localeCompare(b.node.name));
     return map;
   }, [edges, nodeById, nodes]);
 
@@ -416,9 +442,9 @@ export function AuthorGraphCanvas({
     const update = () => {
       const width = Math.round(element.clientWidth);
       const height = Math.round(element.clientHeight);
-      setSize((current) => (
-        current.width === width && current.height === height ? current : { width, height }
-      ));
+      setSize((current) =>
+        current.width === width && current.height === height ? current : { width, height },
+      );
     };
     update();
     const observer = new ResizeObserver(update);
@@ -458,21 +484,23 @@ export function AuthorGraphCanvas({
     animateTo(fittedView());
   }, [animateTo, fittedView, nodes, positions, settled, userInteractedRef]);
 
-  const focusNode = useCallback((nodeId) => {
-    const position = positions.get(nodeId);
-    if (!position) return;
-    const current = viewRef.current;
-    const k = Math.max(current.k, 1.05);
-    const targetX = size.width >= 768 && selectedId != null
-      ? (size.width - 320) / 2
-      : size.width / 2;
-    const targetY = size.width < 768 && selectedId != null ? size.height * 0.32 : size.height / 2;
-    animateTo({
-      x: targetX - position.x * k,
-      y: targetY - position.y * k,
-      k,
-    });
-  }, [animateTo, positions, selectedId, size.height, size.width, viewRef]);
+  const focusNode = useCallback(
+    (nodeId) => {
+      const position = positions.get(nodeId);
+      if (!position) return;
+      const current = viewRef.current;
+      const k = Math.max(current.k, 1.05);
+      const targetX =
+        size.width >= 768 && selectedId != null ? (size.width - 320) / 2 : size.width / 2;
+      const targetY = size.width < 768 && selectedId != null ? size.height * 0.32 : size.height / 2;
+      animateTo({
+        x: targetX - position.x * k,
+        y: targetY - position.y * k,
+        k,
+      });
+    },
+    [animateTo, positions, selectedId, size.height, size.width, viewRef],
+  );
 
   useEffect(() => {
     if (!focusToken || focusToken === lastFocusTokenRef.current) return;
@@ -505,33 +533,41 @@ export function AuthorGraphCanvas({
 
   useEffect(() => {
     if (selectedId != null) setKeyboardFocusId(selectedId);
-    else if (keyboardFocusId == null || !nodeById.has(keyboardFocusId)) setKeyboardFocusId(nodes[0]?.id ?? null);
+    else if (keyboardFocusId == null || !nodeById.has(keyboardFocusId))
+      setKeyboardFocusId(nodes[0]?.id ?? null);
   }, [keyboardFocusId, nodeById, nodes, selectedId]);
 
-  const ensureNodeVisible = useCallback((nodeId) => {
-    const position = positions.get(nodeId);
-    if (!position) return;
-    const current = viewRef.current;
-    const radius = position.radius * current.k;
-    const screenX = current.x + position.x * current.k;
-    const screenY = current.y + position.y * current.k;
-    const horizontalPadding = 24 + radius;
-    const verticalPadding = 24 + radius;
-    const left = horizontalPadding;
-    const right = size.width - (fitInsets.rightInset || 0) - horizontalPadding;
-    const top = verticalPadding;
-    const bottom = size.height - (fitInsets.bottomInset || 0) - verticalPadding;
-    const targetX = right < left
-      ? (left + right) / 2
-      : Math.min(right, Math.max(left, screenX));
-    const targetY = bottom < top
-      ? (top + bottom) / 2
-      : Math.min(bottom, Math.max(top, screenY));
-    const dx = targetX - screenX;
-    const dy = targetY - screenY;
-    if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-    animateTo({ x: current.x + dx, y: current.y + dy, k: current.k });
-  }, [animateTo, fitInsets.bottomInset, fitInsets.rightInset, positions, size.height, size.width, viewRef]);
+  const ensureNodeVisible = useCallback(
+    (nodeId) => {
+      const position = positions.get(nodeId);
+      if (!position) return;
+      const current = viewRef.current;
+      const radius = position.radius * current.k;
+      const screenX = current.x + position.x * current.k;
+      const screenY = current.y + position.y * current.k;
+      const horizontalPadding = 24 + radius;
+      const verticalPadding = 24 + radius;
+      const left = horizontalPadding;
+      const right = size.width - (fitInsets.rightInset || 0) - horizontalPadding;
+      const top = verticalPadding;
+      const bottom = size.height - (fitInsets.bottomInset || 0) - verticalPadding;
+      const targetX = right < left ? (left + right) / 2 : Math.min(right, Math.max(left, screenX));
+      const targetY = bottom < top ? (top + bottom) / 2 : Math.min(bottom, Math.max(top, screenY));
+      const dx = targetX - screenX;
+      const dy = targetY - screenY;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+      animateTo({ x: current.x + dx, y: current.y + dy, k: current.k });
+    },
+    [
+      animateTo,
+      fitInsets.bottomInset,
+      fitInsets.rightInset,
+      positions,
+      size.height,
+      size.width,
+      viewRef,
+    ],
+  );
 
   useEffect(() => {
     if (selectedId == null) {
@@ -544,65 +580,76 @@ export function AuthorGraphCanvas({
     ensureNodeVisible(selectedId);
   }, [ensureNodeVisible, positions, selectedId]);
 
-  const moveKeyboardFocus = useCallback((nodeId, key) => {
-    const origin = positions.get(nodeId);
-    if (!origin) return;
-    const direction = {
-      ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1],
-    }[key];
-    if (!direction) return;
-    let best = null;
-    for (const node of nodes) {
-      if (node.id === nodeId) continue;
-      const candidate = positions.get(node.id);
-      if (!candidate) continue;
-      const dx = candidate.x - origin.x;
-      const dy = candidate.y - origin.y;
-      const forward = dx * direction[0] + dy * direction[1];
-      if (forward <= 0) continue;
-      const d = Math.hypot(dx, dy);
-      const alignment = forward / Math.max(1, d);
-      const score = d / Math.max(0.08, alignment * alignment);
-      if (!best || score < best.score) best = { id: node.id, score };
-    }
-    if (!best) return;
-    markUserInteraction();
-    setKeyboardFocusId(best.id);
-    requestAnimationFrame(() => {
-      svgRef.current?.querySelector(`[data-node-id="${best.id}"]`)?.focus();
-    });
-  }, [markUserInteraction, nodes, positions]);
-
-  const findNodeAt = useCallback((clientX, clientY) => {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    const screenX = clientX - rect.left;
-    const screenY = clientY - rect.top;
-    const minimumRadius = coarsePointer ? 22 : 8;
-    let best = null;
-    for (const node of nodes) {
-      const position = positions.get(node.id);
-      if (!position) continue;
-      const radius = position.radius * view.k;
-      const distanceToCenter = Math.hypot(
-        screenX - (view.x + position.x * view.k),
-        screenY - (view.y + position.y * view.k),
-      );
-      if (distanceToCenter > Math.max(radius, minimumRadius)) continue;
-      const insideVisibleBubble = distanceToCenter <= radius;
-      const score = distanceToCenter - radius;
-      if (!best
-        || (insideVisibleBubble && !best.insideVisibleBubble)
-        || (insideVisibleBubble === best.insideVisibleBubble && score < best.score)) {
-        best = { id: node.id, insideVisibleBubble, score };
+  const moveKeyboardFocus = useCallback(
+    (nodeId, key) => {
+      const origin = positions.get(nodeId);
+      if (!origin) return;
+      const direction = {
+        ArrowLeft: [-1, 0],
+        ArrowRight: [1, 0],
+        ArrowUp: [0, -1],
+        ArrowDown: [0, 1],
+      }[key];
+      if (!direction) return;
+      let best = null;
+      for (const node of nodes) {
+        if (node.id === nodeId) continue;
+        const candidate = positions.get(node.id);
+        if (!candidate) continue;
+        const dx = candidate.x - origin.x;
+        const dy = candidate.y - origin.y;
+        const forward = dx * direction[0] + dy * direction[1];
+        if (forward <= 0) continue;
+        const d = Math.hypot(dx, dy);
+        const alignment = forward / Math.max(1, d);
+        const score = d / Math.max(0.08, alignment * alignment);
+        if (!best || score < best.score) best = { id: node.id, score };
       }
-    }
-    return best?.id ?? null;
-  }, [coarsePointer, nodes, positions, view.k, view.x, view.y]);
+      if (!best) return;
+      markUserInteraction();
+      setKeyboardFocusId(best.id);
+      requestAnimationFrame(() => {
+        svgRef.current?.querySelector(`[data-node-id="${best.id}"]`)?.focus();
+      });
+    },
+    [markUserInteraction, nodes, positions],
+  );
+
+  const findNodeAt = useCallback(
+    (clientX, clientY) => {
+      const rect = svgRef.current?.getBoundingClientRect();
+      if (!rect) return null;
+      const screenX = clientX - rect.left;
+      const screenY = clientY - rect.top;
+      const minimumRadius = coarsePointer ? 22 : 8;
+      let best = null;
+      for (const node of nodes) {
+        const position = positions.get(node.id);
+        if (!position) continue;
+        const radius = position.radius * view.k;
+        const distanceToCenter = Math.hypot(
+          screenX - (view.x + position.x * view.k),
+          screenY - (view.y + position.y * view.k),
+        );
+        if (distanceToCenter > Math.max(radius, minimumRadius)) continue;
+        const insideVisibleBubble = distanceToCenter <= radius;
+        const score = distanceToCenter - radius;
+        if (
+          !best ||
+          (insideVisibleBubble && !best.insideVisibleBubble) ||
+          (insideVisibleBubble === best.insideVisibleBubble && score < best.score)
+        ) {
+          best = { id: node.id, insideVisibleBubble, score };
+        }
+      }
+      return best?.id ?? null;
+    },
+    [coarsePointer, nodes, positions, view.k, view.x, view.y],
+  );
 
   const hoveredNode = hoveredId == null ? null : nodeById.get(hoveredId);
   const selectedNode = selectedId == null ? null : nodeById.get(selectedId);
-  const selectedNeighbors = selectedId == null ? [] : (neighborsById.get(selectedId) || []);
+  const selectedNeighbors = selectedId == null ? [] : neighborsById.get(selectedId) || [];
   const visibleCommunities = communities.slice(0, MAX_COLORED_COMMUNITIES);
 
   return (
@@ -618,7 +665,9 @@ export function AuthorGraphCanvas({
         onDoubleClick={(event) => {
           if (event.target !== event.currentTarget) return;
           const rect = event.currentTarget.getBoundingClientRect();
-          zoomAt({ x: event.clientX - rect.left, y: event.clientY - rect.top }, 1.55, { animated: true });
+          zoomAt({ x: event.clientX - rect.left, y: event.clientY - rect.top }, 1.55, {
+            animated: true,
+          });
         }}
         onClick={(event) => {
           if (!dragMovedRef.current) onSelect(findNodeAt(event.clientX, event.clientY));
@@ -713,7 +762,9 @@ export function AuthorGraphCanvas({
 
       {hoveredNode && hoveredId !== selectedId ? (
         <div className="pointer-events-none absolute left-3 top-3 rounded-sm border bg-popover/95 px-3 py-2 text-sm shadow-sm backdrop-blur-sm">
-          <div className="max-w-64 truncate font-medium">{hoveredNode.name || t('authors.unnamed')}</div>
+          <div className="max-w-64 truncate font-medium">
+            {hoveredNode.name || t('authors.unnamed')}
+          </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
             {t('authors.hoverPapers', {
               papers: hoveredNode.paperCount,
@@ -731,13 +782,21 @@ export function AuthorGraphCanvas({
           </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             {visibleCommunities.map((community) => (
-              <span key={community.id} className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                <span className="size-2 rounded-full" style={{ background: communityColor(community.id) }} />
+              <span
+                key={community.id}
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+              >
+                <span
+                  className="size-2 rounded-full"
+                  style={{ background: communityColor(community.id) }}
+                />
                 {t('authors.communityPeople', { id: community.id + 1, count: community.nodeCount })}
               </span>
             ))}
             {communities.length > visibleCommunities.length ? (
-              <span className="text-[11px] text-muted-foreground">{t('authors.otherCommunitiesGray')}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {t('authors.otherCommunitiesGray')}
+              </span>
             ) : null}
           </div>
         </div>

@@ -20,7 +20,13 @@ const EDITOR = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 let app;
 let editorToken;
 
-async function makeItem({ title, journal = JOURNAL_WHITELIST[0], date = '2024', creator, doi } = {}) {
+async function makeItem({
+  title,
+  journal = JOURNAL_WHITELIST[0],
+  date = '2024',
+  creator,
+  doi,
+} = {}) {
   const item = new Item();
   await item.setItemType('journalArticle');
   item.setField('title', title || tag);
@@ -86,7 +92,10 @@ test('anonymous GET /api/items hides unfiled rows and rejects explicit 待归档
   const visible = await makeItem({ title: `${tag} visible` });
   const hidden = await makeItem({ title: `${tag} hidden`, journal: `Outside Journal ${tag}` });
 
-  const list = await request(app).get('/api/items').query({ search: tag, pageSize: 50 }).expect(200);
+  const list = await request(app)
+    .get('/api/items')
+    .query({ search: tag, pageSize: 50 })
+    .expect(200);
   const keys = list.body.items.map((it) => it.key);
   assert.ok(keys.includes(visible.key));
   assert.ok(!keys.includes(hidden.key));
@@ -96,7 +105,10 @@ test('anonymous GET /api/items hides unfiled rows and rejects explicit 待归档
   await request(app).get(`/api/items/${hidden.key}/fulltext`).expect(404);
   await request(app).get(`/api/items/${hidden.key}/export`).expect(404);
 
-  const unfiled = await request(app).get('/api/items').query({ journal: UNFILED, search: tag }).expect(200);
+  const unfiled = await request(app)
+    .get('/api/items')
+    .query({ journal: UNFILED, search: tag })
+    .expect(200);
   assert.equal(unfiled.body.total, 0);
   assert.equal(unfiled.body.items.length, 0);
 
@@ -106,7 +118,10 @@ test('anonymous GET /api/items hides unfiled rows and rejects explicit 待归档
 });
 
 test('editor token can list and open unfiled items', async () => {
-  const hidden = await makeItem({ title: `${tag} editor-hidden`, journal: `Outside Editor ${tag}` });
+  const hidden = await makeItem({
+    title: `${tag} editor-hidden`,
+    journal: `Outside Editor ${tag}`,
+  });
 
   const list = await request(app)
     .get('/api/items')
@@ -144,8 +159,8 @@ test('anonymous cannot fetch attachments or authors for unfiled-only work', asyn
   await request(app).get(`/api/attachments/${att.key}/file`).expect(404);
   await request(app).get(`/api/attachments/${hidden.key}/fulltext/content.md`).expect(404);
 
-  const authorId = hidden.creators.find((c) => c.lastName === `Author-${tag}`)?.id
-    ?? hidden.creators[0]?.id;
+  const authorId =
+    hidden.creators.find((c) => c.lastName === `Author-${tag}`)?.id ?? hidden.creators[0]?.id;
   assert.ok(authorId);
   await request(app).get(`/api/authors/${authorId}`).expect(404);
 });
@@ -155,8 +170,8 @@ test('author page for mixed corpus drops unfiled papers for anonymous users', as
   const visible = await makeItem({ title: `${tag} mix-visible`, creator });
   await makeItem({ title: `${tag} mix-hidden`, journal: `Outside Mix ${tag}`, creator });
 
-  const authorId = visible.creators.find((c) => c.lastName === `Mixed-${tag}`)?.id
-    ?? visible.creators[0]?.id;
+  const authorId =
+    visible.creators.find((c) => c.lastName === `Mixed-${tag}`)?.id ?? visible.creators[0]?.id;
   const anon = await request(app).get(`/api/authors/${authorId}`).expect(200);
   assert.ok(anon.body.items.every((it) => it.key !== undefined));
   assert.ok(anon.body.items.some((it) => it.key === visible.key));
@@ -173,7 +188,10 @@ test('anonymous GET hides Basket journalArticle without DOI', async () => {
   const missing = await makeItem({ title: `${tag} doi-missing`, doi: null });
   const present = await makeItem({ title: `${tag} doi-present` });
 
-  const list = await request(app).get('/api/items').query({ search: tag, pageSize: 50 }).expect(200);
+  const list = await request(app)
+    .get('/api/items')
+    .query({ search: tag, pageSize: 50 })
+    .expect(200);
   const keys = list.body.items.map((it) => it.key);
   assert.ok(!keys.includes(missing.key));
   assert.ok(keys.includes(present.key));

@@ -65,17 +65,20 @@ export function LibraryView() {
     setFilter((prev) => (prev.year === urlYear ? prev : { ...prev, year: urlYear }));
   }, [searchParams]);
 
-  const onFilterChange = useCallback((next) => {
-    setFilter((prev) => ({ ...prev, ...next }));
-    if ('year' in next) {
-      const nextParams = new URLSearchParams(searchParams);
-      if (next.year) nextParams.set('year', String(next.year));
-      else nextParams.delete('year');
-      setSearchParams(nextParams, { replace: true });
-    }
-    setSelectedKey(null);
-    setDetailOpen(false);
-  }, [searchParams, setSearchParams]);
+  const onFilterChange = useCallback(
+    (next) => {
+      setFilter((prev) => ({ ...prev, ...next }));
+      if ('year' in next) {
+        const nextParams = new URLSearchParams(searchParams);
+        if (next.year) nextParams.set('year', String(next.year));
+        else nextParams.delete('year');
+        setSearchParams(nextParams, { replace: true });
+      }
+      setSelectedKey(null);
+      setDetailOpen(false);
+    },
+    [searchParams, setSearchParams],
+  );
 
   const onSearch = useCallback((search) => {
     setFilter((prev) => ({ ...prev, search: search || null }));
@@ -83,17 +86,25 @@ export function LibraryView() {
     setDetailOpen(false);
   }, []);
 
-  const onImported = useCallback((result) => {
-    toast.success(t('import.success', { title: result.parent?.fields?.title || t('import.unrecognized') }), {
-      description: t('import.type', { type: ITEM_TYPE_LABELS[result.parent?.itemType] || result.parent?.itemType || '—' }),
-    });
-    refreshItems();
-    refreshSidebar();
-    if (result.parent?.key) {
-      setSelectedKey(result.parent.key);
-      setDetailOpen(true);
-    }
-  }, [refreshItems, refreshSidebar, t]);
+  const onImported = useCallback(
+    (result) => {
+      toast.success(
+        t('import.success', { title: result.parent?.fields?.title || t('import.unrecognized') }),
+        {
+          description: t('import.type', {
+            type: ITEM_TYPE_LABELS[result.parent?.itemType] || result.parent?.itemType || '—',
+          }),
+        },
+      );
+      refreshItems();
+      refreshSidebar();
+      if (result.parent?.key) {
+        setSelectedKey(result.parent.key);
+        setDetailOpen(true);
+      }
+    },
+    [refreshItems, refreshSidebar, t],
+  );
 
   const onItemDeleted = useCallback(() => {
     setSelectedKey(null);
@@ -104,15 +115,18 @@ export function LibraryView() {
     toast.success(t('itemDeleted'));
   }, [refreshItems, refreshSidebar, t]);
 
-  const onSelect = useCallback((key) => {
-    if (key === selectedKey) return;
-    if (detailDirty) {
-      setConfirmSwitchTarget(key);
-      return;
-    }
-    setSelectedKey(key);
-    setDetailOpen(true);
-  }, [selectedKey, detailDirty]);
+  const onSelect = useCallback(
+    (key) => {
+      if (key === selectedKey) return;
+      if (detailDirty) {
+        setConfirmSwitchTarget(key);
+        return;
+      }
+      setSelectedKey(key);
+      setDetailOpen(true);
+    },
+    [selectedKey, detailDirty],
+  );
 
   const confirmSwitch = useCallback(() => {
     if (confirmSwitchTarget) {
@@ -179,7 +193,9 @@ export function LibraryView() {
         open={detailOpen && !!selectedKey}
         onClose={() => {
           if (detailDirty) {
-            toast.message(t('common:unsavedChangesToast'), { description: t('common:unsavedCloseDesc') });
+            toast.message(t('common:unsavedChangesToast'), {
+              description: t('common:unsavedCloseDesc'),
+            });
             return;
           }
           setDetailOpen(false);
@@ -194,17 +210,22 @@ export function LibraryView() {
         />
       </ItemDetailDialog>
 
-      <AlertDialog open={!!confirmSwitchTarget} onOpenChange={(open) => { if (!open) setConfirmSwitchTarget(null); }}>
+      <AlertDialog
+        open={!!confirmSwitchTarget}
+        onOpenChange={(open) => {
+          if (!open) setConfirmSwitchTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('common:unsavedSwitchTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('common:unsavedSwitchDesc')}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t('common:unsavedSwitchDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common:continueEditing')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSwitch}>{t('common:discardAndSwitch')}</AlertDialogAction>
+            <AlertDialogAction onClick={confirmSwitch}>
+              {t('common:discardAndSwitch')}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

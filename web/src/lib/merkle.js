@@ -53,9 +53,8 @@ export async function verifyDoiProofPath(doi, proof) {
   let currentHash = await sha256Hex(normalizeDoi(doi));
 
   for (const step of proof.path) {
-    const combined = step.siblingSide === 'left'
-      ? step.siblingHash + currentHash
-      : currentHash + step.siblingHash;
+    const combined =
+      step.siblingSide === 'left' ? step.siblingHash + currentHash : currentHash + step.siblingHash;
     const recomputed = await sha256Hex(combined);
     results.push({
       step: step.step,

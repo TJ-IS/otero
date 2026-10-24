@@ -18,9 +18,7 @@ crossrefRouter.post('/items/:key/crossref', async (req, res) => {
     res.json(result);
   } catch (err) {
     const msg = err.message || 'crossref enrich failed';
-    const status = /not found|未找到/i.test(msg) ? 404
-      : /没有 DOI|no DOI/i.test(msg) ? 400
-      : 400;
+    const status = /not found|未找到/i.test(msg) ? 404 : /没有 DOI|no DOI/i.test(msg) ? 400 : 400;
     res.status(status).json({ error: msg });
   }
 });

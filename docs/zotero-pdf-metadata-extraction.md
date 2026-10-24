@@ -24,13 +24,13 @@
 
 ## 阶段一：入口
 
-| 入口 | 文件 | 关键函数 |
-|------|------|----------|
-| 拖拽到条目树 | `chrome/content/zotero/collectionTree.jsx` | `onDrop()` → `Zotero.Attachments.importFromFile()` |
-| 文件 > 导入 | `chrome/content/zotero/fileInterface.js` | `importFile()` |
-| 右键"创建父条目" | `chrome/content/zotero/zoteroPane.js` | `createParentItemsFromSelected()` |
-| 右键"识别文献" | `chrome/content/zotero/zoteroPane.js` | `recognizeSelected()` |
-| 浏览器连接器 | `xpcom/server/server_connector.js` | `handle()` |
+| 入口             | 文件                                       | 关键函数                                           |
+| ---------------- | ------------------------------------------ | -------------------------------------------------- |
+| 拖拽到条目树     | `chrome/content/zotero/collectionTree.jsx` | `onDrop()` → `Zotero.Attachments.importFromFile()` |
+| 文件 > 导入      | `chrome/content/zotero/fileInterface.js`   | `importFile()`                                     |
+| 右键"创建父条目" | `chrome/content/zotero/zoteroPane.js`      | `createParentItemsFromSelected()`                  |
+| 右键"识别文献"   | `chrome/content/zotero/zoteroPane.js`      | `recognizeSelected()`                              |
+| 浏览器连接器     | `xpcom/server/server_connector.js`         | `handle()`                                         |
 
 创建附件后自动触发：
 
@@ -55,12 +55,12 @@ _recognizePDF(item)
 
 PDF Worker 提供的核心方法：
 
-| 方法 | Worker Action | 用途 |
-|------|--------------|------|
-| `getRecognizerData(itemID)` | `pdf.getRecognizerData` | 提取文本 + 元数据供 recognizer 服务 |
-| `getFullText(itemID, maxPages)` | `pdf.getFulltext` | 提取全文用于全文索引 |
-| `import(itemID)` | `pdf.importAnnotations` | 读取 PDF 内嵌批注 |
-| `export(itemID, path)` | `pdf.writeAnnotations` | 将批注写回 PDF |
+| 方法                            | Worker Action           | 用途                                |
+| ------------------------------- | ----------------------- | ----------------------------------- |
+| `getRecognizerData(itemID)`     | `pdf.getRecognizerData` | 提取文本 + 元数据供 recognizer 服务 |
+| `getFullText(itemID, maxPages)` | `pdf.getFulltext`       | 提取全文用于全文索引                |
+| `import(itemID)`                | `pdf.importAnnotations` | 读取 PDF 内嵌批注                   |
+| `export(itemID, path)`          | `pdf.writeAnnotations`  | 将批注写回 PDF                      |
 
 提取流程：
 
@@ -183,32 +183,32 @@ search.translate({ libraryID: false }); // 先不保存，仅获取数据
 
 ## 关键文件清单
 
-| 文件路径 | 作用 |
-|----------|------|
-| `chrome/content/zotero/xpcom/recognizeDocument.js` | **核心**：调度 PDF/EPUB 文本提取、调用 recognizer 服务、按标识符解析元数据 |
-| `chrome/content/zotero/xpcom/pdfWorker/manager.js` | PDF Worker 管理，与 document-worker 子模块通信 |
-| `chrome/content/zotero/xpcom/attachments.js` | 附件创建、文件管理、`_postProcessFile()` |
-| `chrome/content/zotero/xpcom/fulltext.js` | 全文索引：提取 PDF 全文、分词、缓存 |
-| `chrome/content/zotero/xpcom/retractions.js` | 撤回检测：DOI/PMID 匹配、用户提醒 |
-| `chrome/content/zotero/xpcom/translation/translators.js` | Translator 管理：加载和缓存 web translator |
-| `chrome/content/zotero/xpcom/translation/translate_item.js` | 翻译结果的条目保存器 |
-| `chrome/content/zotero/xpcom/translation/translate_firefox.js` | Firefox 特定 DOM 封装 |
-| `chrome/content/zotero/xpcom/data/item.js` | 条目模型：`isPDFAttachment()`、`setAutoAttachmentTitle()` |
-| `chrome/content/zotero/collectionTree.jsx` | 拖拽入口 |
-| `chrome/content/zotero/zoteroPane.js` | UI 入口：`recognizeSelected()`、`createParentItemsFromSelected()` |
-| `chrome/content/zotero/zotero.mjs` | 模块加载器 |
-| `defaults/preferences/zotero.js` | 默认配置：`autoRecognizeFiles`、`autoRenameFiles` 等 |
-| `document-worker/` (子模块) | PDF.js 解析器的 Worker 封装 |
-| `translators/` (子模块) | 760+ web translator |
+| 文件路径                                                       | 作用                                                                       |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `chrome/content/zotero/xpcom/recognizeDocument.js`             | **核心**：调度 PDF/EPUB 文本提取、调用 recognizer 服务、按标识符解析元数据 |
+| `chrome/content/zotero/xpcom/pdfWorker/manager.js`             | PDF Worker 管理，与 document-worker 子模块通信                             |
+| `chrome/content/zotero/xpcom/attachments.js`                   | 附件创建、文件管理、`_postProcessFile()`                                   |
+| `chrome/content/zotero/xpcom/fulltext.js`                      | 全文索引：提取 PDF 全文、分词、缓存                                        |
+| `chrome/content/zotero/xpcom/retractions.js`                   | 撤回检测：DOI/PMID 匹配、用户提醒                                          |
+| `chrome/content/zotero/xpcom/translation/translators.js`       | Translator 管理：加载和缓存 web translator                                 |
+| `chrome/content/zotero/xpcom/translation/translate_item.js`    | 翻译结果的条目保存器                                                       |
+| `chrome/content/zotero/xpcom/translation/translate_firefox.js` | Firefox 特定 DOM 封装                                                      |
+| `chrome/content/zotero/xpcom/data/item.js`                     | 条目模型：`isPDFAttachment()`、`setAutoAttachmentTitle()`                  |
+| `chrome/content/zotero/collectionTree.jsx`                     | 拖拽入口                                                                   |
+| `chrome/content/zotero/zoteroPane.js`                          | UI 入口：`recognizeSelected()`、`createParentItemsFromSelected()`          |
+| `chrome/content/zotero/zotero.mjs`                             | 模块加载器                                                                 |
+| `defaults/preferences/zotero.js`                               | 默认配置：`autoRecognizeFiles`、`autoRenameFiles` 等                       |
+| `document-worker/` (子模块)                                    | PDF.js 解析器的 Worker 封装                                                |
+| `translators/` (子模块)                                        | 760+ web translator                                                        |
 
 ---
 
 ## 配置项
 
-| 偏好设置 | 默认值 | 说明 |
-|----------|--------|------|
+| 偏好设置                               | 默认值 | 说明                          |
+| -------------------------------------- | ------ | ----------------------------- |
 | `extensions.zotero.autoRecognizeFiles` | `true` | 导入 PDF 时是否自动识别元数据 |
-| `extensions.zotero.autoRenameFiles` | — | 识别后是否自动重命名文件 |
+| `extensions.zotero.autoRenameFiles`    | —      | 识别后是否自动重命名文件      |
 
 ---
 
@@ -228,14 +228,14 @@ Otero 借鉴「本地抽文本 → 标识符 → 外部元数据源」的思路�
        └─ MinerU 批次 + fulltextWorker → Markdown / 图片写入同一存储后端
 ```
 
-| 步骤 | Otero 代码 |
-|------|------------|
-| 导入编排 | `src/services/importService.js` |
-| PDF 解析 | `src/services/pdfParser.js` |
-| 外部识别 | `src/services/recognizers/*` |
-| 字段映射 | `src/services/metadataMapper.js` |
-| 对象读写 | `src/services/storageService.js`、`s3Client.js` |
-| 全文 | `src/services/fulltextService.js`、`mineruService.js`、`fulltextWorker.js` |
-| 批量 DOI 入库 | `scripts/import-downloads-to-db.mjs` |
+| 步骤          | Otero 代码                                                                 |
+| ------------- | -------------------------------------------------------------------------- |
+| 导入编排      | `src/services/importService.js`                                            |
+| PDF 解析      | `src/services/pdfParser.js`                                                |
+| 外部识别      | `src/services/recognizers/*`                                               |
+| 字段映射      | `src/services/metadataMapper.js`                                           |
+| 对象读写      | `src/services/storageService.js`、`s3Client.js`                            |
+| 全文          | `src/services/fulltextService.js`、`mineruService.js`、`fulltextWorker.js` |
+| 批量 DOI 入库 | `scripts/import-downloads-to-db.mjs`                                       |
 
 可选增强（非 Zotero 路径）：`calibrateService` / `extractService` / `crossrefEnrichService` / `chatService` 用 LLM 或 Crossref 再补全。
