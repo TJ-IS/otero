@@ -74,8 +74,8 @@ test('open item export supports BibTeX and RIS and validates format', async () =
     .get(`/api/open/v1/items/${item.key}/export`)
     .query({ format: 'ris' })
     .expect(200);
-  assert.match(ris.text, /^TY  - JOUR/m);
-  assert.match(ris.text, /ER  -/);
+  assert.match(ris.text, /^TY {2}- JOUR/m);
+  assert.match(ris.text, /ER {2}-/);
 
   await request(app)
     .get(`/api/open/v1/items/${item.key}/export`)

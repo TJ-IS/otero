@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: otero_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d otero_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/otero_test
+      # The auth test demotes a freshly promoted admin and expects another
+      # admin to remain. Seeding one bootstrap editor keeps the suite
+      # deterministic on a brand-new CI database.
+      OTERO_EDITOR_WHITELIST: 0x0000000000000000000000000000000000000001
+      OTERO_AUTH_SECRET: ci-test-secret
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migrations
+        run: npm run migrate
+
+      - name: Seed schema
+        run: npm run seed
+
+      - name: Run tests
+        run: npm test
+
+  # Non-blocking on purpose: the existing codebase has not been cleaned up
+  # for lint yet, so a red status here should be visible without preventing
+  # merges. To make lint required later:
+  #   1. remove `continue-on-error: true` below;
+  #   2. rename the job to drop "(non-blocking)";
+  #   3. mark the "Lint" check as required in the repository branch protection.
+  lint:
+    name: Lint (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: web
+
+      # Run both linters even when one fails, then surface the combined
+      # status. Without this, a failing backend lint would skip the frontend.
+      - name: Lint backend and frontend
+        run: |
+          status=0
+          npm run lint || status=1
+          npm --prefix web run lint || status=1
+          exit $status
+
+  # Non-blocking for the same reason as lint: Prettier has not been run over
+  # the repository yet. Remove `continue-on-error: true` and rename the job
+  # once `npm run format` has been applied in a dedicated commit.
+  format-check:
+    name: Format check (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
