@@ -7,10 +7,14 @@ import { config } from '../src/config.js';
 import { importPdf } from '../src/services/importService.js';
 import { Item } from '../src/models/Item.js';
 import { Attachment } from '../src/models/Attachment.js';
+import { deleteStoredFile } from '../src/services/storageService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SAMPLE_PDF = path.join(__dirname, 'fixtures', 'sample.pdf');
-const createdKeys = [];
+// Tracked as { key, path }: Item.loadByKey() does not hydrate the
+// Attachment-only `path` column, so the stored path has to be captured from
+// the import result or it is lost by teardown time.
+const created = [];
 
 before(async () => {
   // Keep PDF import tests independent of local MinIO TLS settings.
@@ -19,8 +23,9 @@ before(async () => {
 });
 
 after(async () => {
-  for (const key of createdKeys.splice(0)) {
-    const it = await Item.loadByKey(key);
+  for (const entry of created.splice(0)) {
+    if (entry.path) await deleteStoredFile(entry.path);
+    const it = await Item.loadByKey(entry.key);
     if (it) await it.delete(true);
   }
   await closeDb();
@@ -29,13 +34,13 @@ after(async () => {
 test('importPdf extracts metadata from PDF Info dict (fallback path)', async () => {
   const r = await importPdf(SAMPLE_PDF, { skipRecognize: false });
   assert.ok(r.attachment, 'attachment should be created');
-  createdKeys.push(r.attachment.key);
+  created.push({ key: r.attachment.key, path: r.attachment.path });
   assert.equal(r.attachment.contentType, 'application/pdf');
   assert.match(r.attachment.path, /\.pdf$/);
 
   assert.equal(r.recognized.source, 'fallback');
   assert.ok(r.parent, 'parent item should be created');
-  createdKeys.push(r.parent.key);
+  created.push({ key: r.parent.key });
   assert.equal(r.parent.itemType, 'document');
 
   const reloaded = await Item.loadByKey(r.parent.key);
@@ -50,6 +55,6 @@ test('importPdf extracts metadata from PDF Info dict (fallback path)', async () 
 test('importPdf with skipRecognize creates only an attachment', async () => {
   const r = await importPdf(SAMPLE_PDF, { skipRecognize: true });
   assert.ok(r.attachment);
-  createdKeys.push(r.attachment.key);
+  created.push({ key: r.attachment.key, path: r.attachment.path });
   assert.equal(r.parent, null);
 });
