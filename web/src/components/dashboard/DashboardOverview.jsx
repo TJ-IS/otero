@@ -1,17 +1,24 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { FileText, Users, BookMarked, Link2, Paperclip, Hash } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { ITEM_TYPE_LABELS } from '@/lib/items';
-import {
-  colorForItemType, colorForFulltextState, FULLTEXT_STATE_LABELS,
-} from '@/lib/chartColors';
+import { colorForItemType, colorForFulltextState, FULLTEXT_STATE_LABELS } from '@/lib/chartColors';
 import { DoiCoverageVenn } from '@/components/dashboard/DoiCoverageVenn';
 import { StatTile } from '@/components/ui/stat-tile';
 import { ChartTooltip } from '@/components/ui/chart-tooltip';
@@ -26,25 +33,39 @@ function shortHash(hash) {
 
 export function DashboardOverview() {
   const { t } = useTranslation(['dashboard', 'common']);
-  const { data: overview, error: overviewError, loading: overviewLoading } = useAsync(() => api.getStatsOverview(), []);
-  const { data: itemTypes, loading: itemTypesLoading } = useAsync(() => api.getStatsItemTypes(), []);
+  const {
+    data: overview,
+    error: overviewError,
+    loading: overviewLoading,
+  } = useAsync(() => api.getStatsOverview(), []);
+  const { data: itemTypes, loading: itemTypesLoading } = useAsync(
+    () => api.getStatsItemTypes(),
+    [],
+  );
   const { data: fulltext, loading: fulltextLoading } = useAsync(() => api.getStatsFulltext(), []);
-  const { data: coverage, loading: coverageLoading } = useAsync(() => api.getStatsDoiCoverage(), []);
+  const { data: coverage, loading: coverageLoading } = useAsync(
+    () => api.getStatsDoiCoverage(),
+    [],
+  );
   const { data: merkleRoot } = useAsync(() => api.getMerkleRoot(), []);
 
-  const itemTypeData = useMemo(() => (itemTypes || []).map(row => ({
-    itemType: row.itemType,
-    label: ITEM_TYPE_LABELS[row.itemType] || row.itemType,
-    count: row.count,
-    color: colorForItemType(row.itemType),
-  })), [itemTypes]);
+  const itemTypeData = useMemo(
+    () =>
+      (itemTypes || []).map((row) => ({
+        itemType: row.itemType,
+        label: ITEM_TYPE_LABELS[row.itemType] || row.itemType,
+        count: row.count,
+        color: colorForItemType(row.itemType),
+      })),
+    [itemTypes],
+  );
 
   const fulltextData = useMemo(() => {
     if (!fulltext) return [];
     const order = ['done', 'running', 'converting', 'pending', 'submitting', 'idle', 'failed'];
     return order
-      .filter(state => fulltext[state] != null)
-      .map(state => ({
+      .filter((state) => fulltext[state] != null)
+      .map((state) => ({
         state,
         label: FULLTEXT_STATE_LABELS[state] || state,
         count: fulltext[state],
@@ -54,9 +75,10 @@ export function DashboardOverview() {
 
   const failedCount = fulltext?.failed || 0;
 
-  const fulltextDoneRatio = overview && fulltext
-    ? Math.round(((fulltext.done || 0) / Math.max(1, overview.totalItems)) * 100)
-    : null;
+  const fulltextDoneRatio =
+    overview && fulltext
+      ? Math.round(((fulltext.done || 0) / Math.max(1, overview.totalItems)) * 100)
+      : null;
 
   return (
     <div className="mx-auto w-full max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
@@ -68,9 +90,21 @@ export function DashboardOverview() {
 
       {overview && (
         <div className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatTile icon={<FileText className="size-4" />} label={t('overview.totalItems')} value={overview.totalItems} />
-          <StatTile icon={<BookMarked className="size-4" />} label={t('overview.journalCount')} value={overview.journalCount} />
-          <StatTile icon={<Users className="size-4" />} label={t('overview.totalCreators')} value={overview.totalCreators} />
+          <StatTile
+            icon={<FileText className="size-4" />}
+            label={t('overview.totalItems')}
+            value={overview.totalItems}
+          />
+          <StatTile
+            icon={<BookMarked className="size-4" />}
+            label={t('overview.journalCount')}
+            value={overview.journalCount}
+          />
+          <StatTile
+            icon={<Users className="size-4" />}
+            label={t('overview.totalCreators')}
+            value={overview.totalCreators}
+          />
           <StatTile
             icon={<Link2 className="size-4" />}
             label={t('overview.withDoi')}
@@ -81,14 +115,20 @@ export function DashboardOverview() {
             icon={<Paperclip className="size-4" />}
             label={t('overview.withFulltext')}
             value={overview.withAttachment}
-            sub={fulltextDoneRatio != null ? t('overview.parseDonePct', { pct: fulltextDoneRatio }) : undefined}
+            sub={
+              fulltextDoneRatio != null
+                ? t('overview.parseDonePct', { pct: fulltextDoneRatio })
+                : undefined
+            }
           />
           <StatTile
             icon={<Hash className="size-4" />}
             label="Merkle Root"
             value={merkleRoot ? shortHash(merkleRoot.root) : '—'}
             valueTitle={merkleRoot?.root}
-            sub={merkleRoot ? t('overview.merkleLeaves', { count: merkleRoot.leafCount }) : undefined}
+            sub={
+              merkleRoot ? t('overview.merkleLeaves', { count: merkleRoot.leafCount }) : undefined
+            }
             mono
           />
         </div>
@@ -97,9 +137,7 @@ export function DashboardOverview() {
       <Card>
         <CardHeader>
           <CardTitle>{t('overview.coverageTitle')}</CardTitle>
-          <CardDescription>
-            {t('overview.coverageDesc')}
-          </CardDescription>
+          <CardDescription>{t('overview.coverageDesc')}</CardDescription>
         </CardHeader>
         <CardContent>
           {coverageLoading ? (
@@ -159,7 +197,7 @@ export function DashboardOverview() {
                 {/* Accessible table fallback for the pie chart */}
                 <table className="mt-2 w-full text-xs text-muted-foreground sm:hidden">
                   <tbody>
-                    {itemTypeData.map(d => (
+                    {itemTypeData.map((d) => (
                       <tr key={d.itemType} className="border-b last:border-0">
                         <td className="py-1">{d.label}</td>
                         <td className="py-1 text-right tabular-nums">{d.count}</td>
@@ -177,7 +215,11 @@ export function DashboardOverview() {
             <CardTitle>{t('overview.fulltextTitle')}</CardTitle>
             <CardDescription>
               {t('overview.fulltextDesc')}
-              {failedCount > 0 && <span className="ml-1">{t('overview.fulltextFailed429', { count: failedCount })}</span>}
+              {failedCount > 0 && (
+                <span className="ml-1">
+                  {t('overview.fulltextFailed429', { count: failedCount })}
+                </span>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -188,8 +230,16 @@ export function DashboardOverview() {
             ) : (
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={fulltextData} layout="vertical" margin={{ left: 16, right: 16 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} allowDecimals={false} />
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                    horizontal={false}
+                  />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                    allowDecimals={false}
+                  />
                   <YAxis
                     type="category"
                     dataKey="label"

@@ -10,7 +10,11 @@ const projectRoot = path.resolve(__dirname, '..');
 function loadDotEnv() {
   const envPath = path.join(projectRoot, '.env');
   let txt;
-  try { txt = fs.readFileSync(envPath, 'utf8'); } catch { return; }
+  try {
+    txt = fs.readFileSync(envPath, 'utf8');
+  } catch {
+    return;
+  }
   for (const raw of txt.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
@@ -161,7 +165,7 @@ export const config = {
     pdfSigningSecret: process.env.OTERO_PDF_SIGNING_SECRET || '',
     editorWhitelist: (process.env.OTERO_EDITOR_WHITELIST || '')
       .split(',')
-      .map(a => a.trim().toLowerCase())
+      .map((a) => a.trim().toLowerCase())
       .filter(Boolean),
     jwtTtlSec: Number(process.env.OTERO_AUTH_JWT_TTL_SEC ?? 60 * 60 * 24 * 7),
     nonceTtlSec: Number(process.env.OTERO_AUTH_NONCE_TTL_SEC ?? 300),

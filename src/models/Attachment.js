@@ -2,7 +2,9 @@ import { Item } from './Item.js';
 import { generateKey } from '../utils/key.js';
 import { execute, withTransaction } from '../db/connection.js';
 import {
-  insertAttachment, getAttachment, getAttachmentsByParent,
+  insertAttachment,
+  getAttachment,
+  getAttachmentsByParent,
 } from '../repositories/itemRepo.js';
 
 export const LinkMode = {
@@ -24,13 +26,25 @@ export class Attachment extends Item {
     this._mtime = opts.mtime ?? null;
   }
 
-  get linkMode() { return this._linkMode; }
-  get contentType() { return this._contentType; }
-  get path() { return this._path; }
-  get md5() { return this._md5; }
-  get mtime() { return this._mtime; }
+  get linkMode() {
+    return this._linkMode;
+  }
+  get contentType() {
+    return this._contentType;
+  }
+  get path() {
+    return this._path;
+  }
+  get md5() {
+    return this._md5;
+  }
+  get mtime() {
+    return this._mtime;
+  }
 
-  isPdf() { return this._contentType === 'application/pdf'; }
+  isPdf() {
+    return this._contentType === 'application/pdf';
+  }
 
   async save() {
     if (this._itemTypeID == null) {
@@ -40,25 +54,38 @@ export class Attachment extends Item {
     await withTransaction(async (client) => {
       const existing = await getAttachment(this._id);
       if (existing) {
-        await execute(`
+        await execute(
+          `
           UPDATE "itemAttachments"
           SET "parentItemID"=$1, "linkMode"=$2, "contentType"=$3, charset=$4, path=$5, md5=$6, mtime=$7
           WHERE "itemID"=$8
-        `, [
-          this._parentItemID, this._linkMode, this._contentType, this._charset,
-          this._path, this._md5, this._mtime == null ? null : Math.round(Number(this._mtime)), this._id,
-        ], client);
+        `,
+          [
+            this._parentItemID,
+            this._linkMode,
+            this._contentType,
+            this._charset,
+            this._path,
+            this._md5,
+            this._mtime == null ? null : Math.round(Number(this._mtime)),
+            this._id,
+          ],
+          client,
+        );
       } else {
-        await insertAttachment({
-          itemId: this._id,
-          parentItemId: this._parentItemID,
-          linkMode: this._linkMode,
-          contentType: this._contentType,
-          charset: this._charset,
-          path: this._path,
-          md5: this._md5,
-          mtime: this._mtime,
-        }, client);
+        await insertAttachment(
+          {
+            itemId: this._id,
+            parentItemId: this._parentItemID,
+            linkMode: this._linkMode,
+            contentType: this._contentType,
+            charset: this._charset,
+            path: this._path,
+            md5: this._md5,
+            mtime: this._mtime,
+          },
+          client,
+        );
       }
     });
     return this;
@@ -108,7 +135,11 @@ export class Attachment extends Item {
 }
 
 export async function createPdfAttachment({
-  parentItemID, storedPath, md5, mtime, contentType = 'application/pdf',
+  parentItemID,
+  storedPath,
+  md5,
+  mtime,
+  contentType = 'application/pdf',
 }) {
   const att = new Attachment({
     itemTypeID: null,

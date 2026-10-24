@@ -1,10 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  JOURNAL_WHITELIST,
-  UNFILED,
-  classifyJournal,
-} from '../src/services/journalWhitelist.js';
+import { JOURNAL_WHITELIST, UNFILED, classifyJournal } from '../src/services/journalWhitelist.js';
 import {
   AIS_BASKET_JOURNALS,
   UNFILED as WEB_UNFILED,
@@ -37,7 +33,10 @@ test('frontend AIS_BASKET_JOURNALS matches backend JOURNAL_WHITELIST', () => {
 });
 
 test('journal meta covers the whitelist and stays in sync across frontend and backend', () => {
-  assert.deepEqual(JOURNAL_META.map((j) => j.name), JOURNAL_WHITELIST);
+  assert.deepEqual(
+    JOURNAL_META.map((j) => j.name),
+    JOURNAL_WHITELIST,
+  );
   assert.deepEqual(WEB_JOURNAL_META, JOURNAL_META);
   for (const journal of JOURNAL_META) {
     assert.ok(journal.abbr, `missing abbr for ${journal.name}`);
@@ -60,13 +59,21 @@ test('classifyJournal maps whitelisted titles through and everything else to UNF
 });
 
 test('normalizeCalibrationFields enforces the AIS basket + DOI rules', () => {
-  const allowedSet = new Set([
-    'title', 'publicationTitle', 'DOI', 'date', 'abstractNote',
-  ]);
+  const allowedSet = new Set(['title', 'publicationTitle', 'DOI', 'date', 'abstractNote']);
 
   // 1. Suggested publicationTitle outside the basket -> reverted to current.
   const out1 = normalizeCalibrationFields(
-    { fields: [{ field: 'publicationTitle', current: 'MIS Quarterly', suggested: 'Nature', status: 'incorrect', confidence: 0.9 }] },
+    {
+      fields: [
+        {
+          field: 'publicationTitle',
+          current: 'MIS Quarterly',
+          suggested: 'Nature',
+          status: 'incorrect',
+          confidence: 0.9,
+        },
+      ],
+    },
     { allowedSet, doiMissing: false },
   );
   assert.equal(out1.length, 1);
@@ -75,7 +82,17 @@ test('normalizeCalibrationFields enforces the AIS basket + DOI rules', () => {
 
   // 2. No DOI -> publicationTitle forced to UNFILED regardless of suggestion.
   const out2 = normalizeCalibrationFields(
-    { fields: [{ field: 'publicationTitle', current: '', suggested: 'MIS Quarterly', status: 'missing', confidence: 0.8 }] },
+    {
+      fields: [
+        {
+          field: 'publicationTitle',
+          current: '',
+          suggested: 'MIS Quarterly',
+          status: 'missing',
+          confidence: 0.8,
+        },
+      ],
+    },
     { allowedSet, doiMissing: true },
   );
   assert.equal(out2[0].suggested, UNFILED);
@@ -83,7 +100,17 @@ test('normalizeCalibrationFields enforces the AIS basket + DOI rules', () => {
 
   // 3. No DOI + already UNFILED -> stays correct.
   const out3 = normalizeCalibrationFields(
-    { fields: [{ field: 'publicationTitle', current: UNFILED, suggested: UNFILED, status: 'correct', confidence: 1 }] },
+    {
+      fields: [
+        {
+          field: 'publicationTitle',
+          current: UNFILED,
+          suggested: UNFILED,
+          status: 'correct',
+          confidence: 1,
+        },
+      ],
+    },
     { allowedSet, doiMissing: true },
   );
   assert.equal(out3[0].suggested, UNFILED);
@@ -91,21 +118,38 @@ test('normalizeCalibrationFields enforces the AIS basket + DOI rules', () => {
 
   // 4. Field not in allowedSet is dropped (LLM must not invent field names).
   const out4 = normalizeCalibrationFields(
-    { fields: [{ field: 'journal', current: '', suggested: 'MIS Quarterly', status: 'missing', confidence: 1 }] },
+    {
+      fields: [
+        {
+          field: 'journal',
+          current: '',
+          suggested: 'MIS Quarterly',
+          status: 'missing',
+          confidence: 1,
+        },
+      ],
+    },
     { allowedSet, doiMissing: false },
   );
   assert.equal(out4.length, 0);
 
   // 5. Non-publicationTitle fields pass through untouched.
   const out5 = normalizeCalibrationFields(
-    { fields: [{ field: 'date', current: '2020', suggested: '2021', status: 'incorrect', confidence: 0.7 }] },
+    {
+      fields: [
+        { field: 'date', current: '2020', suggested: '2021', status: 'incorrect', confidence: 0.7 },
+      ],
+    },
     { allowedSet, doiMissing: false },
   );
   assert.equal(out5[0].suggested, '2021');
 
   // 6. Missing/empty parsed.fields -> [].
   assert.deepEqual(normalizeCalibrationFields({}, { allowedSet, doiMissing: false }), []);
-  assert.deepEqual(normalizeCalibrationFields({ fields: null }, { allowedSet, doiMissing: false }), []);
+  assert.deepEqual(
+    normalizeCalibrationFields({ fields: null }, { allowedSet, doiMissing: false }),
+    [],
+  );
 });
 
 test('mapRecognized decodes HTML entities from CrossRef container-title and title', () => {
@@ -113,7 +157,7 @@ test('mapRecognized decodes HTML entities from CrossRef container-title and titl
     source: 'crossref',
     raw: {
       'container-title': ['Information &amp; Management'],
-      'title': ['Foo &amp; Bar: A &lt;Study&gt;'],
+      title: ['Foo &amp; Bar: A &lt;Study&gt;'],
       DOI: '10.1234/xyz',
       issued: { 'date-parts': [[2021]] },
     },

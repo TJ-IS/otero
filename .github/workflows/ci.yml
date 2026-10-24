@@ -38,7 +38,7 @@ jobs:
       # The auth test demotes a freshly promoted admin and expects another
       # admin to remain. Seeding one bootstrap editor keeps the suite
       # deterministic on a brand-new CI database.
-      OTERO_EDITOR_WHITELIST: "0x0000000000000000000000000000000000000001"
+      OTERO_EDITOR_WHITELIST: '0x0000000000000000000000000000000000000001'
       OTERO_AUTH_SECRET: ci-test-secret
 
     steps:

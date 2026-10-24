@@ -29,14 +29,22 @@ export function JournalsPage() {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground">
       <SiteHeader />
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-page px-4 pb-20 pt-10 sm:px-6 sm:pt-14 lg:px-8">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-page px-4 pb-20 pt-10 sm:px-6 sm:pt-14 lg:px-8"
+      >
         <header className="max-w-3xl border-b border-border pb-10">
           <p className="mb-4 text-xs font-medium text-brand">{t('eyebrow')}</p>
           <h1 className="font-display text-4xl font-semibold leading-[1.08] text-balance sm:text-5xl">
             {t('title')}
           </h1>
-          <p className="mt-5 max-w-[62ch] text-base leading-relaxed text-foreground/80 sm:text-lg">{t('lead')}</p>
-          <p className="mt-4 max-w-[62ch] text-sm leading-relaxed text-muted-foreground">{t('why')}</p>
+          <p className="mt-5 max-w-[62ch] text-base leading-relaxed text-foreground/80 sm:text-lg">
+            {t('lead')}
+          </p>
+          <p className="mt-4 max-w-[62ch] text-sm leading-relaxed text-muted-foreground">
+            {t('why')}
+          </p>
         </header>
 
         {error && !data ? (
@@ -50,7 +58,10 @@ export function JournalsPage() {
             const count = counts.get(journal.name);
             const libraryTo = `/library?journal=${encodeURIComponent(journal.name)}`;
             return (
-              <li key={journal.name} className="grid gap-3 py-6 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto] sm:items-baseline sm:gap-6">
+              <li
+                key={journal.name}
+                className="grid gap-3 py-6 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto] sm:items-baseline sm:gap-6"
+              >
                 <span className="font-mono text-xs tabular-nums text-muted-foreground">
                   {String(index + 1).padStart(2, '0')}
                 </span>
@@ -88,11 +99,13 @@ export function JournalsPage() {
                   </div>
                 </div>
                 <p className="text-sm tabular-nums text-muted-foreground sm:text-right">
-                  {loading && count == null
-                    ? <Skeleton className="inline-block h-4 w-24" />
-                    : count == null
-                      ? t('countUnknown')
-                      : t('countLabel', { count: Number(count).toLocaleString() })}
+                  {loading && count == null ? (
+                    <Skeleton className="inline-block h-4 w-24" />
+                  ) : count == null ? (
+                    t('countUnknown')
+                  ) : (
+                    t('countLabel', { count: Number(count).toLocaleString() })
+                  )}
                 </p>
               </li>
             );

@@ -1,15 +1,19 @@
 import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Checkbox } from './ui/checkbox';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import {
-  Wand2, Loader2, CheckCircle2, AlertCircle,
-  ChevronRight, ChevronDown, Copy, Check,
+  Wand2,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  ChevronRight,
+  ChevronDown,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 const STATUS_VARIANTS = {
@@ -47,7 +51,9 @@ function DebugBlock({ label, content, copied, onCopy }) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+        <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
         <Button
           size="sm"
           variant="ghost"
@@ -89,7 +95,9 @@ function FieldRow({ field, checked, onToggle }) {
           <span className="text-sm font-medium">{fieldLabel}</span>
           <StatusBadge status={field.status} />
           {pct != null && (
-            <span className="text-xs text-muted-foreground tabular-nums">{t('calibrate.confidencePct', { pct })}</span>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {t('calibrate.confidencePct', { pct })}
+            </span>
           )}
         </div>
         <div className="mt-1 space-y-0.5 text-xs">
@@ -100,12 +108,14 @@ function FieldRow({ field, checked, onToggle }) {
           {changed && (
             <div className="text-foreground">
               <span className="text-muted-foreground/80">{t('calibrate.suggested')}</span>
-              <span className="break-all font-medium">{field.suggested || <em className="text-muted-foreground">{t('calibrate.clearValue')}</em>}</span>
+              <span className="break-all font-medium">
+                {field.suggested || (
+                  <em className="text-muted-foreground">{t('calibrate.clearValue')}</em>
+                )}
+              </span>
             </div>
           )}
-          {field.reason && (
-            <div className="text-muted-foreground italic">{field.reason}</div>
-          )}
+          {field.reason && <div className="text-muted-foreground italic">{field.reason}</div>}
         </div>
       </div>
     </label>
@@ -138,16 +148,22 @@ function CreatorRow({ creator, checked, onToggle }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-medium">
             {t('calibrate.authorN', { n: (creator.index ?? 0) + 1 })}
-            <span className="text-muted-foreground font-normal"> · {cur.creatorType || 'author'}</span>
+            <span className="text-muted-foreground font-normal">
+              {' '}
+              · {cur.creatorType || 'author'}
+            </span>
           </span>
           <StatusBadge status={creator.status} />
           {pct != null && (
-            <span className="text-xs text-muted-foreground tabular-nums">{t('calibrate.confidencePct', { pct })}</span>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {t('calibrate.confidencePct', { pct })}
+            </span>
           )}
         </div>
         <div className="mt-1 space-y-0.5 text-xs">
           <div className="text-muted-foreground">
-            <span className="text-muted-foreground/80">{t('calibrate.current')}</span>{curName}
+            <span className="text-muted-foreground/80">{t('calibrate.current')}</span>
+            {curName}
           </div>
           {changed && (
             <div className="text-foreground">
@@ -163,7 +179,12 @@ function CreatorRow({ creator, checked, onToggle }) {
 }
 
 export const CalibratePanel = memo(function CalibratePanel({
-  open, onOpenChange, result, loading, error, onApply,
+  open,
+  onOpenChange,
+  result,
+  loading,
+  error,
+  onApply,
 }) {
   const { t } = useTranslation(['item', 'common']);
   const [fieldSel, setFieldSel] = useState({});
@@ -176,21 +197,25 @@ export const CalibratePanel = memo(function CalibratePanel({
       await navigator.clipboard.writeText(text || '');
       setCopiedKey(key);
       toast.success(t('common:copied'));
-      setTimeout(() => setCopiedKey(k => (k === key ? null : k)), 1500);
+      setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500);
     } catch {
       toast.error(t('common:copyFailed'));
     }
   };
 
   useEffect(() => {
-    if (!result) { setFieldSel({}); setCreatorSel({}); return; }
+    if (!result) {
+      setFieldSel({});
+      setCreatorSel({});
+      return;
+    }
     const fs = {};
-    (result.fields || []).forEach(f => {
+    (result.fields || []).forEach((f) => {
       const changed = f.suggested !== f.current && f.status !== 'correct';
       fs[f.field] = changed;
     });
     const cs = {};
-    (result.creators || []).forEach(c => {
+    (result.creators || []).forEach((c) => {
       const cur = c.current || {};
       const sug = c.suggested || {};
       const curName = [cur.lastName, cur.firstName].filter(Boolean).join(', ');
@@ -202,15 +227,20 @@ export const CalibratePanel = memo(function CalibratePanel({
   }, [result]);
 
   const changeableFields = useMemo(
-    () => (result?.fields || []).filter(f => f.suggested !== f.current && f.status !== 'correct'),
-    [result]
+    () => (result?.fields || []).filter((f) => f.suggested !== f.current && f.status !== 'correct'),
+    [result],
   );
   const changeableCreators = useMemo(
-    () => (result?.creators || []).filter(c => {
-      const cur = c.current || {}; const sug = c.suggested || {};
-      return [cur.lastName, cur.firstName].join(',') !== [sug.lastName, sug.firstName].join(',') && c.status !== 'correct';
-    }),
-    [result]
+    () =>
+      (result?.creators || []).filter((c) => {
+        const cur = c.current || {};
+        const sug = c.suggested || {};
+        return (
+          [cur.lastName, cur.firstName].join(',') !== [sug.lastName, sug.firstName].join(',') &&
+          c.status !== 'correct'
+        );
+      }),
+    [result],
   );
 
   const selectedFieldCount = Object.values(fieldSel).filter(Boolean).length;
@@ -218,20 +248,26 @@ export const CalibratePanel = memo(function CalibratePanel({
   const totalSelected = selectedFieldCount + selectedCreatorCount;
 
   const selectAll = () => {
-    const fs = {}; changeableFields.forEach(f => fs[f.field] = true);
-    const cs = {}; changeableCreators.forEach(c => cs[String(c.index ?? 0)] = true);
-    setFieldSel(fs); setCreatorSel(cs);
+    const fs = {};
+    changeableFields.forEach((f) => (fs[f.field] = true));
+    const cs = {};
+    changeableCreators.forEach((c) => (cs[String(c.index ?? 0)] = true));
+    setFieldSel(fs);
+    setCreatorSel(cs);
   };
-  const selectNone = () => { setFieldSel({}); setCreatorSel({}); };
+  const selectNone = () => {
+    setFieldSel({});
+    setCreatorSel({});
+  };
 
   const handleApply = () => {
     const acceptedFields = {};
-    (result?.fields || []).forEach(f => {
+    (result?.fields || []).forEach((f) => {
       if (fieldSel[f.field]) acceptedFields[f.field] = f.suggested ?? '';
     });
     const acceptedCreators = (result?.creators || [])
-      .filter(c => creatorSel[String(c.index ?? 0)])
-      .map(c => ({
+      .filter((c) => creatorSel[String(c.index ?? 0)])
+      .map((c) => ({
         firstName: c.suggested?.firstName || '',
         lastName: c.suggested?.lastName || '',
         creatorType: c.suggested?.creatorType || c.current?.creatorType || 'author',
@@ -281,46 +317,72 @@ export const CalibratePanel = memo(function CalibratePanel({
           <div className="flex h-40 flex-col items-center justify-center gap-3 text-center">
             <AlertCircle className="size-5 text-destructive" />
             <span className="text-sm text-destructive">{error}</span>
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>{t('common:close')}</Button>
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              {t('common:close')}
+            </Button>
           </div>
         ) : result ? (
           <>
             <div className="flex items-center justify-between px-6 py-2 border-b">
               <div className="text-xs text-muted-foreground">
-                {t('calibrate.fieldSummary', { total: fieldTotal, changes: changeableFields.length })}
+                {t('calibrate.fieldSummary', {
+                  total: fieldTotal,
+                  changes: changeableFields.length,
+                })}
                 {creatorTotal > 0 && (
-                  <> {t('calibrate.creatorSummary', { total: creatorTotal, changes: changeableCreators.length })}</>
+                  <>
+                    {' '}
+                    {t('calibrate.creatorSummary', {
+                      total: creatorTotal,
+                      changes: changeableCreators.length,
+                    })}
+                  </>
                 )}
               </div>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={selectAll}>{t('calibrate.selectAll')}</Button>
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={selectNone}>{t('calibrate.clear')}</Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={selectAll}>
+                  {t('calibrate.selectAll')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs text-muted-foreground"
+                  onClick={selectNone}
+                >
+                  {t('calibrate.clear')}
+                </Button>
               </div>
             </div>
 
             <div className="flex-1 overflow-auto px-6 py-3">
-              <h3 className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('calibrate.fields')}</h3>
+              <h3 className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {t('calibrate.fields')}
+              </h3>
               <div className="divide-y">
-                {(result.fields || []).map(f => (
+                {(result.fields || []).map((f) => (
                   <FieldRow
                     key={f.field}
                     field={f}
                     checked={!!fieldSel[f.field]}
-                    onToggle={v => setFieldSel(s => ({ ...s, [f.field]: !!v }))}
+                    onToggle={(v) => setFieldSel((s) => ({ ...s, [f.field]: !!v }))}
                   />
                 ))}
               </div>
 
               {result.creators && result.creators.length > 0 && (
                 <>
-                  <h3 className="mb-1 mt-5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('calibrate.authors')}</h3>
+                  <h3 className="mb-1 mt-5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {t('calibrate.authors')}
+                  </h3>
                   <div className="divide-y">
                     {result.creators.map((c, i) => (
                       <CreatorRow
                         key={i}
                         creator={c}
                         checked={!!creatorSel[String(c.index ?? i)]}
-                        onToggle={v => setCreatorSel(s => ({ ...s, [String(c.index ?? i)]: !!v }))}
+                        onToggle={(v) =>
+                          setCreatorSel((s) => ({ ...s, [String(c.index ?? i)]: !!v }))
+                        }
                       />
                     ))}
                   </div>
@@ -332,27 +394,30 @@ export const CalibratePanel = memo(function CalibratePanel({
               <div className="max-h-[40vh] overflow-auto border-t bg-muted/30 px-6 py-3 space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">
-                    {t('calibrate.model')} <span className="font-mono text-foreground">{result.debug.model}</span>
-                    {t('calibrate.markdownChars', { count: result.debug.markdownChars?.toLocaleString() ?? 0 })}
+                    {t('calibrate.model')}{' '}
+                    <span className="font-mono text-foreground">{result.debug.model}</span>
+                    {t('calibrate.markdownChars', {
+                      count: result.debug.markdownChars?.toLocaleString() ?? 0,
+                    })}
                   </span>
                 </div>
                 <DebugBlock
                   label={t('calibrate.systemPrompt')}
                   content={result.debug.systemPrompt}
                   copied={copiedKey === 'system'}
-                  onCopy={text => copyDebug('system', text)}
+                  onCopy={(text) => copyDebug('system', text)}
                 />
                 <DebugBlock
                   label={t('calibrate.userPrompt')}
                   content={result.debug.userPrompt}
                   copied={copiedKey === 'user'}
-                  onCopy={text => copyDebug('user', text)}
+                  onCopy={(text) => copyDebug('user', text)}
                 />
                 <DebugBlock
                   label={t('calibrate.rawResponse')}
                   content={result.debug.rawResponse}
                   copied={copiedKey === 'raw'}
-                  onCopy={text => copyDebug('raw', text)}
+                  onCopy={(text) => copyDebug('raw', text)}
                 />
               </div>
             )}
@@ -364,9 +429,13 @@ export const CalibratePanel = memo(function CalibratePanel({
                     size="sm"
                     variant="ghost"
                     className="h-7 px-2 text-xs text-muted-foreground"
-                    onClick={() => setDebugOpen(o => !o)}
+                    onClick={() => setDebugOpen((o) => !o)}
                   >
-                    {debugOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                    {debugOpen ? (
+                      <ChevronDown className="size-3.5" />
+                    ) : (
+                      <ChevronRight className="size-3.5" />
+                    )}
                     {t('calibrate.io')}
                   </Button>
                 )}
@@ -375,7 +444,9 @@ export const CalibratePanel = memo(function CalibratePanel({
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>{t('common:cancel')}</Button>
+                <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                  {t('common:cancel')}
+                </Button>
                 <Button size="sm" onClick={handleApply} disabled={totalSelected === 0}>
                   <CheckCircle2 className="size-3.5" />
                   {t('calibrate.applyDraft', { count: totalSelected })}
@@ -384,7 +455,9 @@ export const CalibratePanel = memo(function CalibratePanel({
             </div>
           </>
         ) : (
-          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">{t('calibrate.noResult')}</div>
+          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+            {t('calibrate.noResult')}
+          </div>
         )}
       </DialogContent>
     </Dialog>

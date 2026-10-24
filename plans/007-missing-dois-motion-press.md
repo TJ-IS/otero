@@ -12,7 +12,8 @@ Copyable DOI rows use ungated `active:scale-[0.99]`. Touch devices can get stick
 
 ```jsx
 /* web/src/components/dashboard/MissingDoisModal.jsx:154 — current */
-className="group absolute left-0 flex w-full items-center justify-between gap-3 px-3 text-left font-mono text-xs transition-colors hover:bg-muted/60 active:scale-[0.99]"
+className =
+  'group absolute left-0 flex w-full items-center justify-between gap-3 px-3 text-left font-mono text-xs transition-colors hover:bg-muted/60 active:scale-[0.99]';
 ```
 
 ## Target
@@ -21,7 +22,8 @@ Replace `active:scale-[0.99]` with `motion-press` (keeps `transition-colors hove
 
 ```jsx
 /* target */
-className="motion-press group absolute left-0 flex w-full items-center justify-between gap-3 px-3 text-left font-mono text-xs transition-colors hover:bg-muted/60"
+className =
+  'motion-press group absolute left-0 flex w-full items-center justify-between gap-3 px-3 text-left font-mono text-xs transition-colors hover:bg-muted/60';
 ```
 
 Existing utility (do not redefine):
@@ -30,7 +32,9 @@ Existing utility (do not redefine):
 /* web/src/index.css:89-96 */
 @media (hover: hover) and (pointer: fine) {
   .motion-press {
-    transition: transform var(--motion-duration-press) var(--motion-ease-out), ...;
+    transition:
+      transform var(--motion-duration-press) var(--motion-ease-out),
+      ...;
   }
   .motion-press:active {
     transform: scale(0.97);

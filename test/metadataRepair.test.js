@@ -55,16 +55,22 @@ test('shouldReplaceCreators detects empty, Wiley names, and-prefix, and fragment
   assert.equal(shouldReplaceCreators([{ firstName: '', lastName: 'Jene' }]), true);
   assert.equal(shouldReplaceCreators([{ firstName: 'wendy', lastName: '' }]), false);
   assert.equal(shouldReplaceCreators([{ firstName: '', lastName: 'wendy' }]), true);
-  assert.equal(shouldReplaceCreators([{ firstName: 'and Jonathan D.', lastName: 'Wareham' }]), true);
+  assert.equal(
+    shouldReplaceCreators([{ firstName: 'and Jonathan D.', lastName: 'Wareham' }]),
+    true,
+  );
   assert.equal(shouldReplaceCreators([{ firstName: '', lastName: 'and' }]), true);
   assert.equal(shouldReplaceCreators([{ firstName: '', lastName: 'Jr.' }]), true);
   assert.equal(shouldReplaceCreators([{ firstName: '', lastName: '' }]), true);
   assert.equal(shouldReplaceCreators([{ firstName: '', lastName: 'Recker' }]), true);
   assert.equal(shouldReplaceCreators([{ firstName: 'Viswanath', lastName: 'Venkatesh' }]), false);
-  assert.equal(shouldReplaceCreators([
-    { firstName: 'Joey F.', lastName: 'George' },
-    { firstName: 'and Duncan', lastName: 'Copeland' },
-  ]), true);
+  assert.equal(
+    shouldReplaceCreators([
+      { firstName: 'Joey F.', lastName: 'George' },
+      { firstName: 'and Duncan', lastName: 'Copeland' },
+    ]),
+    true,
+  );
 });
 
 test('isPlaceholderAbstract covers labels, empty jats, and citation strings', () => {
@@ -72,8 +78,18 @@ test('isPlaceholderAbstract covers labels, empty jats, and citation strings', ()
   assert.equal(isPlaceholderAbstract('Research Article'), true);
   assert.equal(isPlaceholderAbstract('Research Note'), true);
   assert.equal(isPlaceholderAbstract('<jats:p/>'), true);
-  assert.equal(isPlaceholderAbstract('Decision Support Systems, Corrected proof, doi:10.1016/j.dss.2018.08.002'), true);
-  assert.equal(isPlaceholderAbstract('This paper develops a theory of online trust based on a longitudinal field study of virtual teams.'), false);
+  assert.equal(
+    isPlaceholderAbstract(
+      'Decision Support Systems, Corrected proof, doi:10.1016/j.dss.2018.08.002',
+    ),
+    true,
+  );
+  assert.equal(
+    isPlaceholderAbstract(
+      'This paper develops a theory of online trust based on a longitudinal field study of virtual teams.',
+    ),
+    false,
+  );
 });
 
 test('hasSubstantialAbstract rejects placeholders even when Crossref wraps them', () => {
@@ -82,17 +98,37 @@ test('hasSubstantialAbstract rejects placeholders even when Crossref wraps them'
 });
 
 test('shouldOverwriteAbstract never backfills empty abstracts unless allowEmpty', () => {
-  const real = 'This paper develops a theory of online trust based on a longitudinal field study of virtual teams.';
+  const real =
+    'This paper develops a theory of online trust based on a longitudinal field study of virtual teams.';
   assert.equal(shouldOverwriteAbstract('', real), false);
   assert.equal(shouldOverwriteAbstract('', real, { allowEmpty: true }), true);
   assert.equal(shouldOverwriteAbstract('Research Article', real), true);
-  assert.equal(shouldOverwriteAbstract(real, 'Another substantial abstract from Crossref about methods.'), false);
+  assert.equal(
+    shouldOverwriteAbstract(real, 'Another substantial abstract from Crossref about methods.'),
+    false,
+  );
   assert.equal(shouldOverwriteAbstract('Research Note', 'Spotlight'), false);
 });
 
 test('isTestGarbage requires no DOI plus title token or 209x date', () => {
-  assert.equal(isTestGarbage({ title: 'Paper 1 t1785517356628-i2dfm', date: '2099-01-01', doi: '' }), true);
-  assert.equal(isTestGarbage({ title: 'MISQ 2098 t1785517406667-0cp0e', date: 'Spring 2098', doi: '' }), true);
-  assert.equal(isTestGarbage({ title: 'Computer-Based Monitoring', date: '1996', doi: '10.2307/249564' }), false);
-  assert.equal(isTestGarbage({ title: 'Paper 1 t1785517356628-i2dfm', date: '2099-01-01', doi: '10.2307/249564' }), false);
+  assert.equal(
+    isTestGarbage({ title: 'Paper 1 t1785517356628-i2dfm', date: '2099-01-01', doi: '' }),
+    true,
+  );
+  assert.equal(
+    isTestGarbage({ title: 'MISQ 2098 t1785517406667-0cp0e', date: 'Spring 2098', doi: '' }),
+    true,
+  );
+  assert.equal(
+    isTestGarbage({ title: 'Computer-Based Monitoring', date: '1996', doi: '10.2307/249564' }),
+    false,
+  );
+  assert.equal(
+    isTestGarbage({
+      title: 'Paper 1 t1785517356628-i2dfm',
+      date: '2099-01-01',
+      doi: '10.2307/249564',
+    }),
+    false,
+  );
 });

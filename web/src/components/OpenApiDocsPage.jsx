@@ -176,13 +176,16 @@ export function OpenApiDocsPage() {
     jsonLd: webApiJsonLd(),
   });
 
-  const filterRows = useMemo(() => [
-    { param: 'journal', descKey: 'filterJournal' },
-    { param: 'journals', descKey: 'filterJournals' },
-    { param: 'year', descKey: 'filterYear' },
-    { param: 'yearFrom / yearTo', descKey: 'filterYearRange' },
-    { param: 'type', descKey: 'filterType' },
-  ], []);
+  const filterRows = useMemo(
+    () => [
+      { param: 'journal', descKey: 'filterJournal' },
+      { param: 'journals', descKey: 'filterJournals' },
+      { param: 'year', descKey: 'filterYear' },
+      { param: 'yearFrom / yearTo', descKey: 'filterYearRange' },
+      { param: 'type', descKey: 'filterType' },
+    ],
+    [],
+  );
 
   const handleCopyCurl = async (curl) => {
     const text = curl.replaceAll('$BASE', base);
@@ -204,9 +207,7 @@ export function OpenApiDocsPage() {
 
       <section className="space-y-3">
         <p className="max-w-measure text-sm leading-relaxed text-muted-foreground">
-          {t('api.intro')}
-          {' '}
-          {t('api.baseUrl')}
+          {t('api.intro')} {t('api.baseUrl')}
         </p>
         <CodeBlock>{`${base}/api/open/v1`}</CodeBlock>
         <ul className="max-w-measure list-disc space-y-1 pl-5 text-sm text-muted-foreground">
@@ -222,9 +223,7 @@ export function OpenApiDocsPage() {
 
       <section className="space-y-3">
         <h2 className="text-base font-semibold tracking-tight">{t('api.filterTitle')}</h2>
-        <p className="max-w-measure text-sm text-muted-foreground">
-          {t('api.filterApplies')}
-        </p>
+        <p className="max-w-measure text-sm text-muted-foreground">{t('api.filterApplies')}</p>
         <div className="overflow-x-auto border border-border/80">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-left">
@@ -252,32 +251,35 @@ export function OpenApiDocsPage() {
         <h2 className="text-base font-semibold tracking-tight">{t('api.endpointsTitle')}</h2>
         <div className="divide-y border-y border-border/80">
           {ENDPOINTS.map((ep) => (
-          <article key={ep.id} className="space-y-2 py-4">
-            <div className="flex flex-wrap items-baseline gap-2">
-              <span className="border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] font-semibold">
-                {ep.method}
-              </span>
-              <code className="text-sm font-mono break-all">{ep.path}</code>
-            </div>
-            <p className="text-sm text-muted-foreground">{t(`api.endpoints.${ep.endpointKey}`)}</p>
-            {ep.query && (
-              <p className="text-xs text-muted-foreground">
-                {t('api.queryLabel')}<code className="font-mono">{ep.query}</code>
+            <article key={ep.id} className="space-y-2 py-4">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-[11px] font-semibold">
+                  {ep.method}
+                </span>
+                <code className="text-sm font-mono break-all">{ep.path}</code>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {t(`api.endpoints.${ep.endpointKey}`)}
               </p>
-            )}
-            <div className="flex items-start gap-2">
-              <CodeBlock className="flex-1">{ep.curl.replaceAll('$BASE', base)}</CodeBlock>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="shrink-0"
-                onClick={() => handleCopyCurl(ep.curl)}
-                title={t('api.copyCurl')}
-              >
-                <Copy className="size-4" />
-              </Button>
-            </div>
-          </article>
+              {ep.query && (
+                <p className="text-xs text-muted-foreground">
+                  {t('api.queryLabel')}
+                  <code className="font-mono">{ep.query}</code>
+                </p>
+              )}
+              <div className="flex items-start gap-2">
+                <CodeBlock className="flex-1">{ep.curl.replaceAll('$BASE', base)}</CodeBlock>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => handleCopyCurl(ep.curl)}
+                  title={t('api.copyCurl')}
+                >
+                  <Copy className="size-4" />
+                </Button>
+              </div>
+            </article>
           ))}
         </div>
       </section>

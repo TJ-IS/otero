@@ -51,5 +51,7 @@ export function saveChatHistory(itemKey, messages) {
 export function clearChatHistory(itemKey) {
   try {
     localStorage.removeItem(storageKey(itemKey));
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }

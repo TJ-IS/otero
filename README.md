@@ -6,19 +6,19 @@
 
 通过 `src/services/journalWhitelist.js` 对入库文献做**虚拟分类**：原始 `publicationTitle` 永不改写；不在白名单（或缺省）的条目在查询时归入「待归档」。
 
-| # | 期刊 |
-|---|------|
-| 1 | MIS Quarterly |
-| 2 | Information Systems Research |
-| 3 | Journal of Management Information Systems |
-| 4 | Journal of the Association for Information Systems |
-| 5 | Information Systems Journal |
-| 6 | European Journal of Information Systems |
-| 7 | Information and Organization |
-| 8 | Decision Support Systems |
-| 9 | Journal of Information Technology |
-| 10 | The Journal of Strategic Information Systems |
-| 11 | Information & Management |
+| #   | 期刊                                               |
+| --- | -------------------------------------------------- |
+| 1   | MIS Quarterly                                      |
+| 2   | Information Systems Research                       |
+| 3   | Journal of Management Information Systems          |
+| 4   | Journal of the Association for Information Systems |
+| 5   | Information Systems Journal                        |
+| 6   | European Journal of Information Systems            |
+| 7   | Information and Organization                       |
+| 8   | Decision Support Systems                           |
+| 9   | Journal of Information Technology                  |
+| 10  | The Journal of Strategic Information Systems       |
+| 11  | Information & Management                           |
 
 ## 功能特性
 
@@ -37,12 +37,12 @@
 
 ## 技术栈
 
-| 层 | 技术 |
-|----|------|
+| 层   | 技术                                                                                     |
+| ---- | ---------------------------------------------------------------------------------------- |
 | 后端 | Node.js ≥ 20（ESM）、Express、`pg`、pdfjs-dist、adm-zip、zod、`minio`（S3 SDK，对接 R2） |
-| 前端 | Vite + React + shadcn/ui + Tailwind；recharts / d3-force / KaTeX |
-| 数据 | PostgreSQL 16；对象存储 filesystem 或 Cloudflare R2 |
-| 外部 | MinerU、DeepSeek/OpenAI 兼容 LLM、CrossRef / arXiv / OpenLibrary |
+| 前端 | Vite + React + shadcn/ui + Tailwind；recharts / d3-force / KaTeX                         |
+| 数据 | PostgreSQL 16；对象存储 filesystem 或 Cloudflare R2                                      |
+| 外部 | MinerU、DeepSeek/OpenAI 兼容 LLM、CrossRef / arXiv / OpenLibrary                         |
 
 ## 目录结构
 
@@ -202,32 +202,32 @@ node scripts/import-downloads-to-db.mjs --dry-run
 
 ### Web 路由
 
-| 路径 | 说明 |
-|------|------|
-| `/` | 文献库 |
-| `/search` | 检索 |
-| `/items/:key` | 条目详情 |
-| `/dashboard` | 概览 / 期刊 / 时间线 |
-| `/dashboard/authors`、`/authors/:id` | 作者图谱与详情 |
-| `/dashboard/merkle` | Merkle 视图 |
+| 路径                                 | 说明                 |
+| ------------------------------------ | -------------------- |
+| `/`                                  | 文献库               |
+| `/search`                            | 检索                 |
+| `/items/:key`                        | 条目详情             |
+| `/dashboard`                         | 概览 / 期刊 / 时间线 |
+| `/dashboard/authors`、`/authors/:id` | 作者图谱与详情       |
+| `/dashboard/merkle`                  | Merkle 视图          |
 
 ## REST API（摘要）
 
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/health` | 健康检查 |
-| GET/POST | `/api/auth/nonce`、`/verify`、`/me` | 钱包登录 |
-| GET/POST/PATCH/DELETE | `/api/items…` | 条目 CRUD、导出、附件列表 |
-| POST | `/api/import/pdf` | multipart 上传 PDF |
-| GET | `/api/journals` | 期刊 + 待归档计数 |
-| GET | `/api/authors/graph`、`/api/authors/:id` | 作者 |
-| GET | `/api/stats/*` | overview、doi-coverage、years、journals、fulltext、ingestion… |
-| GET/POST/DELETE | `/api/fulltext…`、`/api/items/:key/fulltext…` | 全文队列与内容 |
-| GET | `/api/attachments/:key/file` | 短时签名 PDF 流（需 `exp`+`sig`） |
-| GET | `/api/attachments/:key/fulltext/*` | 全文静态资源 |
-| POST | `/api/items/:key/calibrate`、`/extract`、`/chat`、`/crossref` | LLM / Crossref |
-| GET/POST | `/api/merkle/*` | root / exists / verify / rebuild |
-| — | `/api/collections` | 集合 CRUD |
+| 方法                  | 路径                                                          | 说明                                                          |
+| --------------------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
+| GET                   | `/health`                                                     | 健康检查                                                      |
+| GET/POST              | `/api/auth/nonce`、`/verify`、`/me`                           | 钱包登录                                                      |
+| GET/POST/PATCH/DELETE | `/api/items…`                                                 | 条目 CRUD、导出、附件列表                                     |
+| POST                  | `/api/import/pdf`                                             | multipart 上传 PDF                                            |
+| GET                   | `/api/journals`                                               | 期刊 + 待归档计数                                             |
+| GET                   | `/api/authors/graph`、`/api/authors/:id`                      | 作者                                                          |
+| GET                   | `/api/stats/*`                                                | overview、doi-coverage、years、journals、fulltext、ingestion… |
+| GET/POST/DELETE       | `/api/fulltext…`、`/api/items/:key/fulltext…`                 | 全文队列与内容                                                |
+| GET                   | `/api/attachments/:key/file`                                  | 短时签名 PDF 流（需 `exp`+`sig`）                             |
+| GET                   | `/api/attachments/:key/fulltext/*`                            | 全文静态资源                                                  |
+| POST                  | `/api/items/:key/calibrate`、`/extract`、`/chat`、`/crossref` | LLM / Crossref                                                |
+| GET/POST              | `/api/merkle/*`                                               | root / exists / verify / rebuild                              |
+| —                     | `/api/collections`                                            | 集合 CRUD                                                     |
 
 写操作需编辑者 JWT（`Authorization: Bearer …`）；未登录可读。
 
@@ -250,9 +250,9 @@ npx skills update
 
 ## 备份与数据
 
-| 组件 | 位置 | 备份建议 |
-|------|------|----------|
-| 元数据 | PostgreSQL（本地 compose 为 `data/postgres/`；生产为自备实例） | `pg_dump` / `pg_restore` |
-| PDF + 全文 | R2 bucket，或 `data/storage/`（filesystem） | R2 侧版本/复制；本地则打包 `data/storage` |
+| 组件       | 位置                                                           | 备份建议                                  |
+| ---------- | -------------------------------------------------------------- | ----------------------------------------- |
+| 元数据     | PostgreSQL（本地 compose 为 `data/postgres/`；生产为自备实例） | `pg_dump` / `pg_restore`                  |
+| PDF + 全文 | R2 bucket，或 `data/storage/`（filesystem）                    | R2 侧版本/复制；本地则打包 `data/storage` |
 
 历史「SQLite + 本地 MinIO」迁移脚本与文档已移除；勿再按旧流程操作。

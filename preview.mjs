@@ -18,7 +18,11 @@ async function previewOne(filePath) {
       source: recognized.source,
       itemType: mapped.itemType,
       title: mapped.fields.title || '(no title)',
-      creators: mapped.creators.map(c => [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '').filter(Boolean).join('; ') || '(no authors)',
+      creators:
+        mapped.creators
+          .map((c) => [c.firstName, c.lastName].filter(Boolean).join(' ') || c.name || '')
+          .filter(Boolean)
+          .join('; ') || '(no authors)',
       doi: mapped.fields.DOI || mapped.fields.ISBN || mapped.fields.arXivID || '',
       year: mapped.fields.date || '',
     };
@@ -28,7 +32,7 @@ async function previewOne(filePath) {
 }
 
 async function main() {
-  const files = fs.readdirSync(PDF_DIR).filter(f => f.endsWith('.pdf'));
+  const files = fs.readdirSync(PDF_DIR).filter((f) => f.endsWith('.pdf'));
   console.log(`Total PDFs: ${files.length}\n`);
 
   // Preview first N files
@@ -46,8 +50,8 @@ async function main() {
   console.log('\n');
 
   // Summary stats
-  const ok = results.filter(r => r.ok);
-  const fail = results.filter(r => !r.ok);
+  const ok = results.filter((r) => r.ok);
+  const fail = results.filter((r) => !r.ok);
   const sources = {};
   for (const r of ok) {
     sources[r.source] = (sources[r.source] || 0) + 1;

@@ -25,9 +25,15 @@ function tokenLabel(token) {
 }
 
 function shouldRotate(status, code) {
-  return status === 429 || status === 401 || status === 403
-    || code === 'A0202' || code === 'A0211'
-    || code === -60019 || code === '-60019';
+  return (
+    status === 429 ||
+    status === 401 ||
+    status === 403 ||
+    code === 'A0202' ||
+    code === 'A0211' ||
+    code === -60019 ||
+    code === '-60019'
+  );
 }
 
 function isNotFound(code) {
@@ -45,7 +51,11 @@ function authHeaders(token, extra = {}) {
 async function asJson(res) {
   const text = await res.text();
   let body;
-  try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
+  try {
+    body = text ? JSON.parse(text) : {};
+  } catch {
+    body = { raw: text };
+  }
   return { status: res.status, body };
 }
 
@@ -72,10 +82,13 @@ async function withTokenRotation(kind, fn, opts = {}) {
       return result;
     } catch (err) {
       lastErr = err;
-      const rotate = shouldRotate(err.status, err.mineruCode)
-        || (opts.alsoTryNotFound && isNotFound(err.mineruCode));
+      const rotate =
+        shouldRotate(err.status, err.mineruCode) ||
+        (opts.alsoTryNotFound && isNotFound(err.mineruCode));
       if (!rotate || i === ordered.length - 1) throw err;
-      console.warn(`[mineru] ${kind} failed on token ${tokenLabel(token)}: ${err.message}; trying next`);
+      console.warn(
+        `[mineru] ${kind} failed on token ${tokenLabel(token)}: ${err.message}; trying next`,
+      );
     }
   }
   throw lastErr;
@@ -87,7 +100,14 @@ async function withTokenRotation(kind, fn, opts = {}) {
  *       -> PUT upload the file -> MinerU auto-submits the parse task.
  * Returns { batchId }.
  */
-export async function submitLocalPdf({ filePath, fileName, modelVersion, language, enableFormula, enableTable }) {
+export async function submitLocalPdf({
+  filePath,
+  fileName,
+  modelVersion,
+  language,
+  enableFormula,
+  enableTable,
+}) {
   const mv = modelVersion || config.mineru.modelVersion;
   const body = {
     files: [{ name: fileName }],
@@ -104,7 +124,9 @@ export async function submitLocalPdf({ filePath, fileName, modelVersion, languag
     });
     const { status, body: rb } = await asJson(res);
     if (!res.ok || rb.code !== 0) {
-      const err = new Error(`MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+      const err = new Error(
+        `MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`,
+      );
       err.status = status;
       err.mineruCode = rb.code ?? null;
       throw err;
@@ -143,10 +165,11 @@ const UPLOAD_CONCURRENCY = 8;
  */
 export async function submitLocalPdfs(files, opts = {}) {
   if (files.length === 0) throw new Error('submitLocalPdfs: no files');
-  if (files.length > 200) throw new Error(`submitLocalPdfs: ${files.length} files exceeds the 200-file batch limit`);
+  if (files.length > 200)
+    throw new Error(`submitLocalPdfs: ${files.length} files exceeds the 200-file batch limit`);
   const mv = opts.modelVersion || config.mineru.modelVersion;
   const body = {
-    files: files.map(f => ({ name: f.fileName, data_id: f.fileName })),
+    files: files.map((f) => ({ name: f.fileName, data_id: f.fileName })),
     model_version: mv,
     enable_formula: opts.enableFormula ?? config.mineru.enableFormula,
     enable_table: opts.enableTable ?? config.mineru.enableTable,
@@ -160,7 +183,9 @@ export async function submitLocalPdfs(files, opts = {}) {
     });
     const { status, body: rb } = await asJson(res);
     if (!res.ok || rb.code !== 0) {
-      const err = new Error(`MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+      const err = new Error(
+        `MinerU submit failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`,
+      );
       err.status = status;
       err.mineruCode = rb.code ?? null;
       throw err;
@@ -216,7 +241,9 @@ async function queryBatchOnce(token, batchId) {
   });
   const { status, body: rb } = await asJson(res);
   if (!res.ok || rb.code !== 0) {
-    const err = new Error(`MinerU query failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`);
+    const err = new Error(
+      `MinerU query failed: HTTP ${status} ${rb.msg || ''} (code ${rb.code ?? '?'})`,
+    );
     err.status = status;
     err.mineruCode = rb.code ?? null;
     throw err;
@@ -261,7 +288,11 @@ export async function downloadAndExtract(zipUrl, destDir) {
     const imagesDir = await findDir(destDir, 'images');
     return { fullMdPath, contentListPath, imagesDir };
   } finally {
-    try { await fs.promises.unlink(tmpZip); } catch { /* ignore */ }
+    try {
+      await fs.promises.unlink(tmpZip);
+    } catch {
+      /* ignore */
+    }
   }
 }
 
@@ -269,7 +300,9 @@ async function findFile(root, name) {
   for await (const p of walk(root)) {
     try {
       if (path.basename(p) === name && (await fs.promises.stat(p)).isFile()) return p;
-    } catch { /* race / broken symlink */ }
+    } catch {
+      /* race / broken symlink */
+    }
   }
   return null;
 }
@@ -277,13 +310,19 @@ async function findDir(root, name) {
   for await (const p of walk(root)) {
     try {
       if (path.basename(p) === name && (await fs.promises.stat(p)).isDirectory()) return p;
-    } catch { /* race / broken symlink */ }
+    } catch {
+      /* race / broken symlink */
+    }
   }
   return null;
 }
 async function* walk(dir) {
   let ents;
-  try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { return; }
+  try {
+    ents = await fs.promises.readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
   for (const e of ents) {
     const p = path.join(dir, e.name);
     yield p;
@@ -302,10 +341,14 @@ export async function rewriteAssetPaths(fullMdPath, itemKey) {
   let md = await fs.promises.readFile(fullMdPath, 'utf8');
   const base = `/api/attachments/${itemKey}/fulltext`;
   // Match ![alt](images/...) and <img src="images/...">
-  md = md.replace(/!\[([^\]]*)\]\((images\/[^)]+)\)/g, (_, alt, src) =>
-    `![${alt}](${base}/${normalizeSrc(src)})`);
-  md = md.replace(/<img([^>]+)src=["'](images\/[^"']+)["']/g, (_, attrs, src) =>
-    `<img${attrs}src="${base}/${normalizeSrc(src)}"`);
+  md = md.replace(
+    /!\[([^\]]*)\]\((images\/[^)]+)\)/g,
+    (_, alt, src) => `![${alt}](${base}/${normalizeSrc(src)})`,
+  );
+  md = md.replace(
+    /<img([^>]+)src=["'](images\/[^"']+)["']/g,
+    (_, attrs, src) => `<img${attrs}src="${base}/${normalizeSrc(src)}"`,
+  );
   await fs.promises.writeFile(fullMdPath, md);
 }
 

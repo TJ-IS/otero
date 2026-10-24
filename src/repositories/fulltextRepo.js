@@ -5,11 +5,14 @@ export async function getFullTextRow(itemId) {
 }
 
 export async function getFullTextRowByKey(key) {
-  return queryOne(`
+  return queryOne(
+    `
     SELECT f.* FROM "itemFullText" f
     JOIN items i ON i."itemID" = f."itemID"
     WHERE i.key = $1
-  `, [key]);
+  `,
+    [key],
+  );
 }
 
 /**
@@ -18,8 +21,17 @@ export async function getFullTextRowByKey(key) {
 export async function upsertFullText(itemId, patch) {
   const existing = await getFullTextRow(itemId);
   const cols = [
-    'state', 'mineruBatchId', 'modelVersion', 'extractedPages', 'totalPages',
-    'markdownPath', 'assetDir', 'errCode', 'errMsg', 'submittedAt', 'completedAt',
+    'state',
+    'mineruBatchId',
+    'modelVersion',
+    'extractedPages',
+    'totalPages',
+    'markdownPath',
+    'assetDir',
+    'errCode',
+    'errMsg',
+    'submittedAt',
+    'completedAt',
   ];
   if (existing) {
     const sets = ['"dateModified" = $1'];
@@ -33,10 +45,7 @@ export async function upsertFullText(itemId, patch) {
     }
     if (sets.length === 1) return existing;
     vals.push(itemId);
-    await execute(
-      `UPDATE "itemFullText" SET ${sets.join(', ')} WHERE "itemID"=$${p}`,
-      vals
-    );
+    await execute(`UPDATE "itemFullText" SET ${sets.join(', ')} WHERE "itemID"=$${p}`, vals);
   } else {
     const colNames = ['"itemID"'];
     const placeholders = ['$1'];
@@ -51,7 +60,7 @@ export async function upsertFullText(itemId, patch) {
     }
     await execute(
       `INSERT INTO "itemFullText" (${colNames.join(', ')}) VALUES (${placeholders.join(', ')})`,
-      colVals
+      colVals,
     );
   }
   return getFullTextRow(itemId);
@@ -114,10 +123,11 @@ export async function listFullTextPaged({ filter = 'all', page = 1, pageSize = 5
   }
   const totalRow = await queryOne(
     `SELECT COUNT(*)::int AS n FROM "itemFullText" f ${where}`,
-    params
+    params,
   );
   const offset = Math.max(0, (page - 1) * pageSize);
-  const items = await query(`
+  const items = await query(
+    `
     SELECT f.*, i.key AS "itemKey",
       (SELECT v.value FROM "itemData" d
         JOIN "itemDataValues" v ON v."valueID" = d."valueID"
@@ -129,7 +139,9 @@ export async function listFullTextPaged({ filter = 'all', page = 1, pageSize = 5
     ${where}
     ORDER BY f."dateModified" DESC
     LIMIT $${p++} OFFSET $${p++}
-  `, [...params, pageSize, offset]);
+  `,
+    [...params, pageSize, offset],
+  );
   return { items, total: totalRow.n };
 }
 

@@ -36,6 +36,10 @@ importRouter.post('/pdf', upload.single('pdf'), async (req, res) => {
     res.status(500).json({ error: err.message });
   } finally {
     // Clean up the multer temp file; the file has been copied into our storage.
-    try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+    try {
+      fs.unlinkSync(req.file.path);
+    } catch {
+      /* ignore */
+    }
   }
 });

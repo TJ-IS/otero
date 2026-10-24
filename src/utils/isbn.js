@@ -4,7 +4,9 @@
 /** Remove non-digit/X characters except keep 'X' as check digit at end. */
 export function cleanIsbn(s) {
   if (!s) return null;
-  const cleaned = String(s).toUpperCase().replace(/[^0-9X]/g, '');
+  const cleaned = String(s)
+    .toUpperCase()
+    .replace(/[^0-9X]/g, '');
   if (cleaned.length === 10 || cleaned.length === 13) return cleaned;
   return null;
 }

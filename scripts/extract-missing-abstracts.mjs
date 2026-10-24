@@ -9,7 +9,8 @@ import { JOURNAL_WHITELIST } from '../src/services/journalWhitelist.js';
 const CONCURRENCY = Math.max(1, Number(process.argv[2]) || 3);
 
 await initDb();
-const rows = await query(`
+const rows = await query(
+  `
   SELECT i.key
   FROM items i
   JOIN "itemData" dj ON dj."itemID" = i."itemID"
@@ -25,7 +26,9 @@ const rows = await query(`
       WHERE d."itemID" = i."itemID" AND btrim(v.value) <> ''
     )
   ORDER BY i."itemID"
-`, [JOURNAL_WHITELIST]);
+`,
+  [JOURNAL_WHITELIST],
+);
 console.log(`extract abstracts for ${rows.length} items (concurrency=${CONCURRENCY})`);
 let next = 0;
 let ok = 0;

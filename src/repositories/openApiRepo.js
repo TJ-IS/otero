@@ -3,10 +3,12 @@ import { appendDoiRequiredForArticles, fieldIdByName } from './itemRepo.js';
 import { JOURNAL_WHITELIST } from '../services/journalWhitelist.js';
 
 function placeholders(values, params) {
-  return values.map((value) => {
-    params.push(value);
-    return `$${params.length}`;
-  }).join(',');
+  return values
+    .map((value) => {
+      params.push(value);
+      return `$${params.length}`;
+    })
+    .join(',');
 }
 
 async function buildOpenWhere({ q, journal, journals, yearFrom, yearTo, type } = {}) {
@@ -23,7 +25,7 @@ async function buildOpenWhere({ q, journal, journals, yearFrom, yearTo, type } =
     )`,
   ];
 
-  const journalList = journal ? [journal] : (journals || []);
+  const journalList = journal ? [journal] : journals || [];
   if (journalList.length) {
     const journalParams = placeholders(journalList, params);
     where.push(`EXISTS (
@@ -46,11 +48,15 @@ async function buildOpenWhere({ q, journal, journals, yearFrom, yearTo, type } =
     const clauses = [];
     if (yearFrom != null) {
       params.push(String(yearFrom));
-      clauses.push(`substring(year_v.value from '(1[5-9][0-9]{2}|20[0-9]{2})') >= $${params.length}`);
+      clauses.push(
+        `substring(year_v.value from '(1[5-9][0-9]{2}|20[0-9]{2})') >= $${params.length}`,
+      );
     }
     if (yearTo != null) {
       params.push(String(yearTo));
-      clauses.push(`substring(year_v.value from '(1[5-9][0-9]{2}|20[0-9]{2})') <= $${params.length}`);
+      clauses.push(
+        `substring(year_v.value from '(1[5-9][0-9]{2}|20[0-9]{2})') <= $${params.length}`,
+      );
     }
     where.push(`EXISTS (
       SELECT 1 FROM "itemData" year_d
@@ -108,10 +114,12 @@ async function buildOpenSearchHitsCte(needle, params, p) {
     if (id != null) fieldIds.push(id);
   }
   const fieldParams = fieldIds.length
-    ? fieldIds.map((id) => {
-        params.push(id);
-        return `$${p++}`;
-      }).join(',')
+    ? fieldIds
+        .map((id) => {
+          params.push(id);
+          return `$${p++}`;
+        })
+        .join(',')
     : 'NULL';
   return {
     cte: `search_hits AS MATERIALIZED (
@@ -147,7 +155,8 @@ export async function getOpenFacets(filters = {}) {
     : null;
   const withPrefix = searchHits ? `${searchHits.cte},` : '';
   const matchedFrom = searchHits ? `items i\n      ${searchHits.join}` : 'items i';
-  const bundled = await queryOne(`
+  const bundled = await queryOne(
+    `
     WITH ${withPrefix}
     matched AS MATERIALIZED (
       SELECT i."itemID", i."itemTypeID"
@@ -197,7 +206,9 @@ export async function getOpenFacets(filters = {}) {
            type_rows.rows AS "typeRows",
            availability.obj AS availability
     FROM field_rows, type_rows, availability
-  `, params);
+  `,
+    params,
+  );
 
   const fieldRows = bundled?.fieldRows || [];
   const typeRows = bundled?.typeRows || [];
@@ -227,7 +238,8 @@ export async function getOpenFacets(filters = {}) {
 
 export async function getOpenOverviewStats() {
   const { sql, params } = await buildOpenWhere();
-  const row = await queryOne(`
+  const row = await queryOne(
+    `
     WITH matched AS MATERIALIZED (
       SELECT i."itemID"
       FROM items i
@@ -248,13 +260,16 @@ export async function getOpenOverviewStats() {
       AND (lower(COALESCE("contentType", '')) LIKE '%pdf%' OR lower(path) LIKE '%.pdf')) pdf
       ON pdf."parentItemID" = m."itemID"
     LEFT JOIN "itemFullText" ft ON ft."itemID" = m."itemID" AND ft.state = 'done'
-  `, params);
+  `,
+    params,
+  );
   return { ...row, journalCount: JOURNAL_WHITELIST.length };
 }
 
 export async function getOpenTimeline(filters = {}) {
   const { sql, params } = await buildOpenWhere(filters);
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT substring(v.value from '(1[5-9][0-9]{2}|20[0-9]{2})') AS year,
            COUNT(DISTINCT i."itemID")::int AS count
     FROM items i
@@ -265,8 +280,11 @@ export async function getOpenTimeline(filters = {}) {
     GROUP BY year
     HAVING substring(v.value from '(1[5-9][0-9]{2}|20[0-9]{2})') IS NOT NULL
     ORDER BY year ASC
-  `, params);
+  `,
+    params,
+  );
   const maxYear = new Date().getFullYear() + 1;
-  return rows.map((row) => ({ year: Number(row.year), count: row.count }))
+  return rows
+    .map((row) => ({ year: Number(row.year), count: row.count }))
     .filter((row) => row.year >= 1990 && row.year <= maxYear);
 }

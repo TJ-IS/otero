@@ -17,9 +17,7 @@ export function isBootstrapAdmin(address) {
 }
 
 export function getBootstrapAddresses() {
-  return config.auth.editorWhitelist
-    .map(addr => normalizeAddress(addr))
-    .filter(Boolean);
+  return config.auth.editorWhitelist.map((addr) => normalizeAddress(addr)).filter(Boolean);
 }
 
 function rowToAccount(row) {
@@ -38,10 +36,9 @@ function rowToAccount(row) {
 export async function getAccountByAddress(address) {
   const normalized = normalizeAddress(address);
   if (!normalized) return null;
-  const row = await queryOne(
-    'SELECT * FROM accounts WHERE lower(address) = lower($1)',
-    [normalized]
-  );
+  const row = await queryOne('SELECT * FROM accounts WHERE lower(address) = lower($1)', [
+    normalized,
+  ]);
   return rowToAccount(row);
 }
 
@@ -69,7 +66,7 @@ export async function ensureAccount(address) {
     if (bootstrap && existing.role !== 'admin') {
       const updated = await queryOne(
         `UPDATE accounts SET role = 'admin' WHERE "accountID" = $1 RETURNING *`,
-        [existing.accountID]
+        [existing.accountID],
       );
       return rowToAccount(updated);
     }
@@ -81,7 +78,7 @@ export async function ensureAccount(address) {
      VALUES ($1, $2, $3)
      ON CONFLICT (address) DO UPDATE SET address = EXCLUDED.address
      RETURNING *`,
-    [normalized, role, nowUtc()]
+    [normalized, role, nowUtc()],
   );
   return rowToAccount(created);
 }
@@ -90,7 +87,7 @@ export async function recordLogin(address) {
   const account = await ensureAccount(address);
   const updated = await queryOne(
     `UPDATE accounts SET "lastLoginAt" = $1 WHERE "accountID" = $2 RETURNING *`,
-    [nowUtc(), account.accountID]
+    [nowUtc(), account.accountID],
   );
   return rowToAccount(updated);
 }
@@ -120,7 +117,7 @@ export async function listAccounts({ page = 1, pageSize = 50, q } = {}) {
     `SELECT * FROM accounts ${where}
      ORDER BY "createdAt" DESC, "accountID" DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
+    params,
   );
   return {
     accounts: rows.map(rowToAccount),
@@ -158,7 +155,7 @@ export async function setAccountRole(address, role) {
   }
   const updated = await queryOne(
     `UPDATE accounts SET role = $1 WHERE "accountID" = $2 RETURNING *`,
-    [role, account.accountID]
+    [role, account.accountID],
   );
   return rowToAccount(updated);
 }

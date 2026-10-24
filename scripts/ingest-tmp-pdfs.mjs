@@ -25,7 +25,10 @@ import { normalizeJournalName } from '../src/services/extractService.js';
 import { JOURNAL_WHITELIST } from '../src/services/journalWhitelist.js';
 import { importPdf } from '../src/services/importService.js';
 import {
-  enqueueBatchParse, pollOnce, recoverSubmittingOnStartup, retryFailed,
+  enqueueBatchParse,
+  pollOnce,
+  recoverSubmittingOnStartup,
+  retryFailed,
   waitForSubmitQueue,
 } from '../src/services/fulltextService.js';
 import { extractItem, applyExtraction } from '../src/services/extractService.js';
@@ -42,9 +45,7 @@ process.on('unhandledRejection', (err) => {
 });
 
 const ROOT = config.projectRoot;
-const SOURCES = [
-  { src: 'batch', dir: path.join(ROOT, 'tmp') },
-];
+const SOURCES = [{ src: 'batch', dir: path.join(ROOT, 'tmp') }];
 const JOURNAL_CODE_NAME = {
   IO: 'Information and Organization',
   'I&O': 'Information and Organization',
@@ -56,16 +57,23 @@ const JOURNAL_CODE_NAME = {
   JAIS: 'Journal of the Association for Information Systems',
 };
 const LOG_PATH = path.join(config.dataDir, 'ingest-tmp-log.jsonl');
-const CORE_FIELDS = ['title', 'DOI', 'publicationTitle', 'date', 'abstractNote', 'volume', 'issue', 'pages'];
+const CORE_FIELDS = [
+  'title',
+  'DOI',
+  'publicationTitle',
+  'date',
+  'abstractNote',
+  'volume',
+  'issue',
+  'pages',
+];
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
 const phaseArg = args.find((a) => a.startsWith('--phase='));
 const PHASE = phaseArg ? phaseArg.slice('--phase='.length) : 'all';
 const concurrencyIdx = args.indexOf('--concurrency');
-const CONCURRENCY = concurrencyIdx >= 0
-  ? Math.max(1, Number(args[concurrencyIdx + 1]) || 1)
-  : 2;
+const CONCURRENCY = concurrencyIdx >= 0 ? Math.max(1, Number(args[concurrencyIdx + 1]) || 1) : 2;
 
 function normDoi(doi) {
   const n = normalizeDoi(doi);
@@ -199,10 +207,7 @@ function cleanText(s) {
 }
 
 function loadManifest(dir, src) {
-  const candidates = [
-    path.join(dir, 'manifest.tsv'),
-    path.join(dir, 'archives', 'manifest.tsv'),
-  ];
+  const candidates = [path.join(dir, 'manifest.tsv'), path.join(dir, 'archives', 'manifest.tsv')];
   const p = candidates.find((f) => fs.existsSync(f));
   if (!p) throw new Error(`manifest.tsv not found under ${dir}`);
   const text = fs.readFileSync(p, 'utf8');
@@ -212,33 +217,32 @@ function loadManifest(dir, src) {
   const pdfDir = fs.existsSync(path.join(dir, 'pdfs'))
     ? path.join(dir, 'pdfs')
     : path.join(dir, 'pdfs');
-  return lines.slice(1).map((line) => {
-    const cols = line.split('\t');
-    const row = { src, dir };
-    header.forEach((h, i) => { row[h] = cols[i]; });
-    const journal = row.journal || src;
-    row.src = journal;
-    row.journalName = JOURNAL_CODE_NAME[String(journal).toUpperCase()]
-      || JOURNAL_CODE_NAME[journal]
-      || '';
-    const inferred = doiFromFilename(journal, row.filename);
-    const listed = normalizeDoi(row.doi);
-    const shortDss = listed && /^10\.1016\/j\.dss\.\d{6}$/i.test(listed);
-    const yearDss = inferred.find((d) => /^10\.1016\/j\.dss\.\d{4}\.\d{6}$/i.test(d));
-    row.doi = (shortDss && yearDss ? yearDss : listed)
-      || legacy.get(row.filename)
-      || inferred[0]
-      || '';
-    row.doiCandidates = [...new Set([
-      row.doi,
-      listed,
-      legacy.get(row.filename),
-      ...inferred,
-    ].filter(Boolean))];
-    row.title = row.title || titleFromFilename(row.filename);
-    row.pdfPath = path.join(pdfDir, row.filename);
-    return row;
-  }).filter((r) => r.filename);
+  return lines
+    .slice(1)
+    .map((line) => {
+      const cols = line.split('\t');
+      const row = { src, dir };
+      header.forEach((h, i) => {
+        row[h] = cols[i];
+      });
+      const journal = row.journal || src;
+      row.src = journal;
+      row.journalName =
+        JOURNAL_CODE_NAME[String(journal).toUpperCase()] || JOURNAL_CODE_NAME[journal] || '';
+      const inferred = doiFromFilename(journal, row.filename);
+      const listed = normalizeDoi(row.doi);
+      const shortDss = listed && /^10\.1016\/j\.dss\.\d{6}$/i.test(listed);
+      const yearDss = inferred.find((d) => /^10\.1016\/j\.dss\.\d{4}\.\d{6}$/i.test(d));
+      row.doi =
+        (shortDss && yearDss ? yearDss : listed) || legacy.get(row.filename) || inferred[0] || '';
+      row.doiCandidates = [
+        ...new Set([row.doi, listed, legacy.get(row.filename), ...inferred].filter(Boolean)),
+      ];
+      row.title = row.title || titleFromFilename(row.filename);
+      row.pdfPath = path.join(pdfDir, row.filename);
+      return row;
+    })
+    .filter((r) => r.filename);
 }
 
 function logJson(obj) {
@@ -300,12 +304,17 @@ async function applyMapped(item, mapped, { overwrite = false, forceDoi = null } 
   if (fields.title) fields.title = cleanText(fields.title);
   if (fields.abstractNote) fields.abstractNote = cleanText(fields.abstractNote);
   if (fields.publicationTitle) {
-    fields.publicationTitle = normalizeJournalName(fields.publicationTitle) || cleanText(fields.publicationTitle);
+    fields.publicationTitle =
+      normalizeJournalName(fields.publicationTitle) || cleanText(fields.publicationTitle);
   }
   if (forceDoi) fields.DOI = forceDoi;
 
   if (mapped.itemType && mapped.itemType !== item.itemType) {
-    try { await item.setItemType(mapped.itemType); } catch { /* keep */ }
+    try {
+      await item.setItemType(mapped.itemType);
+    } catch {
+      /* keep */
+    }
   }
 
   const applied = [];
@@ -313,12 +322,15 @@ async function applyMapped(item, mapped, { overwrite = false, forceDoi = null } 
     if (value == null || value === '') continue;
     const cur = item.getField(name);
     const dirty = typeof cur === 'string' && /<[^>]+>/.test(cur);
-    const should = overwrite || !cur || dirty || (name === 'DOI' && normDoi(cur) !== normDoi(value));
+    const should =
+      overwrite || !cur || dirty || (name === 'DOI' && normDoi(cur) !== normDoi(value));
     if (!should) continue;
     try {
       item.setField(name, value);
       applied.push(name);
-    } catch { /* skip unknown */ }
+    } catch {
+      /* skip unknown */
+    }
   }
   if ((overwrite || item.creators.length === 0) && mapped.creators?.length) {
     item.setCreators(mapped.creators);
@@ -340,7 +352,10 @@ async function attachPdf(parent, filePath) {
   });
   await attachment.save();
   await execute('UPDATE items SET "parentItemID"=$1 WHERE "itemID"=$2', [parent.id, attachment.id]);
-  await execute('UPDATE "itemAttachments" SET "parentItemID"=$1 WHERE "itemID"=$2', [parent.id, attachment.id]);
+  await execute('UPDATE "itemAttachments" SET "parentItemID"=$1 WHERE "itemID"=$2', [
+    parent.id,
+    attachment.id,
+  ]);
   return attachment;
 }
 
@@ -373,17 +388,23 @@ async function createFromMapped(mapped, filePath, { forceDoi, journalName } = {}
   applyJournalHint(mapped, journalName);
   mapped.fields.DOI = forceDoi || mapped.fields.DOI;
   if (mapped.fields.title) mapped.fields.title = cleanText(mapped.fields.title);
-  if (mapped.fields.abstractNote) mapped.fields.abstractNote = cleanText(mapped.fields.abstractNote);
+  if (mapped.fields.abstractNote)
+    mapped.fields.abstractNote = cleanText(mapped.fields.abstractNote);
   if (mapped.fields.publicationTitle) {
     mapped.fields.publicationTitle =
-      normalizeJournalName(mapped.fields.publicationTitle) || cleanText(mapped.fields.publicationTitle);
+      normalizeJournalName(mapped.fields.publicationTitle) ||
+      cleanText(mapped.fields.publicationTitle);
   }
 
   const parent = new Item();
   await parent.setItemType(mapped.itemType || 'journalArticle');
   for (const [name, value] of Object.entries(mapped.fields)) {
     if (value == null || value === '') continue;
-    try { parent.setField(name, value); } catch { /* skip */ }
+    try {
+      parent.setField(name, value);
+    } catch {
+      /* skip */
+    }
   }
   for (const c of mapped.creators || []) parent.addCreator(c);
   await parent.save();
@@ -440,7 +461,7 @@ async function importOne(row, existing) {
       existing.set(alias, { ...found, key: item.key });
     }
     return {
-      action: (attached || doiFixed) ? 'updated' : 'exists',
+      action: attached || doiFixed ? 'updated' : 'exists',
       key: item.key,
       doi: item.getField('DOI') || nextDoi,
       title: item.getField('title') || row.title || '',
@@ -496,7 +517,13 @@ async function importOne(row, existing) {
     }
   }
 
-  const rec = { key: parent.key, itemID: parent.id, doi: normDoi(doi), hasPdf: true, ftState: null };
+  const rec = {
+    key: parent.key,
+    itemID: parent.id,
+    doi: normDoi(doi),
+    hasPdf: true,
+    ftState: null,
+  };
   for (const alias of doiAliases(doi || parent.getField('DOI'))) existing.set(alias, rec);
   return {
     action: 'created',
@@ -507,7 +534,9 @@ async function importOne(row, existing) {
 }
 
 async function importPhase(rows, existing) {
-  console.log(`\n=== import (${rows.length} PDFs, concurrency=${CONCURRENCY}${DRY_RUN ? ', dry-run' : ''}) ===`);
+  console.log(
+    `\n=== import (${rows.length} PDFs, concurrency=${CONCURRENCY}${DRY_RUN ? ', dry-run' : ''}) ===`,
+  );
   let created = 0;
   let updated = 0;
   let skipped = 0;
@@ -524,7 +553,9 @@ async function importPhase(rows, existing) {
       else if (r.action === 'updated') updated++;
       else skipped++;
       if (r.key) keys.push(r.key);
-      console.log(`${r.action.toUpperCase().padEnd(8)} ${label} → ${r.key || '-'}  ${(r.title || '').slice(0, 70)}`);
+      console.log(
+        `${r.action.toUpperCase().padEnd(8)} ${label} → ${r.key || '-'}  ${(r.title || '').slice(0, 70)}`,
+      );
       return r;
     } catch (err) {
       fail++;
@@ -540,12 +571,15 @@ async function importPhase(rows, existing) {
 
 async function listKeysNeedingParse(keys) {
   if (!keys.length) return [];
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT i.key, ft.state
     FROM items i
     LEFT JOIN "itemFullText" ft ON ft."itemID" = i."itemID"
     WHERE i.key = ANY($1)
-  `, [keys]);
+  `,
+    [keys],
+  );
   return rows.filter((r) => r.state !== 'done').map((r) => r.key);
 }
 
@@ -567,16 +601,20 @@ async function parsePhase(keys) {
   let last = '';
   while (true) {
     const tick = await pollOnce();
-    const states = await query(`
+    const states = await query(
+      `
       SELECT COALESCE(ft.state, 'idle') AS state, COUNT(*)::int AS n
       FROM items i
       LEFT JOIN "itemFullText" ft ON ft."itemID" = i."itemID"
       WHERE i.key = ANY($1)
       GROUP BY 1
       ORDER BY 1
-    `, [keys]);
+    `,
+      [keys],
+    );
     const map = Object.fromEntries(states.map((r) => [r.state, r.n]));
-    const inFlight = (map.submitting || 0) + (map.pending || 0) + (map.running || 0) + (map.converting || 0);
+    const inFlight =
+      (map.submitting || 0) + (map.pending || 0) + (map.running || 0) + (map.converting || 0);
     const line = `parse ${((Date.now() - start) / 1000).toFixed(0)}s tick=${JSON.stringify(tick)} states=${JSON.stringify(map)}`;
     if (line !== last) {
       console.log(line);
@@ -586,34 +624,43 @@ async function parsePhase(keys) {
     await new Promise((r) => setTimeout(r, Math.max(4000, config.mineru.pollIntervalMs)));
   }
 
-  const failed = await query(`
+  const failed = await query(
+    `
     SELECT i.key FROM items i
     JOIN "itemFullText" ft ON ft."itemID" = i."itemID"
     WHERE i.key = ANY($1) AND ft.state = 'failed'
-  `, [keys]);
+  `,
+    [keys],
+  );
   if (failed.length) {
     console.log(`retrying ${failed.length} failed parse(s)`);
     await retryFailed();
     await new Promise((r) => setTimeout(r, 8000));
     for (let i = 0; i < 40; i++) {
       await pollOnce();
-      const still = await query(`
+      const still = await query(
+        `
         SELECT COUNT(*)::int AS n FROM items i
         JOIN "itemFullText" ft ON ft."itemID" = i."itemID"
         WHERE i.key = ANY($1) AND ft.state IN ('submitting','pending','running','converting')
-      `, [keys]);
+      `,
+        [keys],
+      );
       if ((still[0]?.n || 0) === 0) break;
       await new Promise((r) => setTimeout(r, Math.max(4000, config.mineru.pollIntervalMs)));
     }
   }
 
-  const final = await query(`
+  const final = await query(
+    `
     SELECT COALESCE(ft.state, 'idle') AS state, COUNT(*)::int AS n
     FROM items i
     LEFT JOIN "itemFullText" ft ON ft."itemID" = i."itemID"
     WHERE i.key = ANY($1)
     GROUP BY 1
-  `, [keys]);
+  `,
+    [keys],
+  );
   console.log('parse final', Object.fromEntries(final.map((r) => [r.state, r.n])));
   return { queued: summary.queued, states: final };
 }
@@ -645,17 +692,24 @@ async function validateOne(key) {
   }
   const after = await Item.loadByKey(key);
   let miss = missingFields(after);
-  const needExtract = miss.includes('abstractNote') || miss.includes('creators') || miss.includes('volume');
+  const needExtract =
+    miss.includes('abstractNote') || miss.includes('creators') || miss.includes('volume');
   if (needExtract && !DRY_RUN) {
-    const ft = await query(`
+    const ft = await query(
+      `
       SELECT ft.state FROM "itemFullText" ft
       JOIN items i ON i."itemID" = ft."itemID"
       WHERE i.key = $1
-    `, [key]);
+    `,
+      [key],
+    );
     if (ft[0]?.state === 'done' && config.llm.apiKey) {
       try {
         const result = await extractItem(key);
-        const appliedEx = await applyExtraction(key, result, { fieldThreshold: 0.8, overwrite: false });
+        const appliedEx = await applyExtraction(key, result, {
+          fieldThreshold: 0.8,
+          overwrite: false,
+        });
         extracted = (appliedEx.appliedFields || []).map((f) => f.field);
         if (appliedEx.appliedCreators) extracted.push('creators');
       } catch (err) {
@@ -672,7 +726,8 @@ async function collectValidateKeys(importedKeys) {
   const batchJournals = [...new Set(Object.values(JOURNAL_CODE_NAME))];
   const extra = importedKeys.length
     ? []
-    : await query(`
+    : await query(
+        `
     SELECT i.key
     FROM items i
     JOIN "itemData" dj ON dj."itemID" = i."itemID"
@@ -693,7 +748,9 @@ async function collectValidateKeys(importedKeys) {
           WHERE d."itemID"=i."itemID" AND lower(v.value) LIKE '%/i.infoandorg.%'
         )
       )
-  `, [batchJournals]);
+  `,
+        [batchJournals],
+      );
   return [...new Set([...importedKeys, ...extra.map((r) => r.key)])];
 }
 
@@ -758,11 +815,15 @@ async function main() {
   ensureDataDirs();
   await initDb();
   fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
-  fs.appendFileSync(LOG_PATH, `\n# run ${new Date().toISOString()} phase=${PHASE} dry=${DRY_RUN}\n`);
+  fs.appendFileSync(
+    LOG_PATH,
+    `\n# run ${new Date().toISOString()} phase=${PHASE} dry=${DRY_RUN}\n`,
+  );
 
   const rows = SOURCES.flatMap((s) => {
-    const hasManifest = fs.existsSync(path.join(s.dir, 'manifest.tsv'))
-      || fs.existsSync(path.join(s.dir, 'archives', 'manifest.tsv'));
+    const hasManifest =
+      fs.existsSync(path.join(s.dir, 'manifest.tsv')) ||
+      fs.existsSync(path.join(s.dir, 'archives', 'manifest.tsv'));
     if (!hasManifest) {
       console.warn(`skip missing manifest: ${s.dir}`);
       return [];
@@ -777,10 +838,14 @@ async function main() {
     `${workHeader.join('\t')}\n${rows.map((r) => [r.doi || '', r.src || '', r.filename || '', r.title || ''].join('\t')).join('\n')}\n`,
   );
   const missingDoi = rows.filter((r) => !r.doi);
-  console.log(`Work manifest: ${workManifest} (${rows.length} rows, ${missingDoi.length} without inferred DOI)`);
+  console.log(
+    `Work manifest: ${workManifest} (${rows.length} rows, ${missingDoi.length} without inferred DOI)`,
+  );
   const existing = await loadExistingDois();
   console.log(`DB: ${config.databaseUrl.replace(/:[^:@]+@/, ':***@')}`);
-  console.log(`Storage: ${config.storage.type}  MinerU: ${config.mineru.tokens.length ? `${config.mineru.tokens.length} token(s)` : 'NO'}  LLM: ${config.llm.apiKey ? 'yes' : 'NO'}`);
+  console.log(
+    `Storage: ${config.storage.type}  MinerU: ${config.mineru.tokens.length ? `${config.mineru.tokens.length} token(s)` : 'NO'}  LLM: ${config.llm.apiKey ? 'yes' : 'NO'}`,
+  );
   console.log(`Manifest PDFs: ${rows.length}`);
 
   let importedKeys = [];
@@ -822,5 +887,9 @@ async function main() {
 main().catch(async (err) => {
   console.error('Fatal:', err);
   process.exitCode = 1;
-  try { await closeDb(); } catch { /* ignore */ }
+  try {
+    await closeDb();
+  } catch {
+    /* ignore */
+  }
 });

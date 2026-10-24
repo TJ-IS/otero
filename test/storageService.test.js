@@ -165,11 +165,10 @@ test('uploadDir uploads nested files and prefix list/delete operate on them', as
     objects.set(objectName, fs.readFileSync(localPath));
     return 'fake-etag';
   };
-  client.listObjectsV2 = (_bucket, prefix) => Readable.from(
-    [...objects.keys()]
-      .filter(name => name.startsWith(prefix))
-      .map(name => ({ name })),
-  );
+  client.listObjectsV2 = (_bucket, prefix) =>
+    Readable.from(
+      [...objects.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })),
+    );
   client.removeObjects = async (_bucket, list) => {
     for (const obj of list) objects.delete(obj.name);
   };
@@ -183,11 +182,10 @@ test('uploadDir uploads nested files and prefix list/delete operate on them', as
 
     const prefix = 'UP/ITEMKEY/fulltext';
     const uploaded = await uploadDir(localDir, prefix);
-    assert.deepEqual(uploaded.sort(), [
-      `${prefix}/nested/a.txt`,
-      `${prefix}/nested/deep/b.txt`,
-      `${prefix}/root.txt`,
-    ].sort());
+    assert.deepEqual(
+      uploaded.sort(),
+      [`${prefix}/nested/a.txt`, `${prefix}/nested/deep/b.txt`, `${prefix}/root.txt`].sort(),
+    );
     assert.equal(objects.get(`${prefix}/nested/deep/b.txt`).toString(), 'B');
 
     const listed = await listStoredPrefix(prefix);

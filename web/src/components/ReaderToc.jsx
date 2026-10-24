@@ -4,7 +4,10 @@ import { headingId } from '@/lib/fulltext';
 import { cn } from '@/lib/utils';
 
 function outlineLabel(text) {
-  return String(text || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  return String(text || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // MinerU reports almost every section as level 2, so the heading's own numbering
@@ -37,10 +40,14 @@ export const ReaderToc = memo(function ReaderToc({
     setFade((prev) => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }));
   }, []);
 
-  const items = useMemo(() => outline.map((o) => {
-    const label = outlineLabel(o.text);
-    return { ...o, label, slug: headingId(o.text), depth: outlineDepth(o, label) };
-  }), [outline]);
+  const items = useMemo(
+    () =>
+      outline.map((o) => {
+        const label = outlineLabel(o.text);
+        return { ...o, label, slug: headingId(o.text), depth: outlineDepth(o, label) };
+      }),
+    [outline],
+  );
 
   useEffect(() => {
     const container = scrollRef?.current;
@@ -83,25 +90,26 @@ export const ReaderToc = memo(function ReaderToc({
 
     const attach = () => {
       if (cancelled) return;
-      const elements = items
-        .map((item) => document.getElementById(item.slug))
-        .filter(Boolean);
+      const elements = items.map((item) => document.getElementById(item.slug)).filter(Boolean);
       if (elements.length === 0) {
         if (attempts++ < 40) retryId = requestAnimationFrame(attach);
         return;
       }
 
-      observer = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) intersecting.add(entry.target.id);
-          else intersecting.delete(entry.target.id);
-        }
-        resolveActive();
-      }, {
-        root: container,
-        rootMargin: '0px 0px -55% 0px',
-        threshold: 0,
-      });
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (entry.isIntersecting) intersecting.add(entry.target.id);
+            else intersecting.delete(entry.target.id);
+          }
+          resolveActive();
+        },
+        {
+          root: container,
+          rootMargin: '0px 0px -55% 0px',
+          threshold: 0,
+        },
+      );
 
       for (const el of elements) observer.observe(el);
       resolveActive();
@@ -120,12 +128,16 @@ export const ReaderToc = memo(function ReaderToc({
   useEffect(() => {
     const list = listRef.current;
     if (!list) return;
-    const el = activeId == null
-      ? null
-      : list.querySelector(`[data-toc-id="${CSS.escape(String(activeId))}"]`);
+    const el =
+      activeId == null
+        ? null
+        : list.querySelector(`[data-toc-id="${CSS.escape(String(activeId))}"]`);
     if (el) {
       const { offsetTop, offsetHeight } = el;
-      if (offsetTop < list.scrollTop || offsetTop + offsetHeight > list.scrollTop + list.clientHeight) {
+      if (
+        offsetTop < list.scrollTop ||
+        offsetTop + offsetHeight > list.scrollTop + list.clientHeight
+      ) {
         list.scrollTop = Math.max(0, offsetTop - (list.clientHeight - offsetHeight) / 2);
       }
     }
@@ -134,7 +146,10 @@ export const ReaderToc = memo(function ReaderToc({
 
   if (loading) {
     return (
-      <div className="pointer-events-none flex h-full flex-col justify-center gap-4 pl-1" aria-hidden>
+      <div
+        className="pointer-events-none flex h-full flex-col justify-center gap-4 pl-1"
+        aria-hidden
+      >
         {[18, 11, 11, 18, 7, 11].map((w, i) => (
           <span key={i} className="block h-px rounded-full bg-foreground/15" style={{ width: w }} />
         ))}
@@ -169,9 +184,7 @@ export const ReaderToc = memo(function ReaderToc({
               <span
                 className={cn(
                   'block h-px rounded-full transition-colors duration-150',
-                  active
-                    ? 'bg-brand'
-                    : 'bg-foreground/20 group-hover/toc:bg-foreground/35',
+                  active ? 'bg-brand' : 'bg-foreground/20 group-hover/toc:bg-foreground/35',
                 )}
                 style={{ width: active ? 22 : MARK_WIDTH[item.depth] }}
               />

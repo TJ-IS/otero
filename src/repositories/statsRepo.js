@@ -36,13 +36,15 @@ async function basketScope(itemAlias = 'i') {
   const jfid = await fieldIdByName('publicationTitle');
   if (!jfid) return null;
   const placeholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 2}`).join(',');
-  const where = [`EXISTS (
+  const where = [
+    `EXISTS (
       SELECT 1 FROM "itemData" scope_d
       JOIN "itemDataValues" scope_v ON scope_v."valueID" = scope_d."valueID"
       WHERE scope_d."itemID" = ${itemAlias}."itemID"
         AND scope_d."fieldID" = $1
         AND scope_v.value IN (${placeholders})
-    )`];
+    )`,
+  ];
   const params = [jfid, ...JOURNAL_WHITELIST];
   await appendDoiRequiredForArticles(where, params, params.length + 1, itemAlias);
   return {
@@ -63,7 +65,8 @@ export async function getOverviewStats({ basketOnly = false } = {}) {
     params = scope.params;
   }
 
-  const row = await queryOne(`
+  const row = await queryOne(
+    `
     SELECT
       (SELECT COUNT(*)::int
        FROM items i
@@ -81,7 +84,9 @@ export async function getOverviewStats({ basketOnly = false } = {}) {
        FROM "itemAttachments" ia
        JOIN items i ON i."itemID" = ia."parentItemID"
        WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${extra}) AS "withAttachment"
-  `, params);
+  `,
+    params,
+  );
 
   return {
     totalItems: row?.totalItems ?? 0,
@@ -101,14 +106,17 @@ export async function getItemTypeDistribution({ basketOnly = false } = {}) {
     extra = scope.sql;
     params = scope.params;
   }
-  return query(`
+  return query(
+    `
     SELECT it."typeName" AS "itemType", COUNT(*)::int AS count
     FROM items i
     JOIN "itemTypes" it ON it."itemTypeID" = i."itemTypeID"
     WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${extra}
     GROUP BY it."typeName"
     ORDER BY count DESC
-  `, params);
+  `,
+    params,
+  );
 }
 
 export async function getPublicationYearHistogram({ basketOnly = false } = {}) {
@@ -134,13 +142,16 @@ export async function getPublicationYearHistogram({ basketOnly = false } = {}) {
     if (doiWhere.length) extra = `${extra} AND ${doiWhere[0]}`;
   }
 
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT v.value AS date
     FROM "itemData" d
     JOIN "itemDataValues" v ON v."valueID" = d."valueID"
     JOIN items i ON i."itemID" = d."itemID"
     WHERE d."fieldID" = $1 AND i.deleted = 0 AND i."parentItemID" IS NULL AND ${extra}
-  `, params);
+  `,
+    params,
+  );
 
   const counts = new Map();
   for (const r of rows) {
@@ -158,14 +169,16 @@ export async function getJournalBreakdown() {
   const journals = await listJournals();
   const jfid = await fieldIdByName('publicationTitle');
   const dateFieldId = await fieldIdByName('date');
-  if (!jfid || !dateFieldId) return journals.map(j => ({ ...j, years: [] }));
+  if (!jfid || !dateFieldId) return journals.map((j) => ({ ...j, years: [] }));
 
   const placeholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 3}`).join(',');
 
-  return Promise.all(journals.map(async (j) => {
-    let rows;
-    if (j.name === UNFILED) {
-      rows = await query(`
+  return Promise.all(
+    journals.map(async (j) => {
+      let rows;
+      if (j.name === UNFILED) {
+        rows = await query(
+          `
         SELECT v.value AS date
         FROM "itemData" d
         JOIN "itemDataValues" v ON v."valueID" = d."valueID"
@@ -176,9 +189,12 @@ export async function getJournalBreakdown() {
             JOIN "itemDataValues" v2 ON v2."valueID" = d2."valueID"
             WHERE d2."itemID" = i."itemID" AND d2."fieldID" = $2 AND v2.value IN (${placeholders})
           )
-      `, [dateFieldId, jfid, ...JOURNAL_WHITELIST]);
-    } else {
-      rows = await query(`
+      `,
+          [dateFieldId, jfid, ...JOURNAL_WHITELIST],
+        );
+      } else {
+        rows = await query(
+          `
         SELECT v2.value AS date
         FROM "itemData" d1
         JOIN "itemDataValues" v1 ON v1."valueID" = d1."valueID"
@@ -187,19 +203,22 @@ export async function getJournalBreakdown() {
         JOIN "itemDataValues" v2 ON v2."valueID" = d2."valueID"
         WHERE d1."fieldID" = $2 AND v1.value = $3
           AND i.deleted = 0 AND i."parentItemID" IS NULL
-      `, [dateFieldId, jfid, j.name]);
-    }
-    const counts = new Map();
-    for (const r of rows) {
-      const year = extractYear(r.date);
-      if (year == null) continue;
-      counts.set(year, (counts.get(year) || 0) + 1);
-    }
-    const years = [...counts.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([year, count]) => ({ year, count }));
-    return { ...j, years };
-  }));
+      `,
+          [dateFieldId, jfid, j.name],
+        );
+      }
+      const counts = new Map();
+      for (const r of rows) {
+        const year = extractYear(r.date);
+        if (year == null) continue;
+        counts.set(year, (counts.get(year) || 0) + 1);
+      }
+      const years = [...counts.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([year, count]) => ({ year, count }));
+      return { ...j, years };
+    }),
+  );
 }
 
 export async function getFullTextStatusCounts() {
@@ -240,7 +259,8 @@ async function getCollectedDoiKeys() {
   const collectedKeys = new Set();
   if (!doiFieldId) return collectedKeys;
 
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT v.value AS doi
     FROM "itemData" d
     JOIN "itemDataValues" v ON v."valueID" = d."valueID"
@@ -248,7 +268,9 @@ async function getCollectedDoiKeys() {
     WHERE d."fieldID" = $1
       AND i.deleted = 0
       AND i."parentItemID" IS NULL
-  `, [doiFieldId]);
+  `,
+    [doiFieldId],
+  );
   for (const r of rows) {
     const key = doiCompareKey(r.doi);
     if (key) collectedKeys.add(key);
@@ -273,9 +295,7 @@ export async function getDoiCoverageStats() {
   const collectedTotal = collectedKeys.size;
   const targetOnly = targetTotal - intersection;
   const collectedOnly = collectedTotal - intersection;
-  const coveragePct = targetTotal === 0
-    ? 0
-    : Math.round((intersection / targetTotal) * 1000) / 10;
+  const coveragePct = targetTotal === 0 ? 0 : Math.round((intersection / targetTotal) * 1000) / 10;
 
   return {
     targetTotal,
@@ -297,7 +317,8 @@ async function getLibraryDoiMetaMap() {
   const map = new Map();
   if (!doiFieldId) return map;
 
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT
       v_doi.value AS doi,
       v_pub.value AS "publicationTitle",
@@ -314,7 +335,9 @@ async function getLibraryDoiMetaMap() {
     WHERE d_doi."fieldID" = $1
       AND i.deleted = 0
       AND i."parentItemID" IS NULL
-  `, [doiFieldId, pubFieldId || -1, dateFieldId || -1]);
+  `,
+    [doiFieldId, pubFieldId || -1, dateFieldId || -1],
+  );
 
   for (const r of rows) {
     const key = doiCompareKey(r.doi);
@@ -366,9 +389,7 @@ export async function getDoiCoverageBreakdown() {
   for (const key of targetKeys) {
     const lib = libraryMeta.get(key);
     const collected = Boolean(lib);
-    let journal = lib?.journal && lib.journal !== UNFILED
-      ? lib.journal
-      : inferJournalFromDoi(key);
+    let journal = lib?.journal && lib.journal !== UNFILED ? lib.journal : inferJournalFromDoi(key);
     if (journal && !byJournal.has(journal)) {
       // Library classified outside Basket — still attribute via DOI heuristic
       journal = inferJournalFromDoi(key);
@@ -391,12 +412,9 @@ export async function getDoiCoverageBreakdown() {
   }
 
   function finalize(bucket, yearMap) {
-    bucket.coveragePct = bucket.target === 0
-      ? 0
-      : Math.round((bucket.collected / bucket.target) * 1000) / 10;
-    bucket.years = [...yearMap.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([, row]) => row);
+    bucket.coveragePct =
+      bucket.target === 0 ? 0 : Math.round((bucket.collected / bucket.target) * 1000) / 10;
+    bucket.years = [...yearMap.entries()].sort((a, b) => a[0] - b[0]).map(([, row]) => row);
     return bucket;
   }
 

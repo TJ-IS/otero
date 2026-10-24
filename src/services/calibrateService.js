@@ -17,14 +17,17 @@ const ALLOWED_PUBLICATION_TITLES = [...AIS_BASKET_JOURNALS, UNFILED];
  * List the field names allowed for a given itemType name.
  */
 async function allowedFieldsForType(itemTypeName) {
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT f."fieldName" FROM "itemTypeFields" itf
     JOIN fields f ON f."fieldID" = itf."fieldID"
     JOIN "itemTypes" it ON it."itemTypeID" = itf."itemTypeID"
     WHERE it."typeName" = $1
     ORDER BY itf."orderIndex"
-  `, [itemTypeName]);
-  return rows.map(r => r.fieldName);
+  `,
+    [itemTypeName],
+  );
+  return rows.map((r) => r.fieldName);
 }
 
 /**
@@ -92,7 +95,7 @@ ${markdown}
 - 只对允许字段列表里的字段输出；不要编造字段名。
 - 期刊字段名是 publicationTitle（不是 journal/publicationName）。日期字段是 date（通常只存年份）。DOI 字段名是 DOI（大写）。
 - publicationTitle 的 suggested 必须是下列 AIS Senior Scholars' Basket 期刊之一，或字符串"${UNFILED}"（当全文无法确认属于其中任何一本时使用"${UNFILED}"）。允许值列表：
-${AIS_BASKET_JOURNALS.map(j => `  - ${j}`).join('\n')}
+${AIS_BASKET_JOURNALS.map((j) => `  - ${j}`).join('\n')}
   - ${UNFILED}
 - 若当前 DOI 字段为空（缺失），publicationTitle 的 suggested 必须为"${UNFILED}"，不得建议任何 basket 期刊。
 - 作者：若全文未提及或无法判断，status=correct 且 suggested 与 current 相同。
@@ -104,7 +107,11 @@ ${AIS_BASKET_JOURNALS.map(j => `  - ${j}`).join('\n')}
 function extractJson(text) {
   if (!text) throw new Error('LLM 返回为空');
   // Try direct parse first.
-  try { return JSON.parse(text); } catch { /* fall through */ }
+  try {
+    return JSON.parse(text);
+  } catch {
+    /* fall through */
+  }
   // Extract the first {...} block.
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
@@ -136,9 +143,10 @@ export async function calibrateItem(key) {
   const creators = json.creators || [];
   const allowedFields = await allowedFieldsForType(itemType);
 
-  const markdown = ft.markdown.length > config.llm.maxMarkdownChars
-    ? ft.markdown.slice(0, config.llm.maxMarkdownChars)
-    : ft.markdown;
+  const markdown =
+    ft.markdown.length > config.llm.maxMarkdownChars
+      ? ft.markdown.slice(0, config.llm.maxMarkdownChars)
+      : ft.markdown;
 
   const userPrompt = buildPrompt({ itemType, fields, creators, allowedFields, markdown });
 
@@ -151,7 +159,7 @@ export async function calibrateItem(key) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.llm.apiKey}`,
+        Authorization: `Bearer ${config.llm.apiKey}`,
       },
       body: JSON.stringify({
         model: config.llm.model,
@@ -216,14 +224,15 @@ export function normalizeCalibrationFields(parsed, { allowedSet, doiMissing }) {
   const allowedTitles = new Set(ALLOWED_PUBLICATION_TITLES);
   return Array.isArray(parsed?.fields)
     ? parsed.fields
-        .filter(f => allowedSet.has(f.field))
-        .map(f => {
+        .filter((f) => allowedSet.has(f.field))
+        .map((f) => {
           if (f.field === 'publicationTitle' && f.suggested && !allowedTitles.has(f.suggested)) {
             return {
               ...f,
               suggested: f.current || '',
               status: f.current ? 'correct' : 'missing',
-              reason: `建议值「${f.suggested}」不在 AIS Basket 允许列表内，已忽略。${f.reason || ''}`.trim(),
+              reason:
+                `建议值「${f.suggested}」不在 AIS Basket 允许列表内，已忽略。${f.reason || ''}`.trim(),
             };
           }
           if (f.field === 'publicationTitle' && doiMissing && f.suggested !== UNFILED) {

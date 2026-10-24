@@ -10,10 +10,7 @@ import { parseItem, pollOnce, getFullText, listAll } from '../services/fulltextS
 
 const program = new Command();
 
-program
-  .name('otero')
-  .description('Otero literature management CLI')
-  .version('0.1.0');
+program.name('otero').description('Otero literature management CLI').version('0.1.0');
 
 program
   .command('migrate')
@@ -32,7 +29,9 @@ program
     await initDb();
     await runMigrations();
     const res = await seed();
-    console.log(`Seed OK: ${res.itemTypes} itemTypes, ${res.fields} fields, ${res.creatorTypes} creatorTypes`);
+    console.log(
+      `Seed OK: ${res.itemTypes} itemTypes, ${res.fields} fields, ${res.creatorTypes} creatorTypes`,
+    );
     await closeDb();
   });
 
@@ -44,13 +43,16 @@ program
   .action(async (paths, opts) => {
     await initDb();
     await runMigrations();
-    let ok = 0, fail = 0;
+    let ok = 0,
+      fail = 0;
     for (const p of paths) {
       try {
         const r = await importPdf(p, { skipRecognize: !opts.recognize });
         const parentKey = r.parent?.key ?? '(no parent)';
         const title = r.parent?.getField('title') ?? r.attachment.key;
-        console.log(`[OK]   ${p}\n        parent=${parentKey} attachment=${r.attachment.key}\n        title="${title}"`);
+        console.log(
+          `[OK]   ${p}\n        parent=${parentKey} attachment=${r.attachment.key}\n        title="${title}"`,
+        );
         ok++;
       } catch (err) {
         console.error(`[FAIL] ${p}\n        ${err.message}`);
@@ -82,7 +84,7 @@ program
     } else {
       for (const it of items) {
         const title = it.getField('title') ?? '(untitled)';
-        const creators = it.creators.map(c => c.lastName || c.firstName || c.name).join(', ');
+        const creators = it.creators.map((c) => c.lastName || c.firstName || c.name).join(', ');
         console.log(`${it.key}\t${it.itemType}\t${title}\t${creators}`);
       }
     }
@@ -117,7 +119,7 @@ program
 
 program
   .command('parse')
-  .description('Parse an item\'s PDF to Markdown full text via MinerU')
+  .description("Parse an item's PDF to Markdown full text via MinerU")
   .argument('<key>', 'item key')
   .option('--force', 're-parse even if already done')
   .option('--wait', 'block until the task completes (polls locally)')
@@ -131,12 +133,14 @@ program
         console.log('Polling until done...');
         // eslint-disable-next-line no-constant-condition
         while (true) {
-          await new Promise(r => setTimeout(r, 3000));
+          await new Promise((r) => setTimeout(r, 3000));
           await pollOnce();
           const cur = await getFullText(key);
-          process.stdout.write(`\rstate=${cur.state}` +
-            (cur.totalPages ? ` ${cur.extractedPages ?? 0}/${cur.totalPages}` : '') +
-            '    ');
+          process.stdout.write(
+            `\rstate=${cur.state}` +
+              (cur.totalPages ? ` ${cur.extractedPages ?? 0}/${cur.totalPages}` : '') +
+              '    ',
+          );
           if (cur.state === 'done' || cur.state === 'failed') {
             console.log('');
             if (cur.state === 'failed') console.error(`Failed: ${cur.errMsg}`);
@@ -161,7 +165,8 @@ program
     await initDb();
     await runMigrations();
     const items = await Items.listAll({ type: opts.type, topLevelOnly: true });
-    let ok = 0, fail = 0;
+    let ok = 0,
+      fail = 0;
     for (const it of items) {
       try {
         await parseItem(it.key, { force: !!opts.force });
@@ -172,9 +177,11 @@ program
         fail++;
       }
     }
-    console.log(`\nSubmitted: ${ok} ok, ${fail} failed. ` +
-      `Pending tasks will be advanced by the running server's worker.` +
-      (!ok ? '' : ` Run \`otero serve\` or use --wait on \`otero parse\` to advance them.`));
+    console.log(
+      `\nSubmitted: ${ok} ok, ${fail} failed. ` +
+        `Pending tasks will be advanced by the running server's worker.` +
+        (!ok ? '' : ` Run \`otero serve\` or use --wait on \`otero parse\` to advance them.`),
+    );
     await closeDb();
   });
 
@@ -203,13 +210,14 @@ program
   .option('--limit <n>', 'max rows to process', (v) => parseInt(v, 10))
   .option('--concurrency <n>', 'parallel workers', (v) => parseInt(v, 10), 4)
   .action(async (opts) => {
-    const { backfillFullTextIndex, countUnindexedFullText } = await import(
-      '../services/fulltextIndexService.js'
-    );
+    const { backfillFullTextIndex, countUnindexedFullText } =
+      await import('../services/fulltextIndexService.js');
     await initDb();
     await runMigrations();
     const pending = await countUnindexedFullText();
-    console.log(`Unindexed done rows: ${pending}` + (opts.force ? ' (force re-index all done)' : ''));
+    console.log(
+      `Unindexed done rows: ${pending}` + (opts.force ? ' (force re-index all done)' : ''),
+    );
     let lastLog = 0;
     const res = await backfillFullTextIndex({
       force: !!opts.force,
@@ -241,15 +249,22 @@ program
     await runMigrations();
     try {
       const apply = !!opts.apply && !opts.dryRun;
-      const keys = opts.keys ? String(opts.keys).split(',').map((k) => k.trim()).filter(Boolean) : null;
+      const keys = opts.keys
+        ? String(opts.keys)
+            .split(',')
+            .map((k) => k.trim())
+            .filter(Boolean)
+        : null;
       const res = await repairMetadata({
         apply,
         phase: opts.phase,
         logPath: opts.log || null,
         keys,
       });
-      console.log(`\n${apply ? 'Applied' : 'Dry-run'}: ${res.summary.total} rows, `
-        + `${res.summary.applied} changed, ${res.summary.skipped} skipped, ${res.summary.errors} errors`);
+      console.log(
+        `\n${apply ? 'Applied' : 'Dry-run'}: ${res.summary.total} rows, ` +
+          `${res.summary.applied} changed, ${res.summary.skipped} skipped, ${res.summary.errors} errors`,
+      );
       console.log(`Log: ${res.logPath}`);
       if (res.summary.errors > 0) process.exitCode = 1;
     } catch (err) {
@@ -274,15 +289,22 @@ program
     await runMigrations();
     try {
       const apply = !!opts.apply && !opts.dryRun;
-      const keys = opts.keys ? String(opts.keys).split(',').map((k) => k.trim()).filter(Boolean) : null;
+      const keys = opts.keys
+        ? String(opts.keys)
+            .split(',')
+            .map((k) => k.trim())
+            .filter(Boolean)
+        : null;
       const res = await extractAbstracts({
         apply,
         logPath: opts.log || null,
         limit: opts.limit || null,
         keys,
       });
-      console.log(`\n${apply ? 'Applied' : 'Dry-run'}: scanned ${res.summary.scanned}, `
-        + `${res.summary.hit} extracted, ${res.summary.skipped} skipped`);
+      console.log(
+        `\n${apply ? 'Applied' : 'Dry-run'}: scanned ${res.summary.scanned}, ` +
+          `${res.summary.hit} extracted, ${res.summary.skipped} skipped`,
+      );
       for (const j of res.summary.byJournal) {
         if (!j.candidates) continue;
         console.log(`  ${j.journal}: ${j.hit}/${j.candidates} (${j.rate}%)`);
@@ -297,10 +319,13 @@ program
   });
 
 // Default: print help.
-program.parseAsync(process.argv).catch(err => {
-  console.error(err);
-  process.exitCode = 1;
-}).finally(() => {
-  // closeDb() is called explicitly by short-lived commands above. The serve
-  // command keeps the DB open. Long-running servers shouldn't close.
-});
+program
+  .parseAsync(process.argv)
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    // closeDb() is called explicitly by short-lived commands above. The serve
+    // command keeps the DB open. Long-running servers shouldn't close.
+  });

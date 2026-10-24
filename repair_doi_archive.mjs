@@ -45,15 +45,21 @@ function parseArgs(argv) {
 // Normalization shared with normalizeJournalName: lowercase, drop "The" prefix,
 // turn "&" into "and", collapse whitespace.
 function norm(s) {
-  return (s || '').toLowerCase().replace(/^the\s+/, '').replace(/&/g, 'and').replace(/\s+/g, ' ').trim();
+  return (s || '')
+    .toLowerCase()
+    .replace(/^the\s+/, '')
+    .replace(/&/g, 'and')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Whitelist journals pre-normalized, longest first so more specific names win
 // on substring matching (e.g. "Information Systems Research" before "Information
 // Systems Journal" — both distinct, but ordering by length avoids partial ties).
-const JOURNAL_PATTERNS = JOURNAL_WHITELIST
-  .map(canonical => ({ canonical, norm: norm(canonical) }))
-  .sort((a, b) => b.norm.length - a.norm.length);
+const JOURNAL_PATTERNS = JOURNAL_WHITELIST.map((canonical) => ({
+  canonical,
+  norm: norm(canonical),
+})).sort((a, b) => b.norm.length - a.norm.length);
 
 /**
  * Find the canonical AIS Basket journal whose name appears in the header/footer
@@ -76,7 +82,8 @@ async function listTargets() {
   // Targets: 待归档 (publicationTitle missing or not in whitelist) with fulltext
   // done, OR any top-level non-deleted item whose DOI is the known truncated
   // garbage value (so we also fix the 1 item already in the MISQ bucket).
-  return query(`
+  return query(
+    `
     SELECT i."itemID", i.key,
       (SELECT dv.value FROM "itemData" d JOIN fields f ON f."fieldID"=d."fieldID" AND f."fieldName"='DOI'
         JOIN "itemDataValues" dv ON dv."valueID"=d."valueID" WHERE d."itemID"=i."itemID") AS doi,
@@ -100,7 +107,9 @@ async function listTargets() {
         )
       )
     ORDER BY i."itemID"
-  `, [...JOURNAL_WHITELIST]);
+  `,
+    [...JOURNAL_WHITELIST],
+  );
 }
 
 function csvCell(s) {
@@ -108,9 +117,23 @@ function csvCell(s) {
   if (/[",\n\r]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
   return v;
 }
-function csvRow(cells) { return cells.map(csvCell).join(',') + '\n'; }
+function csvRow(cells) {
+  return cells.map(csvCell).join(',') + '\n';
+}
 
-const CSV_HEADER = ['key', 'itemID', 'title', 'oldDOI', 'newDOI', 'doiChanged', 'oldPubTitle', 'newPubTitle', 'pubChanged', 'archived', 'action'];
+const CSV_HEADER = [
+  'key',
+  'itemID',
+  'title',
+  'oldDOI',
+  'newDOI',
+  'doiChanged',
+  'oldPubTitle',
+  'newPubTitle',
+  'pubChanged',
+  'archived',
+  'action',
+];
 
 async function main() {
   ensureDataDirs();
@@ -124,7 +147,11 @@ async function main() {
   console.log(`日志：${LOG_PATH}\n`);
 
   const logLines = [csvRow(CSV_HEADER)];
-  let doiFixed = 0, doiFilled = 0, archived = 0, noFooterDoi = 0, noJournal = 0;
+  let doiFixed = 0,
+    doiFilled = 0,
+    archived = 0,
+    noFooterDoi = 0,
+    noJournal = 0;
   const start = Date.now();
 
   for (const t of targets) {
@@ -175,8 +202,28 @@ async function main() {
       }
     }
 
-    const action = archivedNow ? 'archived' : (doiChanged ? doiAction : (regexDoi ? 'no-change' : 'no-footer-doi'));
-    logLines.push(csvRow([t.key, t.itemID, t.title, oldDoi, newDoi, doiChanged ? 'yes' : 'no', oldPub, newPub, pubChanged ? 'yes' : 'no', archivedNow ? 'yes' : 'no', action]));
+    const action = archivedNow
+      ? 'archived'
+      : doiChanged
+        ? doiAction
+        : regexDoi
+          ? 'no-change'
+          : 'no-footer-doi';
+    logLines.push(
+      csvRow([
+        t.key,
+        t.itemID,
+        t.title,
+        oldDoi,
+        newDoi,
+        doiChanged ? 'yes' : 'no',
+        oldPub,
+        newPub,
+        pubChanged ? 'yes' : 'no',
+        archivedNow ? 'yes' : 'no',
+        action,
+      ]),
+    );
 
     if ((targets.indexOf(t) + 1) % 100 === 0 || targets.indexOf(t) === targets.length - 1) {
       const done = targets.indexOf(t) + 1;
@@ -202,5 +249,9 @@ async function main() {
 main().catch(async (err) => {
   console.error('Fatal:', err);
   process.exitCode = 1;
-  try { await closeDb(); } catch { /* ignore */ }
+  try {
+    await closeDb();
+  } catch {
+    /* ignore */
+  }
 });

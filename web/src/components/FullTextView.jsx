@@ -34,14 +34,26 @@ function StateBadge({ state }) {
     done: 'default',
     failed: 'destructive',
   };
-  return <Badge variant={map[state] || 'secondary'}>{t(`fulltextStatus.${state}`, { defaultValue: state })}</Badge>;
+  return (
+    <Badge variant={map[state] || 'secondary'}>
+      {t(`fulltextStatus.${state}`, { defaultValue: state })}
+    </Badge>
+  );
 }
 
 export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
   const { t } = useTranslation(['item', 'common']);
   const { canEdit } = useAuth();
-  const { data: row, error, loading, refresh } = useAsync((signal) => api.getFulltext(itemKey, { signal }), [itemKey]);
-  const { data: structure } = useAsync((signal) => api.getFulltextStructure(itemKey, { signal }), [itemKey]);
+  const {
+    data: row,
+    error,
+    loading,
+    refresh,
+  } = useAsync((signal) => api.getFulltext(itemKey, { signal }), [itemKey]);
+  const { data: structure } = useAsync(
+    (signal) => api.getFulltextStructure(itemKey, { signal }),
+    [itemKey],
+  );
   const [busy, setBusy] = useState(false);
   const refreshTimer = useRef(null);
 
@@ -55,22 +67,25 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
     return () => clearInterval(refreshTimer.current);
   }, [isActive, refresh]);
 
-  const triggerParse = useCallback(async ({ force = false } = {}) => {
-    if (!canEdit) {
-      toast.error(t('common:connectWhitelistFirst'));
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.parseFulltext(itemKey, { force });
-      toast.success(t('fulltext.submitted'));
-      refresh();
-    } catch (err) {
-      toast.error(t('fulltext.submitFailed', { message: err.message }));
-    } finally {
-      setBusy(false);
-    }
-  }, [itemKey, refresh, canEdit, t]);
+  const triggerParse = useCallback(
+    async ({ force = false } = {}) => {
+      if (!canEdit) {
+        toast.error(t('common:connectWhitelistFirst'));
+        return;
+      }
+      setBusy(true);
+      try {
+        await api.parseFulltext(itemKey, { force });
+        toast.success(t('fulltext.submitted'));
+        refresh();
+      } catch (err) {
+        toast.error(t('fulltext.submitFailed', { message: err.message }));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [itemKey, refresh, canEdit, t],
+  );
 
   const removeFulltext = useCallback(async () => {
     if (!canEdit) {
@@ -90,10 +105,18 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
   }, [itemKey, refresh, canEdit, t]);
 
   if (loading) {
-    return <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t('common:loadingDots')}</div>;
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+        {t('common:loadingDots')}
+      </div>
+    );
   }
   if (error) {
-    return <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">{t('common:loadFailed', { message: error.message })}</div>;
+    return (
+      <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">
+        {t('common:loadFailed', { message: error.message })}
+      </div>
+    );
   }
   if (!hasPdf) {
     return (
@@ -166,7 +189,9 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
             <Loader2 className="size-8 animate-spin opacity-60" />
             <p>{t(`fulltextStatus.${state}`)}…</p>
             {row?.totalPages && (
-              <p className="text-xs">{t('fulltext.pages', { extracted: row.extractedPages ?? 0, total: row.totalPages })}</p>
+              <p className="text-xs">
+                {t('fulltext.pages', { extracted: row.extractedPages ?? 0, total: row.totalPages })}
+              </p>
             )}
             <p className="text-xs">{t('fulltext.autoRefresh')}</p>
           </div>
@@ -176,8 +201,16 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm text-destructive">
             <AlertCircle className="size-8" />
             <p>{t('fulltext.parseFailed')}</p>
-            <p className="text-xs text-muted-foreground max-w-md">{row?.errMsg || t('common:unknownError')}</p>
-            <Button size="sm" variant="outline" onClick={() => triggerParse({ force: true })} disabled={busy} className="mt-2">
+            <p className="text-xs text-muted-foreground max-w-md">
+              {row?.errMsg || t('common:unknownError')}
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => triggerParse({ force: true })}
+              disabled={busy}
+              className="mt-2"
+            >
               <RefreshCw className="size-3.5" /> {t('fulltext.reparse')}
             </Button>
           </div>
@@ -201,7 +234,6 @@ export const FullTextView = memo(function FullTextView({ itemKey, hasPdf }) {
           </div>
         )}
       </div>
-
     </div>
   );
 });

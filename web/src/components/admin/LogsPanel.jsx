@@ -22,7 +22,7 @@ export function LogsPanel() {
   const [draft, setDraft] = useState({ address: '', action: '', path: '' });
   const { data, error, loading, refresh } = useAsync(
     () => api.getAdminLogs({ page, pageSize: PAGE_SIZE, ...filters }),
-    [page, filters]
+    [page, filters],
   );
 
   const logs = data?.logs || [];
@@ -35,11 +35,11 @@ export function LogsPanel() {
         eyebrow={t('common:nav.admin')}
         title={t('logs.title')}
         description={t('logs.desc')}
-        actions={(
+        actions={
           <Button size="sm" variant="outline" onClick={refresh} disabled={loading}>
             {t('status.refresh')}
           </Button>
-        )}
+        }
       />
 
       <form
@@ -54,13 +54,29 @@ export function LogsPanel() {
           });
         }}
       >
-        <Input value={draft.address} onChange={(e) => setDraft(d => ({ ...d, address: e.target.value }))} placeholder={t('logs.phAddress')} />
-        <Input value={draft.action} onChange={(e) => setDraft(d => ({ ...d, action: e.target.value }))} placeholder={t('logs.phAction')} />
-        <Input value={draft.path} onChange={(e) => setDraft(d => ({ ...d, path: e.target.value }))} placeholder={t('logs.phPath')} />
-        <Button type="submit" size="sm" variant="outline">{t('common:nav.search')}</Button>
+        <Input
+          value={draft.address}
+          onChange={(e) => setDraft((d) => ({ ...d, address: e.target.value }))}
+          placeholder={t('logs.phAddress')}
+        />
+        <Input
+          value={draft.action}
+          onChange={(e) => setDraft((d) => ({ ...d, action: e.target.value }))}
+          placeholder={t('logs.phAction')}
+        />
+        <Input
+          value={draft.path}
+          onChange={(e) => setDraft((d) => ({ ...d, path: e.target.value }))}
+          placeholder={t('logs.phPath')}
+        />
+        <Button type="submit" size="sm" variant="outline">
+          {t('common:nav.search')}
+        </Button>
       </form>
 
-      {error ? <ErrorState message={t('logs.loadFailed', { message: error.message })} onRetry={refresh} /> : null}
+      {error ? (
+        <ErrorState message={t('logs.loadFailed', { message: error.message })} onRetry={refresh} />
+      ) : null}
 
       <section className="overflow-hidden border border-border/80">
         {loading && !data ? (
@@ -86,13 +102,21 @@ export function LogsPanel() {
                       {formatDate(log.createdAt, i18n.language)}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">{log.action}</td>
-                    <td className="max-w-[220px] truncate px-4 py-3 font-mono text-xs" title={log.address || ''}>
+                    <td
+                      className="max-w-[220px] truncate px-4 py-3 font-mono text-xs"
+                      title={log.address || ''}
+                    >
                       {log.address || t('logs.guest')}
                     </td>
-                    <td className="max-w-[320px] truncate px-4 py-3 font-mono text-xs" title={`${log.method || ''} ${log.path || ''}`}>
+                    <td
+                      className="max-w-[320px] truncate px-4 py-3 font-mono text-xs"
+                      title={`${log.method || ''} ${log.path || ''}`}
+                    >
                       {log.method} {log.path}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs tabular-nums">{log.statusCode ?? '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs tabular-nums">
+                      {log.statusCode ?? '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -101,12 +125,24 @@ export function LogsPanel() {
         )}
         {totalPages > 1 ? (
           <div className="flex items-center justify-between border-t px-4 py-3">
-            <p className="text-xs text-muted-foreground">{t('logs.pageOf', { page, total: totalPages })}</p>
+            <p className="text-xs text-muted-foreground">
+              {t('logs.pageOf', { page, total: totalPages })}
+            </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage(p => p - 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1 || loading}
+                onClick={() => setPage((p) => p - 1)}
+              >
                 {t('common:prevPage')}
               </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages || loading} onClick={() => setPage(p => p + 1)}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages || loading}
+                onClick={() => setPage((p) => p + 1)}
+              >
                 {t('common:nextPage')}
               </Button>
             </div>

@@ -23,11 +23,16 @@ export function startFullTextWorker() {
   // Kick one off shortly after start.
   setTimeout(tick, 1000).unref?.();
   const n = config.mineru.tokens.length;
-  console.log(`[fulltext] worker started (poll every ${interval}ms, ${n} MinerU token${n === 1 ? '' : 's'})`);
+  console.log(
+    `[fulltext] worker started (poll every ${interval}ms, ${n} MinerU token${n === 1 ? '' : 's'})`,
+  );
 }
 
 export function stopFullTextWorker() {
-  if (timer) { clearInterval(timer); timer = null; }
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
   started = false;
 }
 
@@ -37,7 +42,9 @@ async function tick() {
   try {
     const res = await pollOnce();
     if (res.checked > 0) {
-      console.log(`[fulltext] tick: batches=${res.checked} finalized=${res.finalized} failed=${res.failed}`);
+      console.log(
+        `[fulltext] tick: batches=${res.checked} finalized=${res.finalized} failed=${res.failed}`,
+      );
     }
   } catch (err) {
     console.error('[fulltext] worker tick failed:', err.message);

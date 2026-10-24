@@ -61,7 +61,7 @@ test('empty tree has null root', async () => {
   // Root may be non-null if the DB already has DOIs; only assert API shape.
   const root = await merkleTree.getRoot();
   assert.ok(root === null || typeof root === 'string');
-  assert.equal(typeof await merkleTree.getLeafCount(), 'number');
+  assert.equal(typeof (await merkleTree.getLeafCount()), 'number');
 });
 
 test('single DOI proof verifies against root', async () => {
@@ -195,9 +195,10 @@ test('proof includes step-by-step path with intermediate hashes', async () => {
     }
 
     for (const step of proof.path) {
-      const expected = step.siblingSide === 'left'
-        ? sha256Hex(step.siblingHash + step.inputHash)
-        : sha256Hex(step.inputHash + step.siblingHash);
+      const expected =
+        step.siblingSide === 'left'
+          ? sha256Hex(step.siblingHash + step.inputHash)
+          : sha256Hex(step.inputHash + step.siblingHash);
       assert.equal(step.outputHash, expected);
     }
   }

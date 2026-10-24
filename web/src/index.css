@@ -100,7 +100,11 @@
 @layer utilities {
   @media (hover: hover) and (pointer: fine) {
     .motion-press {
-      transition: transform var(--motion-duration-press) var(--motion-ease-out), color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+      transition:
+        transform var(--motion-duration-press) var(--motion-ease-out),
+        color 120ms ease,
+        background-color 120ms ease,
+        border-color 120ms ease;
     }
 
     .motion-press:active {
@@ -115,7 +119,9 @@
   .chat-panel {
     opacity: 0;
     transform: translateX(100%);
-    transition: transform var(--motion-duration-panel) var(--motion-ease-drawer), opacity 160ms ease-out;
+    transition:
+      transform var(--motion-duration-panel) var(--motion-ease-drawer),
+      opacity 160ms ease-out;
   }
 
   .chat-panel[data-state='open'] {
@@ -238,30 +244,53 @@
   }
 
   @keyframes typing-pulse {
-    0%, 100% { opacity: 0.32; }
-    50% { opacity: 0.8; }
+    0%,
+    100% {
+      opacity: 0.32;
+    }
+    50% {
+      opacity: 0.8;
+    }
   }
 
   @keyframes motion-fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes motion-fade-out {
-    from { opacity: 1; }
-    to { opacity: 0; }
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
 
   /* Entry animates transform only: if the compositor never advances the
      animation clock the dialog still renders fully opaque. */
   @keyframes detail-dialog-in {
-    from { transform: translate(-50%, -50%) scale(0.97); }
-    to { transform: translate(-50%, -50%) scale(1); }
+    from {
+      transform: translate(-50%, -50%) scale(0.97);
+    }
+    to {
+      transform: translate(-50%, -50%) scale(1);
+    }
   }
 
   @keyframes detail-dialog-out {
-    from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    to { opacity: 0; transform: translate(-50%, -50%) scale(0.98); }
+    from {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.98);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -356,8 +385,10 @@
   body {
     @apply bg-background text-foreground;
     min-width: 320px;
-    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
   }
   ::selection {
     background: hsl(var(--brand) / 0.18);
@@ -499,8 +530,12 @@
     overflow-wrap: anywhere;
     word-break: break-word;
   }
-  .chat-prose > *:first-child { margin-top: 0; }
-  .chat-prose > *:last-child { margin-bottom: 0; }
+  .chat-prose > *:first-child {
+    margin-top: 0;
+  }
+  .chat-prose > *:last-child {
+    margin-bottom: 0;
+  }
   .chat-prose p {
     @apply my-2;
   }

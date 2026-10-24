@@ -54,14 +54,17 @@ const TARGET_FIELDS = [
  * List the field names allowed for a given itemType name.
  */
 async function allowedFieldsForType(itemTypeName) {
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT f."fieldName" FROM "itemTypeFields" itf
     JOIN fields f ON f."fieldID" = itf."fieldID"
     JOIN "itemTypes" it ON it."itemTypeID" = itf."itemTypeID"
     WHERE it."typeName" = $1
     ORDER BY itf."orderIndex"
-  `, [itemTypeName]);
-  return rows.map(r => r.fieldName);
+  `,
+    [itemTypeName],
+  );
+  return rows.map((r) => r.fieldName);
 }
 
 /**
@@ -84,7 +87,8 @@ export async function readHeaderFooterMetadata(key) {
   const seen = new Set();
   const lines = [];
   let doi = '';
-  const DOI_RE = /https?:\/\/(?:dx\.)?doi\.org\/(10\.\d{4,9}\/[^\s)"']+)|\b(10\.\d{4,9}\/[^\s)"']+)/i;
+  const DOI_RE =
+    /https?:\/\/(?:dx\.)?doi\.org\/(10\.\d{4,9}\/[^\s)"']+)|\b(10\.\d{4,9}\/[^\s)"']+)/i;
 
   for (const b of blocks) {
     const t = b.type;
@@ -168,7 +172,11 @@ ${TARGET_FIELDS.join(', ')}
 
 function extractJson(text) {
   if (!text) throw new Error('LLM 返回为空');
-  try { return JSON.parse(text); } catch { /* fall through */ }
+  try {
+    return JSON.parse(text);
+  } catch {
+    /* fall through */
+  }
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start >= 0 && end > start) {
@@ -247,16 +255,31 @@ function trimMarkdownForMetadata(md, maxChars) {
  */
 function fallbackAuthors(markdown) {
   const head = markdown.slice(0, 4000);
-  const lines = head.split('\n').map(l => l.trim()).filter(Boolean);
+  const lines = head
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
   let startIdx = 0;
   for (let i = 0; i < Math.min(lines.length, 25); i++) {
-    if (/^#{1,3}\s+/.test(lines[i])) { startIdx = i + 1; break; }
+    if (/^#{1,3}\s+/.test(lines[i])) {
+      startIdx = i + 1;
+      break;
+    }
   }
   const cand = lines.slice(startIdx, startIdx + 6).join(' ');
   if (!cand) return [];
   const stop = new Set([
-    'Abstract', 'Introduction', 'Keywords', 'Summary', 'Contents',
-    '摘要', '关键词', '引言', '目录', '作者', '通讯',
+    'Abstract',
+    'Introduction',
+    'Keywords',
+    'Summary',
+    'Contents',
+    '摘要',
+    '关键词',
+    '引言',
+    '目录',
+    '作者',
+    '通讯',
   ]);
   const matches = cand.match(/\b[A-Z][a-z]+(?:[- ][A-Z][a-z]+)+\b/g) || [];
   const out = [];
@@ -266,7 +289,7 @@ function fallbackAuthors(markdown) {
     out.push(full);
     if (out.length >= 10) break;
   }
-  return out.map(full => {
+  return out.map((full) => {
     const parts = full.split(' ');
     return {
       firstName: parts.slice(0, -1).join(' '),
@@ -314,7 +337,7 @@ export async function extractItem(key) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.llm.apiKey}`,
+        Authorization: `Bearer ${config.llm.apiKey}`,
       },
       body: JSON.stringify({
         model: config.llm.model,
@@ -349,16 +372,17 @@ export async function extractItem(key) {
   // {field,value,confidence,reason} objects. We rebuild the legacy array
   // shape so consumers (applyExtraction, extract_all.mjs) keep working.
   const suggestedItemType = ITEM_TYPES.includes(parsed.itemType || parsed.suggestedItemType)
-    ? (parsed.itemType || parsed.suggestedItemType)
+    ? parsed.itemType || parsed.suggestedItemType
     : 'document';
   const hasTitleOrDoi = !!(parsed.fields?.title || parsed.fields?.DOI);
   const itemTypeConfidence = clamp01(
-    Number(parsed.itemTypeConfidence) || (hasTitleOrDoi ? 0.9 : 0.5)
+    Number(parsed.itemTypeConfidence) || (hasTitleOrDoi ? 0.9 : 0.5),
   );
 
-  const fieldsObj = parsed.fields && typeof parsed.fields === 'object' && !Array.isArray(parsed.fields)
-    ? parsed.fields
-    : {};
+  const fieldsObj =
+    parsed.fields && typeof parsed.fields === 'object' && !Array.isArray(parsed.fields)
+      ? parsed.fields
+      : {};
   const uncertainSet = new Set(Array.isArray(parsed.uncertain) ? parsed.uncertain : []);
 
   const fields = [];
@@ -376,7 +400,7 @@ export async function extractItem(key) {
   // ~200 MISQ items the same truncated "10.25300/MISQ/202"). Always prefer the
   // regex DOI when present, overriding whatever the LLM returned.
   if (regexDoi) {
-    const llmDoi = fields.find(f => f.field === 'DOI');
+    const llmDoi = fields.find((f) => f.field === 'DOI');
     if (llmDoi) {
       llmDoi.value = regexDoi;
       llmDoi.confidence = Math.max(llmDoi.confidence, 0.95);
@@ -394,26 +418,29 @@ export async function extractItem(key) {
   // "The Journal of Strategic Information Systems"). Without this, a correct
   // but non-canonical journal name would fail the whitelist exact-match and
   // leave the item stuck in "待归档".
-  const pubField = fields.find(f => f.field === 'publicationTitle');
+  const pubField = fields.find((f) => f.field === 'publicationTitle');
   if (pubField && pubField.value) {
     const canonical = normalizeJournalName(pubField.value);
     if (canonical && canonical !== pubField.value) {
       pubField.value = canonical;
       if (!pubField.reason.includes('规范化')) {
-        pubField.reason = (pubField.reason ? pubField.reason + ' ' : '') + '期刊名规范化为白名单标准写法';
+        pubField.reason =
+          (pubField.reason ? pubField.reason + ' ' : '') + '期刊名规范化为白名单标准写法';
       }
     }
   }
 
   let creators = Array.isArray(parsed.creators)
-    ? parsed.creators.map((c, i) => ({
-        firstName: cleanCreatorName(c.firstName || c.f || ''),
-        lastName: cleanCreatorName(c.lastName || c.l || ''),
-        creatorType: c.creatorType || 'author',
-        fieldMode: c.fieldMode ?? (c.firstName || c.f ? 0 : 1),
-        orderIndex: i,
-        confidence: 0.9,
-      })).filter(c => c.firstName || c.lastName)
+    ? parsed.creators
+        .map((c, i) => ({
+          firstName: cleanCreatorName(c.firstName || c.f || ''),
+          lastName: cleanCreatorName(c.lastName || c.l || ''),
+          creatorType: c.creatorType || 'author',
+          fieldMode: c.fieldMode ?? (c.firstName || c.f ? 0 : 1),
+          orderIndex: i,
+          confidence: 0.9,
+        }))
+        .filter((c) => c.firstName || c.lastName)
     : [];
 
   // When the LLM fails to return any authors, fall back to a conservative
@@ -456,11 +483,14 @@ function clamp01(n) {
  */
 export function normalizeJournalName(raw) {
   if (!raw) return null;
-  const norm = s => s.trim().toLowerCase()
-    .replace(/^the\s+/, '')
-    .replace(/&/g, 'and')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const norm = (s) =>
+    s
+      .trim()
+      .toLowerCase()
+      .replace(/^the\s+/, '')
+      .replace(/&/g, 'and')
+      .replace(/\s+/g, ' ')
+      .trim();
   const target = norm(raw);
   for (const canonical of JOURNAL_WHITELIST) {
     if (norm(canonical) === target) return canonical;
@@ -468,18 +498,15 @@ export function normalizeJournalName(raw) {
   return null;
 }
 
-
 function computeOverall(fields, creators, itemTypeConfidence) {
   // Weighted blend: the title carries the most signal, then authors, then the
   // rest. Falls back to itemTypeConfidence when no fields were extracted.
-  const title = fields.find(f => f.field === 'title');
+  const title = fields.find((f) => f.field === 'title');
   const titleScore = title ? title.confidence : 0;
   const creatorAvg = creators.length
     ? creators.reduce((s, c) => s + c.confidence, 0) / creators.length
     : 0;
-  const fieldAvg = fields.length
-    ? fields.reduce((s, f) => s + f.confidence, 0) / fields.length
-    : 0;
+  const fieldAvg = fields.length ? fields.reduce((s, f) => s + f.confidence, 0) / fields.length : 0;
   if (fields.length === 0 && creators.length === 0) return itemTypeConfidence;
   return clamp01(titleScore * 0.4 + creatorAvg * 0.3 + fieldAvg * 0.3);
 }
@@ -519,14 +546,20 @@ export async function applyExtraction(key, result, opts = {}) {
   //       those fields would be silently dropped by Item.save() and the item
   //       could never leave "待归档".
   const scholarlyTypes = new Set([
-    'journalArticle', 'preprint', 'book', 'bookSection', 'conferencePaper', 'thesis', 'report',
+    'journalArticle',
+    'preprint',
+    'book',
+    'bookSection',
+    'conferencePaper',
+    'thesis',
+    'report',
   ]);
-  const pubField = result.fields.find(f => f.field === 'publicationTitle');
-  const doiField = result.fields.find(f => f.field === 'DOI');
+  const pubField = result.fields.find((f) => f.field === 'publicationTitle');
+  const doiField = result.fields.find((f) => f.field === 'DOI');
   const hasScholarlyEvidence =
     scholarlyTypes.has(targetType) &&
     ((pubField && pubField.confidence >= fieldThreshold && pubField.value) ||
-     (doiField && doiField.confidence >= fieldThreshold && doiField.value));
+      (doiField && doiField.confidence >= fieldThreshold && doiField.value));
 
   let typeChanged = false;
   if (
@@ -571,16 +604,24 @@ export async function applyExtraction(key, result, opts = {}) {
   // existing creators (unless overwrite). Full replacement semantics.
   let appliedCreators = false;
   const existingCreators = item.creators;
-  const allConfident = result.creators.length > 0 &&
-    result.creators.every(c => c.confidence >= creatorThreshold);
-  const avgConfident = result.creators.length > 0 &&
-    (result.creators.reduce((s, c) => s + c.confidence, 0) / result.creators.length) >= creatorThreshold;
+  const allConfident =
+    result.creators.length > 0 && result.creators.every((c) => c.confidence >= creatorThreshold);
+  const avgConfident =
+    result.creators.length > 0 &&
+    result.creators.reduce((s, c) => s + c.confidence, 0) / result.creators.length >=
+      creatorThreshold;
 
   if (result.creators.length > 0 && allConfident && avgConfident) {
     if (existingCreators.length === 0 || overwrite) {
-      item.setCreators(result.creators.map(({ firstName, lastName, creatorType, fieldMode, orderIndex }) => ({
-        firstName, lastName, creatorType, fieldMode, orderIndex,
-      })));
+      item.setCreators(
+        result.creators.map(({ firstName, lastName, creatorType, fieldMode, orderIndex }) => ({
+          firstName,
+          lastName,
+          creatorType,
+          fieldMode,
+          orderIndex,
+        })),
+      );
       appliedCreators = true;
     }
   }

@@ -6,10 +6,7 @@ export function StatTile({ icon, label, value, sub, valueTitle, mono, tone, clas
       <div className="flex items-start gap-2">
         {icon ? (
           <span
-            className={cn(
-              'mt-0.5 shrink-0',
-              tone === 'warning' ? 'text-warning' : 'text-brand',
-            )}
+            className={cn('mt-0.5 shrink-0', tone === 'warning' ? 'text-warning' : 'text-brand')}
           >
             {icon}
           </span>

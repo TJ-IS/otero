@@ -14,7 +14,14 @@ import { api } from '@/api/client';
  *   error: Error|null, hasMore: boolean, loadMore: () => void
  * }}
  */
-export function useInfiniteItems({ filter = {}, sortField = 'dateModified', sortDir = 'desc', pageSize = 100, version = 0, enabled = true } = {}) {
+export function useInfiniteItems({
+  filter = {},
+  sortField = 'dateModified',
+  sortDir = 'desc',
+  pageSize = 100,
+  version = 0,
+  enabled = true,
+} = {}) {
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -29,43 +36,73 @@ export function useInfiniteItems({ filter = {}, sortField = 'dateModified', sort
 
   const { type, journal, collection, search, year, yearFrom, yearTo } = filter;
 
-  const fetchPage = useCallback(async (pageNum, { append }) => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const reqId = ++reqIdRef.current;
-    if (append) setLoadingMore(true); else setLoading(true);
-    try {
-      const res = await api.listItems({
-        type, journal, collection, search, year, yearFrom, yearTo,
-        page: pageNum, pageSize, sortField, sortDir, signal: controller.signal,
-      });
-      if (reqId !== reqIdRef.current) return; // superseded by a newer request
-      setItems(prev => append ? [...prev, ...res.items] : res.items);
-      setTotal(res.total);
-      setTotalPages(res.totalPages);
-      setPage(res.page);
-      setError(null);
-    } catch (e) {
-      if (reqId !== reqIdRef.current || e.name === 'AbortError') return;
-      setError(e);
-    } finally {
-      if (reqId === reqIdRef.current) {
-        setLoading(false);
-        setLoadingMore(false);
+  const fetchPage = useCallback(
+    async (pageNum, { append }) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const reqId = ++reqIdRef.current;
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+      try {
+        const res = await api.listItems({
+          type,
+          journal,
+          collection,
+          search,
+          year,
+          yearFrom,
+          yearTo,
+          page: pageNum,
+          pageSize,
+          sortField,
+          sortDir,
+          signal: controller.signal,
+        });
+        if (reqId !== reqIdRef.current) return; // superseded by a newer request
+        setItems((prev) => (append ? [...prev, ...res.items] : res.items));
+        setTotal(res.total);
+        setTotalPages(res.totalPages);
+        setPage(res.page);
+        setError(null);
+      } catch (e) {
+        if (reqId !== reqIdRef.current || e.name === 'AbortError') return;
+        setError(e);
+      } finally {
+        if (reqId === reqIdRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-    }
-  }, [type, journal, collection, search, year, yearFrom, yearTo, pageSize, sortField, sortDir]);
+    },
+    [type, journal, collection, search, year, yearFrom, yearTo, pageSize, sortField, sortDir],
+  );
 
   // Reset to page 1 on any filter/sort/version change.
   useEffect(() => {
     if (!enabled) {
-      setItems([]); setTotal(0); setTotalPages(0); setPage(1); setLoading(false);
+      setItems([]);
+      setTotal(0);
+      setTotalPages(0);
+      setPage(1);
+      setLoading(false);
       return;
     }
     fetchPage(1, { append: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, journal, collection, search, year, yearFrom, yearTo, sortField, sortDir, version, enabled]);
+  }, [
+    type,
+    journal,
+    collection,
+    search,
+    year,
+    yearFrom,
+    yearTo,
+    sortField,
+    sortDir,
+    version,
+    enabled,
+  ]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 

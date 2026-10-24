@@ -9,7 +9,11 @@ import { searchAuthors, listAuthorItems } from '../repositories/authorRepo.js';
 import { getFullText } from './fulltextService.js';
 import { getFullTextStructure } from './fulltextService.js';
 import { toBibtex, toRis, toBibtexBatch, toRisBatch } from './exportService.js';
-import { getOpenFacets, getOpenOverviewStats, getOpenTimeline } from '../repositories/openApiRepo.js';
+import {
+  getOpenFacets,
+  getOpenOverviewStats,
+  getOpenTimeline,
+} from '../repositories/openApiRepo.js';
 import { JOURNAL_WHITELIST, UNFILED } from './journalWhitelist.js';
 import { isBasketVisibleItem } from './itemVisibility.js';
 import { normalizeDoi } from '../utils/doi.js';
@@ -17,7 +21,7 @@ import { signPdfAccess } from './pdfAccess.js';
 
 export const OTERO_OPEN_API_SKILL_NAME = 'otero-open-api';
 export const OTERO_OPEN_API_SKILL_DESCRIPTION =
-  'Read-only access to the Otero AIS Senior Scholars\' Basket literature library via HTTP APIs. Use when searching papers or authors, resolving DOI or item keys, fetching structured full text, exporting citations, or querying corpus statistics.';
+  "Read-only access to the Otero AIS Senior Scholars' Basket literature library via HTTP APIs. Use when searching papers or authors, resolving DOI or item keys, fetching structured full text, exporting citations, or querying corpus statistics.";
 export const AGENT_SKILLS_DISCOVERY_SCHEMA =
   'https://schemas.agentskills.io/discovery/0.2.0/schema.json';
 
@@ -75,7 +79,8 @@ export function parseOpenFilters(query = {}) {
   }
 
   const year = query.year != null && query.year !== '' ? parsePositiveInt(query.year) : null;
-  let yearFrom = query.yearFrom != null && query.yearFrom !== '' ? parsePositiveInt(query.yearFrom) : null;
+  let yearFrom =
+    query.yearFrom != null && query.yearFrom !== '' ? parsePositiveInt(query.yearFrom) : null;
   let yearTo = query.yearTo != null && query.yearTo !== '' ? parsePositiveInt(query.yearTo) : null;
 
   if (year != null && Number.isNaN(year)) throw new OpenApiError(400, 'invalid year');
@@ -342,7 +347,7 @@ export async function exportOpenArticles({ format = 'bibtex', q, ...filters }) {
   // for a large corpus.
   for (let index = 0; index < pageNumbers.length; index += 4) {
     const batch = pageNumbers.slice(index, index + 4);
-    pages.push(...await Promise.all(batch.map((page) => Items.list({ ...common, page }))));
+    pages.push(...(await Promise.all(batch.map((page) => Items.list({ ...common, page })))));
   }
   const json = [first, ...pages].flatMap((page) => page.items.map((item) => item.toJSON()));
   return {
@@ -355,7 +360,9 @@ export async function exportOpenArticles({ format = 'bibtex', q, ...filters }) {
 export { getOpenFacets, getOpenOverviewStats, getOpenTimeline };
 
 export function skillMarkdownDigest(markdown) {
-  const hash = createHash('sha256').update(String(markdown ?? ''), 'utf8').digest('hex');
+  const hash = createHash('sha256')
+    .update(String(markdown ?? ''), 'utf8')
+    .digest('hex');
   return `sha256:${hash}`;
 }
 

@@ -52,7 +52,12 @@ export async function importPdf(pdfPath, opts = {}) {
   try {
     extraction = await extractPdf(extractPath, { maxPages: 3 });
   } finally {
-    if (needsCleanup) try { fs.unlinkSync(extractPath); } catch { /* ignore */ }
+    if (needsCleanup)
+      try {
+        fs.unlinkSync(extractPath);
+      } catch {
+        /* ignore */
+      }
   }
 
   // 4. Recognize.
@@ -66,14 +71,20 @@ export async function importPdf(pdfPath, opts = {}) {
   await parent.setItemType(mapped.itemType);
   for (const [name, value] of Object.entries(mapped.fields)) {
     if (value === null || value === undefined || value === '') continue;
-    try { parent.setField(name, value); }
-    catch { /* field not in schema or not allowed for this type — skip */ }
+    try {
+      parent.setField(name, value);
+    } catch {
+      /* field not in schema or not allowed for this type — skip */
+    }
   }
   for (const c of mapped.creators) parent.addCreator(c);
   await parent.save();
 
   await execute('UPDATE items SET "parentItemID"=$1 WHERE "itemID"=$2', [parent.id, attachment.id]);
-  await execute('UPDATE "itemAttachments" SET "parentItemID"=$1 WHERE "itemID"=$2', [parent.id, attachment.id]);
+  await execute('UPDATE "itemAttachments" SET "parentItemID"=$1 WHERE "itemID"=$2', [
+    parent.id,
+    attachment.id,
+  ]);
 
   return { attachment, parent, recognized, mapped };
 }

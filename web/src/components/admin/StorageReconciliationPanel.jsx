@@ -17,7 +17,12 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import {
-  Database, HardDrive, RefreshCw, Loader2, AlertCircle, ExternalLink,
+  Database,
+  HardDrive,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
+  ExternalLink,
   Trash2,
 } from 'lucide-react';
 import { useAsync } from '@/hooks/useAsync';
@@ -69,8 +74,12 @@ function VirtualMissingList({ items }) {
                 <p className="truncate font-mono text-xs text-muted-foreground">{item.path}</p>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
-                <Badge variant="outline" className="text-xs">{item.type || 'attachment'}</Badge>
-                {item.deleted ? <Badge variant="secondary">{t('reconcile.deletedItem')}</Badge> : null}
+                <Badge variant="outline" className="text-xs">
+                  {item.type || 'attachment'}
+                </Badge>
+                {item.deleted ? (
+                  <Badge variant="secondary">{t('reconcile.deletedItem')}</Badge>
+                ) : null}
               </div>
             </div>
           );
@@ -103,13 +112,24 @@ function VirtualOrphanList({ items, selected, onToggle }) {
               className="absolute left-0 top-0 flex w-full items-center gap-3 border-b py-2"
               style={{ transform: `translateY(${row.start}px)` }}
             >
-              <Checkbox checked={selected.has(item.name)} onCheckedChange={() => onToggle(item.name)} />
+              <Checkbox
+                checked={selected.has(item.name)}
+                onCheckedChange={() => onToggle(item.name)}
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-mono text-xs">{item.name}</p>
-                {item.key ? <p className="truncate text-xs text-muted-foreground">{t('reconcile.linkedItem', { key: item.key })}</p> : null}
+                {item.key ? (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {t('reconcile.linkedItem', { key: item.key })}
+                  </p>
+                ) : null}
               </div>
-              <Badge variant="outline" className="shrink-0 text-xs">{item.type || 'unknown'}</Badge>
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{item.sizeFormatted}</span>
+              <Badge variant="outline" className="shrink-0 text-xs">
+                {item.type || 'unknown'}
+              </Badge>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                {item.sizeFormatted}
+              </span>
             </div>
           );
         })}
@@ -122,7 +142,10 @@ export function StorageReconciliationPanel() {
   const { t } = useTranslation(['admin', 'common']);
   const forceNextRefresh = useRef(false);
   const {
-    data, error, loading, refresh: runRefresh,
+    data,
+    error,
+    loading,
+    refresh: runRefresh,
   } = useAsync(() => {
     const force = forceNextRefresh.current;
     forceNextRefresh.current = false;
@@ -187,7 +210,9 @@ export function StorageReconciliationPanel() {
     return (
       <div className="mx-auto max-w-page px-4 py-8 sm:px-6 lg:px-8">
         <LoadingSkeleton variant="chart" label={t('reconcile.scanning')} />
-        <p className="mt-3 text-center text-xs text-muted-foreground">{t('reconcile.scanningHint')}</p>
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          {t('reconcile.scanningHint')}
+        </p>
       </div>
     );
   }
@@ -195,7 +220,10 @@ export function StorageReconciliationPanel() {
   if (error) {
     return (
       <div className="mx-auto max-w-page px-4 py-8 sm:px-6 lg:px-8">
-        <ErrorState message={t('reconcile.loadFailed', { message: error.message })} onRetry={refresh} />
+        <ErrorState
+          message={t('reconcile.loadFailed', { message: error.message })}
+          onRetry={refresh}
+        />
       </div>
     );
   }
@@ -217,11 +245,12 @@ export function StorageReconciliationPanel() {
       <PageHeader
         eyebrow={t('common:nav.admin')}
         title={t('reconcile.title')}
-        actions={(
+        actions={
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('reconcile.rescan')}
+            <RefreshCw className={`size-3.5 ${loading ? 'animate-spin' : ''}`} />{' '}
+            {t('reconcile.rescan')}
           </Button>
-        )}
+        }
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -229,9 +258,20 @@ export function StorageReconciliationPanel() {
           icon={<Database className="size-4" />}
           label={t('reconcile.dbRefs')}
           value={summary?.dbReferences ?? '—'}
-          sub={summary ? t('reconcile.dbRefsSub', { objects: summary.dbExactObjects, prefixes: summary.dbPrefixes }) : undefined}
+          sub={
+            summary
+              ? t('reconcile.dbRefsSub', {
+                  objects: summary.dbExactObjects,
+                  prefixes: summary.dbPrefixes,
+                })
+              : undefined
+          }
         />
-        <StatTile icon={<HardDrive className="size-4" />} label={t('reconcile.r2Total')} value={summary?.r2Objects ?? '—'} />
+        <StatTile
+          icon={<HardDrive className="size-4" />}
+          label={t('reconcile.r2Total')}
+          value={summary?.r2Objects ?? '—'}
+        />
         <StatTile
           icon={<AlertCircle className="size-4" />}
           label={t('reconcile.r2Missing')}
@@ -243,7 +283,11 @@ export function StorageReconciliationPanel() {
           icon={<Trash2 className="size-4" />}
           label={t('reconcile.r2Orphans')}
           value={summary?.orphanInR2 ?? '—'}
-          sub={summary?.orphanBytesFormatted ? t('reconcile.orphanBytes', { size: summary.orphanBytesFormatted }) : undefined}
+          sub={
+            summary?.orphanBytesFormatted
+              ? t('reconcile.orphanBytes', { size: summary.orphanBytesFormatted })
+              : undefined
+          }
           tone={summary?.orphanInR2 ? 'warning' : undefined}
         />
       </div>
@@ -252,12 +296,15 @@ export function StorageReconciliationPanel() {
         <Card className={deleteResult.error ? 'border-destructive/40' : 'border-success/40'}>
           <CardContent className="text-sm">
             {deleteResult.error ? (
-              <span className="text-destructive">{t('reconcile.deleteFailed', { error: deleteResult.error })}</span>
+              <span className="text-destructive">
+                {t('reconcile.deleteFailed', { error: deleteResult.error })}
+              </span>
             ) : (
               <div className="space-y-1">
                 <p>
                   {t('reconcile.deletedObjects', { count: deleteResult.deleted.length })}
-                  {deleteResult.skipped.length > 0 && t('reconcile.skippedObjects', { count: deleteResult.skipped.length })}
+                  {deleteResult.skipped.length > 0 &&
+                    t('reconcile.skippedObjects', { count: deleteResult.skipped.length })}
                 </p>
                 {deleteResult.skipped.length > 0 && (
                   <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
@@ -285,7 +332,11 @@ export function StorageReconciliationPanel() {
           ) : (
             <>
               <VirtualMissingList items={missingInR2} />
-              <TruncatedNote truncated={data?.truncated?.missingInR2} listCap={data?.listCap} total={summary?.missingInR2} />
+              <TruncatedNote
+                truncated={data?.truncated?.missingInR2}
+                listCap={data?.listCap}
+                total={summary?.missingInR2}
+              />
             </>
           )}
         </CardContent>
@@ -305,7 +356,8 @@ export function StorageReconciliationPanel() {
                 disabled={selectedCount === 0}
                 onClick={() => setConfirmOpen(true)}
               >
-                <Trash2 className="mr-1.5 size-3.5" /> {t('reconcile.deleteSelected', { count: selectedCount })}
+                <Trash2 className="mr-1.5 size-3.5" />{' '}
+                {t('reconcile.deleteSelected', { count: selectedCount })}
               </Button>
             )}
           </div>
@@ -320,7 +372,11 @@ export function StorageReconciliationPanel() {
                 <span>{t('reconcile.selectPage')}</span>
               </div>
               <VirtualOrphanList items={orphanInR2} selected={selected} onToggle={toggle} />
-              <TruncatedNote truncated={data?.truncated?.orphanInR2} listCap={data?.listCap} total={summary?.orphanInR2} />
+              <TruncatedNote
+                truncated={data?.truncated?.orphanInR2}
+                listCap={data?.listCap}
+                total={summary?.orphanInR2}
+              />
             </>
           )}
         </CardContent>
@@ -328,8 +384,11 @@ export function StorageReconciliationPanel() {
 
       {data?.timestamp && (
         <p className="text-center text-xs text-muted-foreground">
-          {data.cached ? t('reconcile.cached') : t('reconcile.live')} · {t('reconcile.collectedAt', { time: new Date(data.timestamp).toLocaleString() })}
-          {Number.isFinite(data.durationMs) ? t('reconcile.duration', { seconds: (data.durationMs / 1000).toFixed(1) }) : ''}
+          {data.cached ? t('reconcile.cached') : t('reconcile.live')} ·{' '}
+          {t('reconcile.collectedAt', { time: new Date(data.timestamp).toLocaleString() })}
+          {Number.isFinite(data.durationMs)
+            ? t('reconcile.duration', { seconds: (data.durationMs / 1000).toFixed(1) })
+            : ''}
         </p>
       )}
 
@@ -354,7 +413,11 @@ export function StorageReconciliationPanel() {
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Trash2 className="mr-1.5 size-3.5" />}
+              {deleting ? (
+                <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1.5 size-3.5" />
+              )}
               {t('reconcile.confirmDelete')}
             </AlertDialogAction>
           </AlertDialogFooter>

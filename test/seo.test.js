@@ -135,30 +135,18 @@ test('/journals shell is indexable and lists the 11 basket journals', async () =
 test('canonical host middleware 301s a foreign Host when enabled', async () => {
   config.enforceCanonicalHost = true;
   try {
-    const res = await request(app)
-      .get('/library')
-      .set('Host', 'wtf-is.eu.cc')
-      .expect(301);
+    const res = await request(app).get('/library').set('Host', 'wtf-is.eu.cc').expect(301);
     assert.equal(res.headers.location, `${CANONICAL}/library`);
 
-    await request(app)
-      .get('/health')
-      .set('Host', 'wtf-is.eu.cc')
-      .expect(200);
+    await request(app).get('/health').set('Host', 'wtf-is.eu.cc').expect(200);
 
-    await request(app)
-      .get('/library')
-      .set('Host', '127.0.0.1')
-      .expect(200);
+    await request(app).get('/library').set('Host', '127.0.0.1').expect(200);
   } finally {
     config.enforceCanonicalHost = false;
   }
 });
 
 test('canonical host middleware is off by default', async () => {
-  const res = await request(app)
-    .get('/robots.txt')
-    .set('Host', 'wtf-is.eu.cc')
-    .expect(200);
+  const res = await request(app).get('/robots.txt').set('Host', 'wtf-is.eu.cc').expect(200);
   assert.match(res.text, /Sitemap:/);
 });

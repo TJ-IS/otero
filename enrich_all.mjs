@@ -50,11 +50,20 @@ function csvCell(s) {
   if (/[",\n\r]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
   return v;
 }
-function csvRow(cells) { return cells.map(csvCell).join(',') + '\n'; }
+function csvRow(cells) {
+  return cells.map(csvCell).join(',') + '\n';
+}
 
 const CSV_HEADER = [
-  'key', 'doi', 'crossrefTitle', 'crossrefJournal', 'itemType',
-  'fieldsUpdated', 'creatorsUpdated', 'creatorCount', 'error',
+  'key',
+  'doi',
+  'crossrefTitle',
+  'crossrefJournal',
+  'itemType',
+  'fieldsUpdated',
+  'creatorsUpdated',
+  'creatorCount',
+  'error',
 ];
 
 // ---- Query all top-level non-deleted items with a DOI ----------------------
@@ -62,20 +71,26 @@ async function listItemsWithDoi() {
   const doiFid = await fieldIdByName('DOI');
   if (!doiFid) return [];
 
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT i.key, i."itemID", v.value AS doi
     FROM items i
     JOIN "itemData" d ON d."itemID" = i."itemID" AND d."fieldID" = $1
     JOIN "itemDataValues" v ON v."valueID" = d."valueID"
     WHERE i."parentItemID" IS NULL AND i.deleted = 0
     ORDER BY i."dateAdded" DESC
-  `, [doiFid]);
+  `,
+    [doiFid],
+  );
 
-  return rows.map(r => ({ key: r.key, itemID: r.itemID, doi: r.doi }));
+  return rows.map((r) => ({ key: r.key, itemID: r.itemID, doi: r.doi }));
 }
 
 // ---- Main -------------------------------------------------------------------
-let processed = 0, okCount = 0, notFoundCount = 0, failCount = 0;
+let processed = 0,
+  okCount = 0,
+  notFoundCount = 0,
+  failCount = 0;
 const startTime = Date.now();
 
 function progressLine(total) {
@@ -84,8 +99,12 @@ function progressLine(total) {
 }
 
 async function processOne(item, total) {
-  let crossrefTitle = '', crossrefJournal = '', itemType = '';
-  let fieldsUpdated = [], creatorsUpdated = false, creatorCount = 0;
+  let crossrefTitle = '',
+    crossrefJournal = '',
+    itemType = '';
+  let fieldsUpdated = [],
+    creatorsUpdated = false,
+    creatorCount = 0;
   let error = '';
 
   try {
@@ -93,9 +112,7 @@ async function processOne(item, total) {
     if (!recognized) {
       notFoundCount++;
       error = 'CrossRef not found';
-      fs.appendFileSync(LOG_PATH, csvRow([
-        item.key, item.doi, '', '', '', '', 'no', 0, error,
-      ]));
+      fs.appendFileSync(LOG_PATH, csvRow([item.key, item.doi, '', '', '', '', 'no', 0, error]));
       return;
     }
 
@@ -117,7 +134,9 @@ async function processOne(item, total) {
       if (mapped.itemType && mapped.itemType !== it.itemType) {
         try {
           await it.setItemType(mapped.itemType);
-        } catch { /* unknown type, keep original */ }
+        } catch {
+          /* unknown type, keep original */
+        }
       }
 
       // Overwrite all fields from CrossRef
@@ -126,7 +145,9 @@ async function processOne(item, total) {
         try {
           it.setField(name, value);
           fieldsUpdated.push(name);
-        } catch { /* field not allowed for type, skip */ }
+        } catch {
+          /* field not allowed for type, skip */
+        }
       }
 
       // Replace creators
@@ -145,11 +166,20 @@ async function processOne(item, total) {
     processed++;
   }
 
-  fs.appendFileSync(LOG_PATH, csvRow([
-    item.key, item.doi, crossrefTitle, crossrefJournal, itemType,
-    fieldsUpdated.join(' '), creatorsUpdated ? 'yes' : 'no', creatorCount,
-    error,
-  ]));
+  fs.appendFileSync(
+    LOG_PATH,
+    csvRow([
+      item.key,
+      item.doi,
+      crossrefTitle,
+      crossrefJournal,
+      itemType,
+      fieldsUpdated.join(' '),
+      creatorsUpdated ? 'yes' : 'no',
+      creatorCount,
+      error,
+    ]),
+  );
   process.stdout.write(progressLine(total));
 }
 
@@ -170,9 +200,9 @@ async function main() {
 
   for (let i = 0; i < targets.length; i += CONCURRENCY) {
     const batch = targets.slice(i, i + CONCURRENCY);
-    await Promise.all(batch.map(t => processOne(t, targets.length)));
+    await Promise.all(batch.map((t) => processOne(t, targets.length)));
     if (BATCH_DELAY > 0 && i + CONCURRENCY < targets.length) {
-      await new Promise(r => setTimeout(r, BATCH_DELAY));
+      await new Promise((r) => setTimeout(r, BATCH_DELAY));
     }
   }
 
@@ -182,7 +212,9 @@ async function main() {
   console.log(`  OK:        ${okCount}`);
   console.log(`  NotFound:  ${notFoundCount}`);
   console.log(`  Failed:    ${failCount}`);
-  console.log(`  Time:      ${elapsed}s  (avg ${(processed ? elapsed / processed : 0).toFixed(2)}s/item)`);
+  console.log(
+    `  Time:      ${elapsed}s  (avg ${(processed ? elapsed / processed : 0).toFixed(2)}s/item)`,
+  );
   console.log(`  Log:       ${LOG_PATH}`);
 
   await closeDb();
@@ -191,5 +223,9 @@ async function main() {
 main().catch(async (err) => {
   console.error('Fatal:', err);
   process.exitCode = 1;
-  try { await closeDb(); } catch { /* ignore */ }
+  try {
+    await closeDb();
+  } catch {
+    /* ignore */
+  }
 });

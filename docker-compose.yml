@@ -6,7 +6,7 @@ services:
     ports:
       # Host access for local tooling. Inside the compose network other
       # services reach it as hostname `postgres:5432`.
-      - "${POSTGRES_PORT:-5432}:5432"
+      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
     environment:
@@ -16,7 +16,7 @@ services:
     networks:
       - otero-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-otero} -d ${POSTGRES_DB:-otero}"]
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-otero} -d ${POSTGRES_DB:-otero}']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -29,7 +29,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "4321:3000"
+      - '4321:3000'
     volumes:
       - ./data:/app/data
     # Inject app config (S3/R2, MinerU, OpenAI, auth, …) from .env.

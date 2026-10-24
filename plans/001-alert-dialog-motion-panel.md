@@ -17,14 +17,14 @@ Destructive confirms (delete item, empty trash, discard edits) use `AlertDialog`
 
 ```jsx
 /* web/src/components/ui/alert-dialog.jsx:31 — current Content (excerpt) */
-'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in ...'
+'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in ...';
 ```
 
 Compare Dialog, which already prefixes both with `motion-panel`:
 
 ```jsx
 /* web/src/components/ui/dialog.jsx:21 — exemplar Overlay */
-"motion-panel fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in ..."
+'motion-panel fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in ...';
 ```
 
 ## Target
@@ -38,7 +38,7 @@ Both AlertDialog Overlay and Content class strings start with `motion-panel`, ma
 
 ```jsx
 /* target Content — prepend motion-panel; keep existing duration/zoom/slide classes */
-'motion-panel fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in ...'
+'motion-panel fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in ...';
 ```
 
 ## Repo conventions to follow

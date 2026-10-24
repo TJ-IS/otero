@@ -32,7 +32,7 @@ async function main() {
   await startServer({ port: config.api.port, host: config.api.host });
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error(err);
   process.exit(1);
 });

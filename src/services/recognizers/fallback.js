@@ -40,8 +40,11 @@ function parseInfoAuthors(authorField) {
   // PDF Info 'Author' is often a single string with names separated by 'and' / ',' / ';'.
   const raw = String(authorField || '').trim();
   if (!raw) return [];
-  const parts = raw.split(/\s+and\s+|[,;]\s*/).map(s => s.trim()).filter(Boolean);
-  return parts.map(name => {
+  const parts = raw
+    .split(/\s+and\s+|[,;]\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return parts.map((name) => {
     const tokens = name.split(/\s+/);
     if (tokens.length === 1) return { name: tokens[0] };
     return { firstName: tokens.slice(0, -1).join(' '), lastName: tokens[tokens.length - 1] };

@@ -2,13 +2,7 @@
 // Uses d3-force purely for physics; rendering is plain React/SVG.
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  forceSimulation,
-  forceManyBody,
-  forceLink,
-  forceCenter,
-  forceCollide,
-} from 'd3-force';
+import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide } from 'd3-force';
 
 // Bubble radius scales with sqrt(paperCount) so *area* (not radius) tracks
 // paper count linearly, matching how humans perceive bubble size.
@@ -36,11 +30,11 @@ export function nodeMetricValue(node, metric = 'paperCount') {
 }
 
 function usePrefersReducedMotion() {
-  const [reduced, setReduced] = useState(() => (
+  const [reduced, setReduced] = useState(() =>
     typeof window !== 'undefined'
       ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      : false
-  ));
+      : false,
+  );
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -110,7 +104,7 @@ export function useForceLayout(nodes, edges, { width, height, sizeMetric = 'pape
         radius: radiusScale(nodeMetricValue(node, sizeMetric), maxMetricValue, minMetricValue),
       };
     });
-    const simLinks = edges.map(e => ({ ...e }));
+    const simLinks = edges.map((e) => ({ ...e }));
 
     // Stronger repulsion pushes disconnected authors/components apart so
     // separate collaboration circles read as distinct clusters instead of
@@ -119,11 +113,18 @@ export function useForceLayout(nodes, edges, { width, height, sizeMetric = 'pape
     // making the sub-community structure visible.
     const sim = forceSimulation(simNodes)
       .force('charge', forceManyBody().strength(-450).distanceMax(900))
-      .force('link', forceLink(simLinks).id(d => d.id)
-        .distance(d => 100 + 120 / Math.sqrt(d.weight))
-        .strength(d => Math.min(1, 0.25 + d.weight * 0.15)))
+      .force(
+        'link',
+        forceLink(simLinks)
+          .id((d) => d.id)
+          .distance((d) => 100 + 120 / Math.sqrt(d.weight))
+          .strength((d) => Math.min(1, 0.25 + d.weight * 0.15)),
+      )
       .force('center', forceCenter(width / 2, height / 2))
-      .force('collide', forceCollide(d => d.radius + 8))
+      .force(
+        'collide',
+        forceCollide((d) => d.radius + 8),
+      )
       .alphaDecay(0.035);
 
     simRef.current = sim;

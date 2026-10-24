@@ -22,7 +22,10 @@ function decodeEntities(s) {
 }
 
 function splitNames(nameStr) {
-  const tokens = String(nameStr || '').trim().split(/\s+/).filter(Boolean);
+  const tokens = String(nameStr || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   if (tokens.length === 0) return null;
   if (tokens.length === 1) return { name: tokens[0] };
   return { firstName: tokens.slice(0, -1).join(' '), lastName: tokens[tokens.length - 1] };
@@ -55,14 +58,17 @@ function crossrefAuthors(message) {
 function mapCrossref(message) {
   const fields = {};
   if (message.title?.[0]) fields.title = decodeEntities(message.title[0]);
-  if (message['container-title']?.[0]) fields.publicationTitle = decodeEntities(message['container-title'][0]);
+  if (message['container-title']?.[0])
+    fields.publicationTitle = decodeEntities(message['container-title'][0]);
   if (message.volume) fields.volume = message.volume;
   if (message.issue) fields.issue = message.issue;
   if (message.page) fields.pages = message.page;
-  const year = pickYear(message['published-print']?.['date-parts']?.[0]?.join('-')
-    || message['published-online']?.['date-parts']?.[0]?.join('-')
-    || message['issued']?.['date-parts']?.[0]?.join('-')
-    || message['created']?.['date-parts']?.[0]?.join('-'));
+  const year = pickYear(
+    message['published-print']?.['date-parts']?.[0]?.join('-') ||
+      message['published-online']?.['date-parts']?.[0]?.join('-') ||
+      message['issued']?.['date-parts']?.[0]?.join('-') ||
+      message['created']?.['date-parts']?.[0]?.join('-'),
+  );
   if (year) fields.date = year;
   if (message.DOI) fields.DOI = message.DOI;
   if (message.ISSN?.[0]) fields.ISSN = message.ISSN[0];
@@ -75,7 +81,8 @@ function mapCrossref(message) {
   // otherwise default to journalArticle too (CrossRef is mostly journals).
   let itemType = 'journalArticle';
   if (message.type === 'book') itemType = 'book';
-  else if (message.type === 'book-chapter' || message.type === 'book-section') itemType = 'bookSection';
+  else if (message.type === 'book-chapter' || message.type === 'book-section')
+    itemType = 'bookSection';
   else if (message.type === 'proceedings-article') itemType = 'conferencePaper';
   else if (message.type === 'report') itemType = 'report';
 
@@ -95,8 +102,10 @@ function mapArxiv(entry) {
   fields.arXivID = null; // arXivID field is per-type; handled below as `extra` instead
   fields.extra = `arXiv: ${entry.id || ''}`;
 
-  const creators = (entry.authors || []).map(name => splitNames(name)).filter(Boolean)
-    .map(c => ({ ...c, creatorType: 'author' }));
+  const creators = (entry.authors || [])
+    .map((name) => splitNames(name))
+    .filter(Boolean)
+    .map((c) => ({ ...c, creatorType: 'author' }));
 
   return { itemType: 'preprint', fields, creators };
 }
@@ -104,7 +113,8 @@ function mapArxiv(entry) {
 function mapOpenlibrary(entry) {
   const fields = {};
   if (entry.title) fields.title = decodeEntities(entry.title);
-  if (entry.subtitle) fields.title = `${decodeEntities(entry.title)}: ${decodeEntities(entry.subtitle)}`;
+  if (entry.subtitle)
+    fields.title = `${decodeEntities(entry.title)}: ${decodeEntities(entry.subtitle)}`;
   const publishers = entry.publishers?.[0]?.name;
   if (publishers) fields.publisher = publishers;
   const place = entry.publishers?.[0]?.location;
@@ -118,10 +128,13 @@ function mapOpenlibrary(entry) {
   const isbn = entry.identifiers?.isbn_13?.[0] || entry.identifiers?.isbn_10?.[0];
   if (isbn) fields.ISBN = isbn;
 
-  const creators = (entry.authors || []).map(a => {
-    const name = a.name || a;
-    return splitNames(name);
-  }).filter(Boolean).map(c => ({ ...c, creatorType: 'author' }));
+  const creators = (entry.authors || [])
+    .map((a) => {
+      const name = a.name || a;
+      return splitNames(name);
+    })
+    .filter(Boolean)
+    .map((c) => ({ ...c, creatorType: 'author' }));
 
   return { itemType: 'book', fields, creators };
 }
@@ -132,16 +145,21 @@ function mapFallback(fb) {
   if (fb.date) fields.date = fb.date;
   if (fb.doi) fields.DOI = fb.doi;
   if (fb.abstractNote) fields.abstractNote = fb.abstractNote;
-  const creators = (fb.authors || []).map(a => ({ ...a, creatorType: 'author' }));
+  const creators = (fb.authors || []).map((a) => ({ ...a, creatorType: 'author' }));
   return { itemType: 'document', fields, creators, isbn: fb.isbn || null };
 }
 
 export function mapRecognized(recognized) {
   switch (recognized.source) {
-    case 'crossref':    return mapCrossref(recognized.raw);
-    case 'arxiv':       return mapArxiv(recognized.raw);
-    case 'openlibrary': return mapOpenlibrary(recognized.raw);
-    case 'fallback':    return mapFallback(recognized.fallback);
-    default: throw new Error(`Unknown recognizer source: ${recognized.source}`);
+    case 'crossref':
+      return mapCrossref(recognized.raw);
+    case 'arxiv':
+      return mapArxiv(recognized.raw);
+    case 'openlibrary':
+      return mapOpenlibrary(recognized.raw);
+    case 'fallback':
+      return mapFallback(recognized.fallback);
+    default:
+      throw new Error(`Unknown recognizer source: ${recognized.source}`);
   }
 }

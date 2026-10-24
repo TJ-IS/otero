@@ -66,7 +66,11 @@ test('analyzeUndirectedGraph finds two dense communities connected by a weak bri
 });
 
 test('analyzeUndirectedGraph is stable and does not mutate its inputs', () => {
-  const nodes = [{ id: 2, paperCount: 3 }, { id: 1, paperCount: 2 }, { id: 3, paperCount: 1 }];
+  const nodes = [
+    { id: 2, paperCount: 3 },
+    { id: 1, paperCount: 2 },
+    { id: 3, paperCount: 1 },
+  ];
   const edges = [
     { source: 2, target: 1, weight: 2 },
     { source: 3, target: 2, weight: 1 },

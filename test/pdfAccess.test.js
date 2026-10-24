@@ -54,7 +54,10 @@ test('HMAC pdf signatures expire and reject tampering', () => {
   const signed = signPdfAccess(attachment.key, 60);
   assert.equal(verifyPdfAccess(attachment.key, signed.exp, signed.sig), true);
   assert.equal(verifyPdfAccess(attachment.key, signed.exp, 'not-the-sig'), false);
-  assert.equal(verifyPdfAccess(attachment.key, Math.floor(Date.now() / 1000) - 10, signed.sig), false);
+  assert.equal(
+    verifyPdfAccess(attachment.key, Math.floor(Date.now() / 1000) - 10, signed.sig),
+    false,
+  );
 });
 
 test('unsigned or bad signatures cannot stream PDF', async () => {
@@ -90,19 +93,20 @@ test('website pdf-url requires a logged-in wallet and returns a signed URL', asy
   assert.ok(minted.body.expiresAt);
 
   const guests = await request(app).get(`/api/items/${item.key}/attachments`).expect(200);
-  assert.equal(guests.body.attachments.some(a => String(a.contentType || '').includes('pdf')), false);
+  assert.equal(
+    guests.body.attachments.some((a) => String(a.contentType || '').includes('pdf')),
+    false,
+  );
 
   const authed = await request(app)
     .get(`/api/items/${item.key}/attachments`)
     .set('Authorization', `Bearer ${token}`)
     .expect(200);
-  assert.ok(authed.body.attachments.some(a => a.key === attachment.key));
+  assert.ok(authed.body.attachments.some((a) => a.key === attachment.key));
 });
 
 test('open API pdf-url mints a usable temporary key without login', async () => {
-  const minted = await request(app)
-    .get(`/api/open/v1/items/${item.key}/pdf-url`)
-    .expect(200);
+  const minted = await request(app).get(`/api/open/v1/items/${item.key}/pdf-url`).expect(200);
   assert.match(minted.body.url, new RegExp(`/api/attachments/${attachment.key}/file\\?`));
   const streamed = await request(app).get(minted.body.url);
   assert.ok(streamed.status === 200 || streamed.body?.error === 'file missing');

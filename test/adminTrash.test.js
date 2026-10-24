@@ -35,6 +35,6 @@ test('empty trash uses one bulk delete and cleans orphan dictionaries', async ()
       orphanCreators: result.orphanCreators,
       orphanValues: result.orphanValues,
     },
-    { rootItems: 2, deletedItems: 5, orphanCreators: 3, orphanValues: 7 }
+    { rootItems: 2, deletedItems: 5, orphanCreators: 3, orphanValues: 7 },
   );
 });

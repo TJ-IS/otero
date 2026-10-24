@@ -48,7 +48,7 @@ export async function insertActivityLog({
       durationMs,
       String(action).slice(0, 80),
       meta && typeof meta === 'object' ? meta : null,
-    ]
+    ],
   );
   return row;
 }
@@ -88,13 +88,16 @@ export async function listActivityLogs({
     where.push(`"createdAt" <= $${params.length}`);
   }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const countRow = await queryOne(`SELECT COUNT(*)::int AS n FROM "activityLogs" ${clause}`, params);
+  const countRow = await queryOne(
+    `SELECT COUNT(*)::int AS n FROM "activityLogs" ${clause}`,
+    params,
+  );
   params.push(safeSize, offset);
   const rows = await query(
     `SELECT * FROM "activityLogs" ${clause}
      ORDER BY "createdAt" DESC, "logID" DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
+    params,
   );
   return {
     logs: rows,

@@ -39,7 +39,12 @@ export function SiteHeader({ className, actions }) {
   const items = PRIMARY_NAV.filter((item) => !item.editorsOnly || canEdit);
 
   return (
-    <header className={cn('site-header sticky top-0 z-40 border-b border-border/90 bg-background/95 backdrop-blur', className)}>
+    <header
+      className={cn(
+        'site-header sticky top-0 z-40 border-b border-border/90 bg-background/95 backdrop-blur',
+        className,
+      )}
+    >
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-sm focus:bg-background focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -57,7 +62,12 @@ export function SiteHeader({ className, actions }) {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="md:hidden" aria-label={t('primaryNavigation')}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="md:hidden"
+              aria-label={t('primaryNavigation')}
+            >
               <Menu className="size-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -87,7 +97,10 @@ export function SiteHeader({ className, actions }) {
                           >
                             {ChildIcon ? (
                               <ChildIcon
-                                className={cn('size-3.5 shrink-0', childActive ? 'text-brand' : 'text-muted-foreground/70')}
+                                className={cn(
+                                  'size-3.5 shrink-0',
+                                  childActive ? 'text-brand' : 'text-muted-foreground/70',
+                                )}
                                 strokeWidth={1.8}
                               />
                             ) : null}
@@ -104,7 +117,10 @@ export function SiteHeader({ className, actions }) {
                   <NavLink
                     to={item.to}
                     end={item.end}
-                    className={cn('gap-2.5', isNavActive(item, pathname) && 'font-medium text-brand')}
+                    className={cn(
+                      'gap-2.5',
+                      isNavActive(item, pathname) && 'font-medium text-brand',
+                    )}
                   >
                     <Icon className="size-3.5" strokeWidth={1.8} />
                     {t(`nav.${item.key}`)}
@@ -178,7 +194,10 @@ export function SiteHeader({ className, actions }) {
                     <NavLink
                       to={item.to}
                       end={item.end}
-                      className={cn(navigationMenuTriggerStyle(), active && 'border-brand text-brand')}
+                      className={cn(
+                        navigationMenuTriggerStyle(),
+                        active && 'border-brand text-brand',
+                      )}
                     >
                       <Icon className="size-3.5" strokeWidth={1.8} />
                       <span>{t(`nav.${item.key}`)}</span>

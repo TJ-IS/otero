@@ -45,14 +45,17 @@ function DuplicateGroup({ label, count, keys, dates, titles, onSelectItem }) {
       <CardContent className="p-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="min-w-0 break-all font-mono text-xs text-muted-foreground">{label}</span>
-          <Badge variant="destructive" className="shrink-0">{t('duplicates.copies', { count })}</Badge>
+          <Badge variant="destructive" className="shrink-0">
+            {t('duplicates.copies', { count })}
+          </Badge>
         </div>
         <ul className="space-y-1">
           {keys?.map((key, i) => (
             <li key={key} className="flex items-center justify-between gap-2 text-sm">
               <ItemKeyButton itemKey={key} onSelect={onSelectItem} />
               <span className="truncate text-xs text-muted-foreground">
-                {titles?.[i] || (dates?.[i] && new Date(dates[i].replace(' ', 'T') + 'Z').toLocaleDateString())}
+                {titles?.[i] ||
+                  (dates?.[i] && new Date(dates[i].replace(' ', 'T') + 'Z').toLocaleDateString())}
               </span>
             </li>
           ))}
@@ -80,12 +83,19 @@ function AllDuplicates({ onSelectItem, version }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
-          <Badge variant="secondary">{t('duplicates.doiGroups', { count: summary?.totalDoiDuplicates ?? 0 })}</Badge>
-          <Badge variant="secondary">{t('duplicates.titleGroups', { count: summary?.totalTitleDuplicates ?? 0 })}</Badge>
-          <Badge variant="outline">{t('duplicates.affected', { count: summary?.affectedItems ?? 0 })}</Badge>
+          <Badge variant="secondary">
+            {t('duplicates.doiGroups', { count: summary?.totalDoiDuplicates ?? 0 })}
+          </Badge>
+          <Badge variant="secondary">
+            {t('duplicates.titleGroups', { count: summary?.totalTitleDuplicates ?? 0 })}
+          </Badge>
+          <Badge variant="outline">
+            {t('duplicates.affected', { count: summary?.affectedItems ?? 0 })}
+          </Badge>
         </div>
         <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
-          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} /> {t('duplicates.rescan')}
+          <RefreshCw className={`mr-1.5 size-3.5 ${loading ? 'animate-spin' : ''}`} />{' '}
+          {t('duplicates.rescan')}
         </Button>
       </div>
 
@@ -166,12 +176,32 @@ function DuplicateSearch({ onSelectItem }) {
         </CardHeader>
         <CardContent>
           <form onSubmit={onSearch} className="grid gap-3 sm:grid-cols-3">
-            <Input placeholder="DOI" value={form.doi} onChange={(e) => setForm({ ...form, doi: e.target.value })} />
-            <Input placeholder={t('duplicates.phTitle')} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-            <Input placeholder={t('duplicates.phAuthor')} value={form.author} onChange={(e) => setForm({ ...form, author: e.target.value })} />
+            <Input
+              placeholder="DOI"
+              value={form.doi}
+              onChange={(e) => setForm({ ...form, doi: e.target.value })}
+            />
+            <Input
+              placeholder={t('duplicates.phTitle')}
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
+            />
+            <Input
+              placeholder={t('duplicates.phAuthor')}
+              value={form.author}
+              onChange={(e) => setForm({ ...form, author: e.target.value })}
+            />
             <div className="sm:col-span-3">
-              <Button type="submit" size="sm" disabled={loading || (!form.doi && !form.title && !form.author)}>
-                {loading ? <Loader2 className="mr-1.5 size-3.5 animate-spin" /> : <Search className="mr-1.5 size-3.5" />}
+              <Button
+                type="submit"
+                size="sm"
+                disabled={loading || (!form.doi && !form.title && !form.author)}
+              >
+                {loading ? (
+                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                ) : (
+                  <Search className="mr-1.5 size-3.5" />
+                )}
                 {t('duplicates.query')}
               </Button>
             </div>
@@ -207,16 +237,29 @@ function SearchResult({ result, onSelectItem }) {
   return (
     <div className="space-y-3">
       {doiHits.length > 0 && (
-        <ResultBlock title={t('duplicates.doiHit')} tone="destructive" rows={doiHits.map((r) => ({ key: r.key, extra: r.doi }))} onSelectItem={onSelectItem} />
+        <ResultBlock
+          title={t('duplicates.doiHit')}
+          tone="destructive"
+          rows={doiHits.map((r) => ({ key: r.key, extra: r.doi }))}
+          onSelectItem={onSelectItem}
+        />
       )}
       {titleExact.length > 0 && (
-        <ResultBlock title={t('duplicates.titleExact')} tone="destructive" rows={titleExact.map((r) => ({ key: r.key, extra: r.title }))} onSelectItem={onSelectItem} />
+        <ResultBlock
+          title={t('duplicates.titleExact')}
+          tone="destructive"
+          rows={titleExact.map((r) => ({ key: r.key, extra: r.title }))}
+          onSelectItem={onSelectItem}
+        />
       )}
       {titleFuzzy.length > 0 && (
         <ResultBlock
           title={t('duplicates.titleSimilar')}
           tone="warning"
-          rows={titleFuzzy.map((r) => ({ key: r.key, extra: `${r.title} (${Math.round(r.similarity_score * 100)}%)` }))}
+          rows={titleFuzzy.map((r) => ({
+            key: r.key,
+            extra: `${r.title} (${Math.round(r.similarity_score * 100)}%)`,
+          }))}
           onSelectItem={onSelectItem}
         />
       )}
@@ -224,7 +267,10 @@ function SearchResult({ result, onSelectItem }) {
         <ResultBlock
           title={t('duplicates.authorMatch')}
           tone="secondary"
-          rows={authorHits.map((r) => ({ key: r.key, extra: `${r.firstName || ''} ${r.lastName || ''}`.trim() }))}
+          rows={authorHits.map((r) => ({
+            key: r.key,
+            extra: `${r.firstName || ''} ${r.lastName || ''}`.trim(),
+          }))}
           onSelectItem={onSelectItem}
         />
       )}
@@ -244,7 +290,10 @@ function ResultBlock({ title, tone, rows, onSelectItem }) {
       <CardContent>
         <ul className="divide-y">
           {rows.map((r, i) => (
-            <li key={`${r.key}-${i}`} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+            <li
+              key={`${r.key}-${i}`}
+              className="flex items-center justify-between gap-2 py-1.5 text-sm"
+            >
               <ItemKeyButton itemKey={r.key} onSelect={onSelectItem} />
               <span className="min-w-0 truncate text-xs text-muted-foreground">{r.extra}</span>
             </li>
@@ -262,14 +311,17 @@ export function DuplicatesPanel() {
   const [pendingKey, setPendingKey] = useState(null);
   const [duplicatesVersion, setDuplicatesVersion] = useState(0);
 
-  const selectItem = useCallback((key) => {
-    if (key === selectedKey) return;
-    if (detailDirty) {
-      setPendingKey(key);
-      return;
-    }
-    setSelectedKey(key);
-  }, [detailDirty, selectedKey]);
+  const selectItem = useCallback(
+    (key) => {
+      if (key === selectedKey) return;
+      if (detailDirty) {
+        setPendingKey(key);
+        return;
+      }
+      setSelectedKey(key);
+    },
+    [detailDirty, selectedKey],
+  );
 
   const closeDetail = useCallback(() => {
     if (detailDirty) {
@@ -297,7 +349,7 @@ export function DuplicatesPanel() {
   }, []);
 
   return (
-      <div className="relative h-full min-h-0 overflow-hidden">
+    <div className="relative h-full min-h-0 overflow-hidden">
       <div className="h-full overflow-auto">
         <div className="mx-auto max-w-page space-y-8 px-4 py-8 sm:px-6 lg:px-8">
           <PageHeader
@@ -331,7 +383,12 @@ export function DuplicatesPanel() {
         ) : null}
       </ItemDetailDialog>
 
-      <AlertDialog open={!!pendingKey} onOpenChange={(open) => { if (!open) setPendingKey(null); }}>
+      <AlertDialog
+        open={!!pendingKey}
+        onOpenChange={(open) => {
+          if (!open) setPendingKey(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('common:unsavedSwitchTitle')}</AlertDialogTitle>
@@ -339,7 +396,9 @@ export function DuplicatesPanel() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common:continueEditing')}</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSwitch}>{t('common:discardAndSwitch')}</AlertDialogAction>
+            <AlertDialogAction onClick={confirmSwitch}>
+              {t('common:discardAndSwitch')}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

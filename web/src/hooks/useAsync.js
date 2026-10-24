@@ -12,19 +12,29 @@ export function useAsync(fetcher, deps = []) {
   const [loading, setLoading] = useState(true);
   const [nonce, setNonce] = useState(0);
 
-  const refresh = useCallback(() => setNonce(n => n + 1), []);
+  const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
     setLoading(true);
     fetcher(controller.signal)
-      .then((d) => { if (!cancelled) { setData(d); setError(null); } })
+      .then((d) => {
+        if (!cancelled) {
+          setData(d);
+          setError(null);
+        }
+      })
       .catch((e) => {
         if (!cancelled && e.name !== 'AbortError') setError(e);
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; controller.abort(); };
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, nonce]);
 

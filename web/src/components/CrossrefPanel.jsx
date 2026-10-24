@@ -1,15 +1,11 @@
 import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Checkbox } from './ui/checkbox';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { toast } from 'sonner';
-import {
-  Globe, Loader2, CheckCircle2, AlertCircle, Users,
-} from 'lucide-react';
+import { Globe, Loader2, CheckCircle2, AlertCircle, Users } from 'lucide-react';
 
 const STATUS_VARIANTS = {
   match: { variant: 'secondary' },
@@ -66,7 +62,12 @@ function FieldRow({ field, checked, onToggle }) {
 }
 
 export const CrossrefPanel = memo(function CrossrefPanel({
-  open, onOpenChange, result, loading, error, onApply,
+  open,
+  onOpenChange,
+  result,
+  loading,
+  error,
+  onApply,
 }) {
   const { t } = useTranslation(['item', 'common']);
   const [fieldSel, setFieldSel] = useState({});
@@ -81,44 +82,45 @@ export const CrossrefPanel = memo(function CrossrefPanel({
       return;
     }
     const fs = {};
-    (result.fields || []).forEach(f => {
+    (result.fields || []).forEach((f) => {
       fs[f.field] = f.status === 'missing';
     });
     setFieldSel(fs);
     setApplyCreators(result.creators?.status === 'missing');
     setApplyItemType(
-      Boolean(result.suggestedItemType)
-      && result.suggestedItemType !== result.itemType
+      Boolean(result.suggestedItemType) && result.suggestedItemType !== result.itemType,
     );
   }, [result]);
 
   const changeableFields = useMemo(
-    () => (result?.fields || []).filter(f => f.status === 'missing' || f.status === 'conflict'),
+    () => (result?.fields || []).filter((f) => f.status === 'missing' || f.status === 'conflict'),
     [result],
   );
   const conflictFields = useMemo(
-    () => (result?.fields || []).filter(f => f.status === 'conflict'),
+    () => (result?.fields || []).filter((f) => f.status === 'conflict'),
     [result],
   );
   const missingFields = useMemo(
-    () => (result?.fields || []).filter(f => f.status === 'missing'),
+    () => (result?.fields || []).filter((f) => f.status === 'missing'),
     [result],
   );
 
   const selectedFieldCount = Object.values(fieldSel).filter(Boolean).length;
-  const totalSelected = selectedFieldCount
-    + (applyCreators ? 1 : 0)
-    + (applyItemType ? 1 : 0);
+  const totalSelected = selectedFieldCount + (applyCreators ? 1 : 0) + (applyItemType ? 1 : 0);
 
   const selectFillable = () => {
     const fs = {};
-    missingFields.forEach(f => { fs[f.field] = true; });
+    missingFields.forEach((f) => {
+      fs[f.field] = true;
+    });
     setFieldSel(fs);
     setApplyCreators(result?.creators?.status === 'missing');
   };
   const selectConflicts = () => {
     const fs = { ...fieldSel };
-    conflictFields.forEach(f => { fs[f.field] = true; });
+    conflictFields.forEach((f) => {
+      fs[f.field] = true;
+    });
     setFieldSel(fs);
     if (result?.creators?.status === 'conflict') setApplyCreators(true);
   };
@@ -134,7 +136,7 @@ export const CrossrefPanel = memo(function CrossrefPanel({
       return;
     }
     const acceptedFields = {};
-    (result?.fields || []).forEach(f => {
+    (result?.fields || []).forEach((f) => {
       if (fieldSel[f.field]) acceptedFields[f.field] = f.suggested ?? '';
     });
     const acceptedCreators = applyCreators
@@ -153,8 +155,9 @@ export const CrossrefPanel = memo(function CrossrefPanel({
     });
   };
 
-  const creatorsChangeable = result?.creators
-    && (result.creators.status === 'missing' || result.creators.status === 'conflict');
+  const creatorsChangeable =
+    result?.creators &&
+    (result.creators.status === 'missing' || result.creators.status === 'conflict');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -168,11 +171,17 @@ export const CrossrefPanel = memo(function CrossrefPanel({
               <>
                 DOI <span className="font-mono text-foreground">{result.doi}</span>
                 {' · '}
-                <span className="text-amber-600 dark:text-amber-500">{t('crossref.summaryMissing', { count: result.summary?.missing || 0 })}</span>
+                <span className="text-amber-600 dark:text-amber-500">
+                  {t('crossref.summaryMissing', { count: result.summary?.missing || 0 })}
+                </span>
                 {' · '}
-                <span className="text-destructive">{t('crossref.summaryConflict', { count: result.summary?.conflict || 0 })}</span>
+                <span className="text-destructive">
+                  {t('crossref.summaryConflict', { count: result.summary?.conflict || 0 })}
+                </span>
                 {' · '}
-                <span className="text-muted-foreground">{t('crossref.summaryMatch', { count: result.summary?.match || 0 })}</span>
+                <span className="text-muted-foreground">
+                  {t('crossref.summaryMatch', { count: result.summary?.match || 0 })}
+                </span>
               </>
             ) : (
               t('crossref.hint')
@@ -189,7 +198,9 @@ export const CrossrefPanel = memo(function CrossrefPanel({
           <div className="flex h-40 flex-col items-center justify-center gap-3 text-center px-6">
             <AlertCircle className="size-5 text-destructive" />
             <span className="text-sm text-destructive">{error}</span>
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>{t('common:close')}</Button>
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+              {t('common:close')}
+            </Button>
           </div>
         ) : result ? (
           <>
@@ -200,15 +211,30 @@ export const CrossrefPanel = memo(function CrossrefPanel({
                   : t('crossref.reviewConflicts')}
               </div>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={selectFillable}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs"
+                  onClick={selectFillable}
+                >
                   {t('crossref.selectFillable')}
                 </Button>
                 {conflictFields.length > 0 && (
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={selectConflicts}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs"
+                    onClick={selectConflicts}
+                  >
                     {t('crossref.includeConflicts')}
                   </Button>
                 )}
-                <Button size="sm" variant="ghost" className="h-7 px-2 text-xs text-muted-foreground" onClick={selectNone}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-xs text-muted-foreground"
+                  onClick={selectNone}
+                >
                   {t('crossref.clear')}
                 </Button>
               </div>
@@ -219,7 +245,7 @@ export const CrossrefPanel = memo(function CrossrefPanel({
                 <label className="flex items-start gap-3 py-2.5 mb-2 hover:bg-accent/40 -mx-2 px-2 rounded-sm">
                   <Checkbox
                     checked={applyItemType}
-                    onCheckedChange={v => setApplyItemType(!!v)}
+                    onCheckedChange={(v) => setApplyItemType(!!v)}
                     className="mt-0.5"
                   />
                   <div className="min-w-0 flex-1 text-xs">
@@ -230,20 +256,24 @@ export const CrossrefPanel = memo(function CrossrefPanel({
                     <div className="mt-1 text-muted-foreground">
                       {t('crossref.currentType', { type: result.itemType })}
                       <span className="mx-1.5">→</span>
-                      <span className="font-medium text-foreground">{result.suggestedItemType}</span>
+                      <span className="font-medium text-foreground">
+                        {result.suggestedItemType}
+                      </span>
                     </div>
                   </div>
                 </label>
               )}
 
-              <h3 className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">{t('crossref.fields')}</h3>
+              <h3 className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                {t('crossref.fields')}
+              </h3>
               <div className="divide-y">
-                {(result.fields || []).map(f => (
+                {(result.fields || []).map((f) => (
                   <FieldRow
                     key={f.field}
                     field={f}
                     checked={!!fieldSel[f.field]}
-                    onToggle={v => setFieldSel(s => ({ ...s, [f.field]: !!v }))}
+                    onToggle={(v) => setFieldSel((s) => ({ ...s, [f.field]: !!v }))}
                   />
                 ))}
               </div>
@@ -260,7 +290,7 @@ export const CrossrefPanel = memo(function CrossrefPanel({
                   >
                     <Checkbox
                       checked={applyCreators}
-                      onCheckedChange={v => setApplyCreators(!!v)}
+                      onCheckedChange={(v) => setApplyCreators(!!v)}
                       disabled={!creatorsChangeable}
                       className="mt-0.5"
                     />
@@ -271,15 +301,19 @@ export const CrossrefPanel = memo(function CrossrefPanel({
                       </div>
                       <div className="text-muted-foreground">
                         <span className="text-muted-foreground/80">{t('crossref.current')}</span>
-                        {result.creators.current?.length
-                          ? result.creators.current.map(c => c.label).join('; ')
-                          : <em>{t('crossref.empty')}</em>}
+                        {result.creators.current?.length ? (
+                          result.creators.current.map((c) => c.label).join('; ')
+                        ) : (
+                          <em>{t('crossref.empty')}</em>
+                        )}
                       </div>
                       {creatorsChangeable && (
                         <div className="text-foreground">
-                          <span className="text-muted-foreground/80">{t('crossref.suggestedSource')}</span>
+                          <span className="text-muted-foreground/80">
+                            {t('crossref.suggestedSource')}
+                          </span>
                           <span className="font-medium">
-                            {result.creators.suggested.map(c => c.label).join('; ')}
+                            {result.creators.suggested.map((c) => c.label).join('; ')}
                           </span>
                         </div>
                       )}
@@ -295,11 +329,11 @@ export const CrossrefPanel = memo(function CrossrefPanel({
             </div>
 
             <div className="flex items-center justify-between px-6 py-3 border-t">
-              <span className="text-xs text-muted-foreground">
-                {t('crossref.applyDraftHint')}
-              </span>
+              <span className="text-xs text-muted-foreground">{t('crossref.applyDraftHint')}</span>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>{t('common:cancel')}</Button>
+                <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                  {t('common:cancel')}
+                </Button>
                 <Button size="sm" onClick={handleApply} disabled={totalSelected === 0}>
                   <CheckCircle2 className="size-3.5" />
                   {t('crossref.applyDraft', { count: totalSelected })}
@@ -308,7 +342,9 @@ export const CrossrefPanel = memo(function CrossrefPanel({
             </div>
           </>
         ) : (
-          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">{t('crossref.noResult')}</div>
+          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+            {t('crossref.noResult')}
+          </div>
         )}
       </DialogContent>
     </Dialog>

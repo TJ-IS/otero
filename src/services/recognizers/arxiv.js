@@ -51,9 +51,11 @@ function parseFirstEntry(xml) {
   const title = pick('title')?.replace(/\s+/g, ' ').trim() || null;
   const summary = pick('summary')?.replace(/\s+/g, ' ').trim() || null;
   const published = pick('published') || null;
-  const authors = Array.from(body.matchAll(/<author>\s*<name>([^<]+)<\/name>/g))
-    .map(m => m[1].trim());
-  const pdfUrl = pickAttr('link', 'href') && body.match(/<link[^>]*title="pdf"[^>]*href="([^"]+)"/)?.[1];
+  const authors = Array.from(body.matchAll(/<author>\s*<name>([^<]+)<\/name>/g)).map((m) =>
+    m[1].trim(),
+  );
+  const pdfUrl =
+    pickAttr('link', 'href') && body.match(/<link[^>]*title="pdf"[^>]*href="([^"]+)"/)?.[1];
   const doi = body.match(/<link[^>]*title="doi"[^>]*href="([^"]+)"/)?.[1] || null;
   const journalRef = pick('journal_ref') || null;
   const primaryCategory = pickAttr('category', 'term');

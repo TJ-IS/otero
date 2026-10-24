@@ -200,7 +200,9 @@ export function DoiCoverageVenn({ data }) {
             style={{ transition: 'fill-opacity 160ms ease' }}
             onMouseEnter={() => setHover('targetOnly')}
             onMouseLeave={() => setHover(null)}
-            onClick={() => { if (canOpenMissing) setMissingOpen(true); }}
+            onClick={() => {
+              if (canOpenMissing) setMissingOpen(true);
+            }}
             className={canOpenMissing ? 'cursor-pointer' : undefined}
           />
 
@@ -210,7 +212,9 @@ export function DoiCoverageVenn({ data }) {
             cy={layout.cy}
             r={layout.right.r}
             fill={COLLECTED_FILL}
-            fillOpacity={hover && hover !== 'collectedOnly' && hover !== 'intersection' ? 0.1 : 0.22}
+            fillOpacity={
+              hover && hover !== 'collectedOnly' && hover !== 'intersection' ? 0.1 : 0.22
+            }
             stroke={COLLECTED_FILL}
             strokeWidth={1.5}
             strokeOpacity={0.75}
@@ -244,7 +248,9 @@ export function DoiCoverageVenn({ data }) {
             dominantBaseline="central"
             className={`fill-foreground ${canOpenMissing ? 'cursor-pointer' : ''}`}
             style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
-            onClick={() => { if (canOpenMissing) setMissingOpen(true); }}
+            onClick={() => {
+              if (canOpenMissing) setMissingOpen(true);
+            }}
             onMouseEnter={() => setHover('targetOnly')}
             onMouseLeave={() => setHover(null)}
           >
@@ -319,18 +325,24 @@ export function DoiCoverageVenn({ data }) {
               <li key={r.id}>
                 <div
                   className={`flex w-full items-start gap-3 px-3 py-2.5 text-left transition-colors ${
-                    isAction ? 'cursor-pointer hover:bg-muted/50 active:scale-[0.995]' : 'cursor-default'
+                    isAction
+                      ? 'cursor-pointer hover:bg-muted/50 active:scale-[0.995]'
+                      : 'cursor-default'
                   }`}
                   style={{ background: active ? 'hsl(var(--muted) / 0.55)' : undefined }}
                   onMouseEnter={() => setHover(r.id)}
                   onMouseLeave={() => setHover(null)}
                   onClick={isAction ? () => setMissingOpen(true) : undefined}
-                  onKeyDown={isAction ? (e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setMissingOpen(true);
-                    }
-                  } : undefined}
+                  onKeyDown={
+                    isAction
+                      ? (e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setMissingOpen(true);
+                          }
+                        }
+                      : undefined
+                  }
                   role={isAction ? 'button' : undefined}
                   tabIndex={isAction ? 0 : undefined}
                 >
@@ -341,7 +353,9 @@ export function DoiCoverageVenn({ data }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="text-sm font-medium">{r.label}</p>
-                      <p className="text-sm font-semibold tabular-nums">{formatCount(counts[r.id], lng)}</p>
+                      <p className="text-sm font-semibold tabular-nums">
+                        {formatCount(counts[r.id], lng)}
+                      </p>
                     </div>
                     <p className="text-xs text-muted-foreground">{r.hint}</p>
                     {isAction ? (

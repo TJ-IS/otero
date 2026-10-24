@@ -24,7 +24,11 @@ async function req(path, opts = {}) {
   });
   if (!res.ok) {
     let detail;
-    try { detail = (await res.json()).error; } catch { detail = res.statusText; }
+    try {
+      detail = (await res.json()).error;
+    } catch {
+      detail = res.statusText;
+    }
     throw new Error(`${res.status} ${detail || ''}`.trim());
   }
   if (res.status === 204) return null;
@@ -35,16 +39,36 @@ async function req(path, opts = {}) {
 
 export const api = {
   // Auth
-  async getMe() { return req('/api/auth/me'); },
+  async getMe() {
+    return req('/api/auth/me');
+  },
   async getNonce(address) {
-    return req(`/api/auth/nonce?address=${encodeURIComponent(address)}`).then(r => r.message);
+    return req(`/api/auth/nonce?address=${encodeURIComponent(address)}`).then((r) => r.message);
   },
   async verifyWallet(address, nonce, signature) {
-    return req('/api/auth/verify', { method: 'POST', body: JSON.stringify({ address, nonce, signature }) });
+    return req('/api/auth/verify', {
+      method: 'POST',
+      body: JSON.stringify({ address, nonce, signature }),
+    });
   },
 
   // Items
-  listItems({ type, journal, collection, search, year, yearFrom, yearTo, topLevel = true, includeDeleted = false, page = 1, pageSize = 100, sortField = 'dateModified', sortDir = 'desc', signal } = {}) {
+  listItems({
+    type,
+    journal,
+    collection,
+    search,
+    year,
+    yearFrom,
+    yearTo,
+    topLevel = true,
+    includeDeleted = false,
+    page = 1,
+    pageSize = 100,
+    sortField = 'dateModified',
+    sortDir = 'desc',
+    signal,
+  } = {}) {
     const qs = new URLSearchParams();
     if (type) qs.set('type', type);
     if (journal) qs.set('journal', journal);
@@ -61,7 +85,16 @@ export const api = {
     qs.set('sortDir', sortDir);
     return req(`/api/items?${qs.toString()}`, { signal });
   },
-  listItemKeys({ type, journal, collection, search, year, yearFrom, yearTo, includeDeleted = false } = {}) {
+  listItemKeys({
+    type,
+    journal,
+    collection,
+    search,
+    year,
+    yearFrom,
+    yearTo,
+    includeDeleted = false,
+  } = {}) {
     const qs = new URLSearchParams();
     if (type) qs.set('type', type);
     if (journal) qs.set('journal', journal);
@@ -71,20 +104,28 @@ export const api = {
     if (yearFrom != null && yearFrom !== '') qs.set('yearFrom', String(yearFrom));
     if (yearTo != null && yearTo !== '') qs.set('yearTo', String(yearTo));
     if (includeDeleted) qs.set('includeDeleted', 'true');
-    return req(`/api/items/keys?${qs.toString()}`).then(r => r.keys);
+    return req(`/api/items/keys?${qs.toString()}`).then((r) => r.keys);
   },
   async fetchItemExport(key, format = 'bibtex') {
     const headers = authToken ? { Authorization: `Bearer ${authToken}` } : {};
     const res = await fetch(`/api/items/${key}/export?format=${format}`, { headers });
     if (!res.ok) {
       let detail;
-      try { detail = (await res.json()).error; } catch { detail = res.statusText; }
+      try {
+        detail = (await res.json()).error;
+      } catch {
+        detail = res.statusText;
+      }
       throw new Error(`${res.status} ${detail || ''}`.trim());
     }
     return res.text();
   },
-  getItem(key, options) { return req(`/api/items/${key}`, options); },
-  getItemAttachments(key, options) { return req(`/api/items/${key}/attachments`, options).then(r => r.attachments); },
+  getItem(key, options) {
+    return req(`/api/items/${key}`, options);
+  },
+  getItemAttachments(key, options) {
+    return req(`/api/items/${key}/attachments`, options).then((r) => r.attachments);
+  },
   getItemPdfUrl(key, { attachment } = {}) {
     const qs = new URLSearchParams();
     if (attachment) qs.set('attachment', attachment);
@@ -92,18 +133,28 @@ export const api = {
     return req(`/api/items/${key}/pdf-url${suffix}`);
   },
   logClientActivity({ path }) {
-    return req('/api/activity/client', { method: 'POST', body: JSON.stringify({ path }) }).catch(() => null);
+    return req('/api/activity/client', { method: 'POST', body: JSON.stringify({ path }) }).catch(
+      () => null,
+    );
   },
-  createItem(body) { return req('/api/items', { method: 'POST', body: JSON.stringify(body) }); },
-  updateItem(key, body) { return req(`/api/items/${key}`, { method: 'PATCH', body: JSON.stringify(body) }); },
+  createItem(body) {
+    return req('/api/items', { method: 'POST', body: JSON.stringify(body) });
+  },
+  updateItem(key, body) {
+    return req(`/api/items/${key}`, { method: 'PATCH', body: JSON.stringify(body) });
+  },
   deleteItem(key, permanent = false) {
     const qs = permanent ? '?permanent=true' : '';
     return req(`/api/items/${key}${qs}`, { method: 'DELETE' });
   },
 
   // Collections
-  listCollections() { return req('/api/collections').then(r => r.collections); },
-  getCollection(key) { return req(`/api/collections/${key}`); },
+  listCollections() {
+    return req('/api/collections').then((r) => r.collections);
+  },
+  getCollection(key) {
+    return req(`/api/collections/${key}`);
+  },
   createCollection({ name, parentKey }) {
     return req('/api/collections', { method: 'POST', body: JSON.stringify({ name, parentKey }) });
   },
@@ -113,19 +164,20 @@ export const api = {
   },
   addItemToCollection(collectionKey, itemKey) {
     return req(`/api/collections/${collectionKey}/items`, {
-      method: 'POST', body: JSON.stringify({ itemKey }),
+      method: 'POST',
+      body: JSON.stringify({ itemKey }),
     });
   },
 
   // Journals
-  listJournals(options) { return req('/api/journals', options).then(r => r.journals); },
+  listJournals(options) {
+    return req('/api/journals', options).then((r) => r.journals);
+  },
 
   // Authors
   getAuthorGraph(options = {}) {
     const normalized = typeof options === 'number' ? { minPapers: options } : options;
-    const {
-      minPapers, minCollaborations, journal, yearFrom, yearTo, signal,
-    } = normalized || {};
+    const { minPapers, minCollaborations, journal, yearFrom, yearTo, signal } = normalized || {};
     const qs = new URLSearchParams();
     if (minPapers != null) qs.set('minPapers', String(minPapers));
     if (minCollaborations != null) qs.set('minCollaborations', String(minCollaborations));
@@ -140,14 +192,30 @@ export const api = {
   },
 
   // Dashboard stats
-  getStatsOverview() { return req('/api/stats/overview'); },
-  getStatsItemTypes() { return req('/api/stats/item-types').then(r => r.itemTypes); },
-  getStatsYears() { return req('/api/stats/years').then(r => r.years); },
-  getStatsJournals() { return req('/api/stats/journals').then(r => r.journals); },
-  getStatsFulltext() { return req('/api/stats/fulltext').then(r => r.counts); },
-  getStatsIngestion() { return req('/api/stats/ingestion').then(r => r.activity); },
-  getStatsDoiCoverage() { return req('/api/stats/doi-coverage'); },
-  getStatsDoiCoverageBreakdown() { return req('/api/stats/doi-coverage/breakdown'); },
+  getStatsOverview() {
+    return req('/api/stats/overview');
+  },
+  getStatsItemTypes() {
+    return req('/api/stats/item-types').then((r) => r.itemTypes);
+  },
+  getStatsYears() {
+    return req('/api/stats/years').then((r) => r.years);
+  },
+  getStatsJournals() {
+    return req('/api/stats/journals').then((r) => r.journals);
+  },
+  getStatsFulltext() {
+    return req('/api/stats/fulltext').then((r) => r.counts);
+  },
+  getStatsIngestion() {
+    return req('/api/stats/ingestion').then((r) => r.activity);
+  },
+  getStatsDoiCoverage() {
+    return req('/api/stats/doi-coverage');
+  },
+  getStatsDoiCoverageBreakdown() {
+    return req('/api/stats/doi-coverage/breakdown');
+  },
   getStatsDoiCoverageMissing({ journal, year } = {}) {
     const qs = new URLSearchParams();
     if (journal) qs.set('journal', journal);
@@ -181,9 +249,15 @@ export const api = {
     const qs = force ? '?force=true' : '';
     return req(`/api/items/${key}/fulltext/parse${qs}`, { method: 'POST' });
   },
-  getFulltext(key, options) { return req(`/api/items/${key}/fulltext`, options); },
-  getFulltextStructure(key, options) { return req(`/api/items/${key}/fulltext/structure`, options); },
-  deleteFulltext(key) { return req(`/api/items/${key}/fulltext`, { method: 'DELETE' }); },
+  getFulltext(key, options) {
+    return req(`/api/items/${key}/fulltext`, options);
+  },
+  getFulltextStructure(key, options) {
+    return req(`/api/items/${key}/fulltext/structure`, options);
+  },
+  deleteFulltext(key) {
+    return req(`/api/items/${key}/fulltext`, { method: 'DELETE' });
+  },
   parseFulltextBatch(keys) {
     return req('/api/fulltext/parse-batch', { method: 'POST', body: JSON.stringify({ keys }) });
   },
@@ -205,15 +279,25 @@ export const api = {
   },
 
   // Admin
-  getAdminStatus() { return req('/api/admin/status'); },
-  getAdminPostgresStatus() { return req('/api/admin/status/postgres'); },
-  getAdminR2Status() { return req('/api/admin/status/r2'); },
+  getAdminStatus() {
+    return req('/api/admin/status');
+  },
+  getAdminPostgresStatus() {
+    return req('/api/admin/status/postgres');
+  },
+  getAdminR2Status() {
+    return req('/api/admin/status/r2');
+  },
   getAdminTrash({ page = 1, pageSize = 50 } = {}) {
     const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     return req(`/api/admin/trash?${qs.toString()}`);
   },
-  emptyAdminTrash() { return req('/api/admin/trash', { method: 'DELETE' }); },
-  getAdminDuplicates() { return req('/api/admin/duplicates'); },
+  emptyAdminTrash() {
+    return req('/api/admin/trash', { method: 'DELETE' });
+  },
+  getAdminDuplicates() {
+    return req('/api/admin/duplicates');
+  },
   checkAdminDuplicates({ doi, title, author, limit } = {}) {
     const qs = new URLSearchParams();
     if (doi) qs.set('doi', doi);
@@ -253,12 +337,16 @@ export const api = {
   },
 
   // Merkle DOI proofs
-  getMerkleRoot() { return req('/api/merkle/root'); },
+  getMerkleRoot() {
+    return req('/api/merkle/root');
+  },
   checkMerkleExists(doi) {
     return req(`/api/merkle/exists?doi=${encodeURIComponent(doi)}`);
   },
   verifyMerkleProof(doi, proof) {
     return req('/api/merkle/verify', { method: 'POST', body: JSON.stringify({ doi, proof }) });
   },
-  rebuildMerkleTree() { return req('/api/merkle/rebuild', { method: 'POST' }); },
+  rebuildMerkleTree() {
+    return req('/api/merkle/rebuild', { method: 'POST' });
+  },
 };

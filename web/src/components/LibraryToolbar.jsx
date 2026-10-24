@@ -12,7 +12,15 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Check, ChevronDown, Upload, RefreshCw, Search, X, ListChecks, Sparkles, Loader2,
+  Check,
+  ChevronDown,
+  Upload,
+  RefreshCw,
+  Search,
+  X,
+  ListChecks,
+  Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { api } from '@/api/client';
 import { toast } from 'sonner';
@@ -132,10 +140,15 @@ export const LibraryToolbar = memo(function LibraryToolbar({
       const tid = toast.loading(t('import.loading', { name: file.name }));
       try {
         const result = await api.uploadPdf(file);
-        toast.success(t('import.success', { title: result.parent?.fields?.title || t('import.unrecognized') }), {
-          id: tid,
-          description: t('import.type', { type: ITEM_TYPE_LABELS[result.parent?.itemType] || result.parent?.itemType || '—' }),
-        });
+        toast.success(
+          t('import.success', { title: result.parent?.fields?.title || t('import.unrecognized') }),
+          {
+            id: tid,
+            description: t('import.type', {
+              type: ITEM_TYPE_LABELS[result.parent?.itemType] || result.parent?.itemType || '—',
+            }),
+          },
+        );
         onImported(result);
       } catch (err) {
         toast.error(t('import.failed', { message: err.message }), { id: tid });
@@ -195,7 +208,17 @@ export const LibraryToolbar = memo(function LibraryToolbar({
     } finally {
       setBatchParsing(false);
     }
-  }, [canEdit, total, batchParsing, filter?.type, filter?.journal, filter?.collection, filter?.search, filter?.year, t]);
+  }, [
+    canEdit,
+    total,
+    batchParsing,
+    filter?.type,
+    filter?.journal,
+    filter?.collection,
+    filter?.search,
+    filter?.year,
+    t,
+  ]);
 
   return (
     <div className="shrink-0 space-y-4 pb-4 pt-6">
@@ -204,7 +227,10 @@ export const LibraryToolbar = memo(function LibraryToolbar({
           <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-brand">
             {t('common:nav.library')}
           </p>
-          <h1 className="mt-1 truncate font-display text-2xl font-semibold tracking-tight" title={title}>
+          <h1
+            className="mt-1 truncate font-display text-2xl font-semibold tracking-tight"
+            title={title}
+          >
             {title}
           </h1>
         </div>
@@ -217,7 +243,11 @@ export const LibraryToolbar = memo(function LibraryToolbar({
               className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
               title={t('table.batchParseTitle')}
             >
-              {batchParsing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
+              {batchParsing ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Sparkles className="size-3" />
+              )}
               {t('table.batchParse')}
             </button>
           ) : null}
@@ -292,13 +322,22 @@ export const LibraryToolbar = memo(function LibraryToolbar({
                 <Upload className="size-3.5" />
                 <span className="hidden sm:inline">{t('importPdf')}</span>
               </Button>
-              <input ref={fileInput} type="file" accept="application/pdf" multiple className="hidden" onChange={onFileInputChange} />
+              <input
+                ref={fileInput}
+                type="file"
+                accept="application/pdf"
+                multiple
+                className="hidden"
+                onChange={onFileInputChange}
+              />
             </>
           ) : null}
         </div>
       </div>
 
-      {canEdit ? <MineruTaskLog open={logOpen} onOpenChange={setLogOpen} onSelectItem={onSelectItem} /> : null}
+      {canEdit ? (
+        <MineruTaskLog open={logOpen} onOpenChange={setLogOpen} onSelectItem={onSelectItem} />
+      ) : null}
     </div>
   );
 });

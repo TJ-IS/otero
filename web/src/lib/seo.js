@@ -99,7 +99,9 @@ export function applyPageMeta({
 }
 
 export function truncateMeta(text, max = 160) {
-  const s = String(text ?? '').replace(/\s+/g, ' ').trim();
+  const s = String(text ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (s.length <= max) return s;
   return `${s.slice(0, max - 1).trimEnd()}…`;
 }
@@ -109,9 +111,10 @@ export function scholarlyArticleJsonLd(item) {
   const fields = item.fields || {};
   const authors = (item.creators || [])
     .map((c) => {
-      const name = c.fieldMode === 1 || !c.firstName
-        ? (c.lastName || c.name || '')
-        : `${c.lastName || ''}, ${c.firstName || ''}`.trim().replace(/^,\s*/, '');
+      const name =
+        c.fieldMode === 1 || !c.firstName
+          ? c.lastName || c.name || ''
+          : `${c.lastName || ''}, ${c.firstName || ''}`.trim().replace(/^,\s*/, '');
       return name ? { '@type': 'Person', name } : null;
     })
     .filter(Boolean);
@@ -128,9 +131,7 @@ export function scholarlyArticleJsonLd(item) {
     isPartOf: fields.publicationTitle
       ? { '@type': 'Periodical', name: fields.publicationTitle }
       : undefined,
-    identifier: doi
-      ? { '@type': 'PropertyValue', propertyID: 'DOI', value: doi }
-      : undefined,
+    identifier: doi ? { '@type': 'PropertyValue', propertyID: 'DOI', value: doi } : undefined,
   };
   return Object.fromEntries(Object.entries(data).filter(([, v]) => v != null));
 }

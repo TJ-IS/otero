@@ -20,7 +20,13 @@ const handleClear = useCallback(() => {
 
 ```jsx
 /* web/src/components/ChatPanel.jsx:195-196 — current trigger */
-<Button variant="ghost" size="icon" className="size-7 ..." onClick={handleClear} title={t('chat.clear')}>
+<Button
+  variant="ghost"
+  size="icon"
+  className="size-7 ..."
+  onClick={handleClear}
+  title={t('chat.clear')}
+>
   <Trash2 className="size-3.5" />
 </Button>
 ```

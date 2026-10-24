@@ -18,13 +18,13 @@ services:
     ports:
       # 左边是宿主机端口，按需改。若前面有 Nginx 反代，建议只监听本地：
       #   "127.0.0.1:4321:3000"
-      - "4321:3000"
+      - '4321:3000'
     volumes:
       # 运行时数据（filesystem 存储模式下的 PDF/全文、缓存等）
       - ./data:/app/data
     # 让容器能用 host.docker.internal 访问宿主机上的数据库
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'
     environment:
       # ---------- 运行环境（无需修改） ----------
       - NODE_ENV=production
@@ -77,8 +77,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
 networks:
   otero-net:

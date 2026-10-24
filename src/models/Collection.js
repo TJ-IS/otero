@@ -2,10 +2,15 @@ import { DataObject } from './DataObject.js';
 import { generateKey } from '../utils/key.js';
 import { execute } from '../db/connection.js';
 import {
-  insertCollection, getCollectionByKey, getCollectionById,
+  insertCollection,
+  getCollectionByKey,
+  getCollectionById,
   listCollections as repoListCollections,
-  renameCollection, setCollectionDeleted,
-  addChildItem, removeChildItem, getCollectionItems,
+  renameCollection,
+  setCollectionDeleted,
+  addChildItem,
+  removeChildItem,
+  getCollectionItems,
 } from '../repositories/collectionRepo.js';
 
 export class Collection extends DataObject {
@@ -15,11 +20,21 @@ export class Collection extends DataObject {
     this._parentCollectionID = opts.parentCollectionID ?? null;
   }
 
-  get name() { return this._name; }
-  get parentCollectionID() { return this._parentCollectionID; }
+  get name() {
+    return this._name;
+  }
+  get parentCollectionID() {
+    return this._parentCollectionID;
+  }
 
-  setName(name) { this._name = name; return this; }
-  setParent(id) { this._parentCollectionID = id; return this; }
+  setName(name) {
+    this._name = name;
+    return this;
+  }
+  setParent(id) {
+    this._parentCollectionID = id;
+    return this;
+  }
 
   async save() {
     if (this._id == null) {
@@ -95,5 +110,7 @@ export const Collections = {
     const rows = await repoListCollections(opts);
     return rows.map(_rowToCollection);
   },
-  loadByKey(key) { return Collection.loadByKey(key); },
+  loadByKey(key) {
+    return Collection.loadByKey(key);
+  },
 };

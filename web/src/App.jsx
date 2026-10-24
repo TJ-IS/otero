@@ -8,7 +8,7 @@ import { ResearchPortal } from '@/components/ResearchPortal';
 import { api } from '@/api/client';
 
 function lazyNamed(loader, name) {
-  return lazy(() => loader().then(module => ({ default: module[name] })));
+  return lazy(() => loader().then((module) => ({ default: module[name] })));
 }
 
 const LibraryView = lazyNamed(() => import('@/components/LibraryView'), 'LibraryView');
@@ -19,19 +19,37 @@ const AuthorGraph = lazyNamed(() => import('@/components/AuthorGraph'), 'AuthorG
 const AuthorPage = lazyNamed(() => import('@/components/AuthorPage'), 'AuthorPage');
 const ItemPage = lazyNamed(() => import('@/components/ItemPage'), 'ItemPage');
 const DashboardLayout = lazyNamed(() => import('@/components/DashboardLayout'), 'DashboardLayout');
-const DashboardOverview = lazyNamed(() => import('@/components/dashboard/DashboardOverview'), 'DashboardOverview');
-const DashboardJournals = lazyNamed(() => import('@/components/dashboard/DashboardJournals'), 'DashboardJournals');
-const DashboardTimeline = lazyNamed(() => import('@/components/dashboard/DashboardTimeline'), 'DashboardTimeline');
-const DashboardAuthorStats = lazyNamed(() => import('@/components/dashboard/DashboardAuthorStats'), 'DashboardAuthorStats');
+const DashboardOverview = lazyNamed(
+  () => import('@/components/dashboard/DashboardOverview'),
+  'DashboardOverview',
+);
+const DashboardJournals = lazyNamed(
+  () => import('@/components/dashboard/DashboardJournals'),
+  'DashboardJournals',
+);
+const DashboardTimeline = lazyNamed(
+  () => import('@/components/dashboard/DashboardTimeline'),
+  'DashboardTimeline',
+);
+const DashboardAuthorStats = lazyNamed(
+  () => import('@/components/dashboard/DashboardAuthorStats'),
+  'DashboardAuthorStats',
+);
 const DocsLayout = lazyNamed(() => import('@/components/DocsLayout'), 'DocsLayout');
 const OpenApiDocsPage = lazyNamed(() => import('@/components/OpenApiDocsPage'), 'OpenApiDocsPage');
 const AgentsMdPage = lazyNamed(() => import('@/components/AgentsMdPage'), 'AgentsMdPage');
 const AdminLayout = lazyNamed(() => import('@/components/AdminLayout'), 'AdminLayout');
-const SystemStatusPanel = lazyNamed(() => import('@/components/admin/SystemStatusPanel'), 'SystemStatusPanel');
-const DuplicatesPanel = lazyNamed(() => import('@/components/admin/DuplicatesPanel'), 'DuplicatesPanel');
+const SystemStatusPanel = lazyNamed(
+  () => import('@/components/admin/SystemStatusPanel'),
+  'SystemStatusPanel',
+);
+const DuplicatesPanel = lazyNamed(
+  () => import('@/components/admin/DuplicatesPanel'),
+  'DuplicatesPanel',
+);
 const StorageReconciliationPanel = lazyNamed(
   () => import('@/components/admin/StorageReconciliationPanel'),
-  'StorageReconciliationPanel'
+  'StorageReconciliationPanel',
 );
 const TrashPanel = lazyNamed(() => import('@/components/admin/TrashPanel'), 'TrashPanel');
 const AccountsPanel = lazyNamed(() => import('@/components/admin/AccountsPanel'), 'AccountsPanel');
@@ -40,7 +58,11 @@ const LogsPanel = lazyNamed(() => import('@/components/admin/LogsPanel'), 'LogsP
 function RouteFallback() {
   const { t } = useTranslation('common');
   return (
-    <div className="min-h-[100dvh] bg-background p-6" aria-busy="true" aria-label={t('loadingPage')}>
+    <div
+      className="min-h-[100dvh] bg-background p-6"
+      aria-busy="true"
+      aria-label={t('loadingPage')}
+    >
       <div className="mx-auto max-w-5xl animate-pulse space-y-5">
         <div className="h-8 w-48 rounded-sm bg-muted" />
         <div className="h-4 w-72 max-w-full rounded-sm bg-muted" />
@@ -63,8 +85,15 @@ function NotFoundPage() {
       <h1 className="font-display text-2xl font-semibold">{t('notFound.title')}</h1>
       <p className="max-w-md text-sm leading-relaxed text-muted-foreground">{t('notFound.body')}</p>
       <div className="flex items-center gap-3">
-        <Link to="/" className="text-sm font-medium text-brand hover:underline">{t('brandHome')}</Link>
-        <Link to="/library" className="rounded-sm border px-3 py-1.5 text-xs font-medium transition-colors hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">{t('backToLibrary')}</Link>
+        <Link to="/" className="text-sm font-medium text-brand hover:underline">
+          {t('brandHome')}
+        </Link>
+        <Link
+          to="/library"
+          className="rounded-sm border px-3 py-1.5 text-xs font-medium transition-colors hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          {t('backToLibrary')}
+        </Link>
       </div>
     </main>
   );

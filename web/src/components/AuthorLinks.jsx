@@ -29,7 +29,9 @@ export function AuthorLinks({ creators, query, emptyText = '—', className }) {
               >
                 {label}
               </Link>
-            ) : label}
+            ) : (
+              label
+            )}
           </span>
         );
       })}

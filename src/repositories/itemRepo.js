@@ -106,17 +106,21 @@ export async function getOrCreateValueId(value, client = null) {
   const existing = await queryOne(
     'SELECT "valueID" FROM "itemDataValues" WHERE md5(value) = md5($1)',
     [value],
-    client
+    client,
   );
   if (existing) return existing.valueID;
 
   // Upsert so concurrent inserts of the same value never abort the
   // surrounding transaction and always return a valueID.
-  const row = await queryOne(`
+  const row = await queryOne(
+    `
     INSERT INTO "itemDataValues"(value) VALUES ($1)
     ON CONFLICT ((md5(value))) DO UPDATE SET value = "itemDataValues".value
     RETURNING "valueID"
-  `, [value], client);
+  `,
+    [value],
+    client,
+  );
   if (!row?.valueID) {
     throw new Error(`getOrCreateValueId failed for value length=${String(value).length}`);
   }
@@ -126,24 +130,38 @@ export async function getOrCreateValueId(value, client = null) {
 // ---------------------------------------------------------------------------
 // Item CRUD
 // ---------------------------------------------------------------------------
-export async function insertItemRow({
-  itemTypeID, key, parentItemID = null, deleted = 0, inPublications = 0,
-  dateAdded, dateModified, version = 0,
-}, client = null) {
+export async function insertItemRow(
+  {
+    itemTypeID,
+    key,
+    parentItemID = null,
+    deleted = 0,
+    inPublications = 0,
+    dateAdded,
+    dateModified,
+    version = 0,
+  },
+  client = null,
+) {
   const now = nowUtc();
-  const row = await queryOne(`
+  const row = await queryOne(
+    `
     INSERT INTO items("itemTypeID", key, "dateAdded", "dateModified", version, "parentItemID", deleted, "inPublications")
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING "itemID"
-  `, [
-    itemTypeID, key,
-    dateAdded ?? now,
-    dateModified ?? now,
-    version,
-    parentItemID,
-    deleted,
-    inPublications,
-  ], client);
+  `,
+    [
+      itemTypeID,
+      key,
+      dateAdded ?? now,
+      dateModified ?? now,
+      version,
+      parentItemID,
+      deleted,
+      inPublications,
+    ],
+    client,
+  );
   return row.itemID;
 }
 
@@ -151,7 +169,7 @@ export async function updateItemModifiedDate(itemId, client = null) {
   await execute(
     'UPDATE items SET "dateModified" = $1 WHERE "itemID"=$2',
     [nowUtc(), itemId],
-    client
+    client,
   );
 }
 
@@ -274,10 +292,12 @@ async function appendSearchHitsCte(searchQuery, params, p) {
     if (id != null) fieldIds.push(id);
   }
   const fidSql = fieldIds.length
-    ? fieldIds.map((id) => {
-        params.push(id);
-        return `$${p++}`;
-      }).join(',')
+    ? fieldIds
+        .map((id) => {
+          params.push(id);
+          return `$${p++}`;
+        })
+        .join(',')
     : 'NULL';
   const cte = `search_hits AS MATERIALIZED (
     SELECT u."itemID", MAX(u.rank)::float4 AS rank
@@ -346,16 +366,32 @@ export async function appendDoiRequiredForArticles(where, params, p, itemAlias =
   return p;
 }
 
-export async function appendItemScopeFilters(where, params, p, {
-  journal, journals, yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
-  joinScope = false,
-} = {}, joins = []) {
+export async function appendItemScopeFilters(
+  where,
+  params,
+  p,
+  {
+    journal,
+    journals,
+    yearFrom,
+    yearTo,
+    basketOnly = false,
+    requireDoiForArticles = false,
+    joinScope = false,
+  } = {},
+  joins = [],
+) {
   const jfid = await fieldIdByName('publicationTitle');
   const journalList = Array.isArray(journals) ? journals.filter(Boolean) : [];
 
-  const journalValues = journal && journal !== UNFILED
-    ? [journal]
-    : (!journal && journalList.length > 0 ? journalList : (!journal && basketOnly ? JOURNAL_WHITELIST : null));
+  const journalValues =
+    journal && journal !== UNFILED
+      ? [journal]
+      : !journal && journalList.length > 0
+        ? journalList
+        : !journal && basketOnly
+          ? JOURNAL_WHITELIST
+          : null;
 
   if (journal === UNFILED) {
     if (!jfid) return null;
@@ -372,8 +408,12 @@ export async function appendItemScopeFilters(where, params, p, {
     if (joinScope) {
       const jParam = p++;
       const vParam = p++;
-      joins.push(`JOIN "itemData" scope_jd ON scope_jd."itemID" = i."itemID" AND scope_jd."fieldID" = $${jParam}`);
-      joins.push(`JOIN "itemDataValues" scope_jv ON scope_jv."valueID" = scope_jd."valueID" AND scope_jv.value = ANY($${vParam}::text[])`);
+      joins.push(
+        `JOIN "itemData" scope_jd ON scope_jd."itemID" = i."itemID" AND scope_jd."fieldID" = $${jParam}`,
+      );
+      joins.push(
+        `JOIN "itemDataValues" scope_jv ON scope_jv."valueID" = scope_jd."valueID" AND scope_jv.value = ANY($${vParam}::text[])`,
+      );
       params.push(jfid, journalValues);
     } else {
       const jParam = p++;
@@ -408,8 +448,12 @@ export async function appendItemScopeFilters(where, params, p, {
       params.push(yearTo);
     }
     if (joinScope) {
-      joins.push(`JOIN "itemData" scope_yd ON scope_yd."itemID" = i."itemID" AND scope_yd."fieldID" = $${dParam}`);
-      joins.push(`JOIN "itemDataValues" scope_yv ON scope_yv."valueID" = scope_yd."valueID" AND ${yearConds.join(' AND ')}`);
+      joins.push(
+        `JOIN "itemData" scope_yd ON scope_yd."itemID" = i."itemID" AND scope_yd."fieldID" = $${dParam}`,
+      );
+      joins.push(
+        `JOIN "itemDataValues" scope_yv ON scope_yv."valueID" = scope_yd."valueID" AND ${yearConds.join(' AND ')}`,
+      );
     } else {
       where.push(`EXISTS (
         SELECT 1 FROM "itemData" d
@@ -431,8 +475,12 @@ export async function appendItemScopeFilters(where, params, p, {
     } else {
       const typeParam = p++;
       const doiParam = p++;
-      joins.push(`LEFT JOIN "itemData" scope_doi ON scope_doi."itemID" = i."itemID" AND scope_doi."fieldID" = $${doiParam}`);
-      joins.push(`LEFT JOIN "itemDataValues" scope_doiv ON scope_doiv."valueID" = scope_doi."valueID"`);
+      joins.push(
+        `LEFT JOIN "itemData" scope_doi ON scope_doi."itemID" = i."itemID" AND scope_doi."fieldID" = $${doiParam}`,
+      );
+      joins.push(
+        `LEFT JOIN "itemDataValues" scope_doiv ON scope_doiv."valueID" = scope_doi."valueID"`,
+      );
       where.push(`(
         i."itemTypeID" <> $${typeParam}
         OR (scope_doiv.value IS NOT NULL AND BTRIM(scope_doiv.value) <> '')
@@ -452,8 +500,16 @@ export async function appendItemScopeFilters(where, params, p, {
  * (e.g. an unknown type name), letting callers short-circuit to an empty result.
  */
 async function _buildItemFilter({
-  type, journal, journals, collection, search, includeDeleted = false,
-  yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
+  type,
+  journal,
+  journals,
+  collection,
+  search,
+  includeDeleted = false,
+  yearFrom,
+  yearTo,
+  basketOnly = false,
+  requireDoiForArticles = false,
   joinScope = false,
 } = {}) {
   const where = ['i."parentItemID" IS NULL'];
@@ -470,9 +526,21 @@ async function _buildItemFilter({
     params.push(typeId);
   }
 
-  p = await appendItemScopeFilters(where, params, p, {
-    journal, journals, yearFrom, yearTo, basketOnly, requireDoiForArticles, joinScope,
-  }, joins);
+  p = await appendItemScopeFilters(
+    where,
+    params,
+    p,
+    {
+      journal,
+      journals,
+      yearFrom,
+      yearTo,
+      basketOnly,
+      requireDoiForArticles,
+      joinScope,
+    },
+    joins,
+  );
   if (p == null) return null;
 
   if (collection) {
@@ -489,9 +557,20 @@ async function _buildItemFilter({
 }
 
 export async function listItems({
-  type, journal, journals, collection, search, includeDeleted = false,
-  yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
-  page = 1, pageSize = 100, sortField = 'dateModified', sortDir = 'desc',
+  type,
+  journal,
+  journals,
+  collection,
+  search,
+  includeDeleted = false,
+  yearFrom,
+  yearTo,
+  basketOnly = false,
+  requireDoiForArticles = false,
+  page = 1,
+  pageSize = 100,
+  sortField = 'dateModified',
+  sortDir = 'desc',
 } = {}) {
   const validPage = Math.max(1, parseInt(page, 10) || 1);
   const validPageSize = Math.min(200, Math.max(1, parseInt(pageSize, 10) || 100));
@@ -500,8 +579,17 @@ export async function listItems({
 
   const empty = { items: [], total: 0, page: validPage, pageSize: validPageSize, totalPages: 0 };
   const filter = await _buildItemFilter({
-    type, journal, journals, collection, search, includeDeleted,
-    yearFrom, yearTo, basketOnly, requireDoiForArticles, joinScope: true,
+    type,
+    journal,
+    journals,
+    collection,
+    search,
+    includeDeleted,
+    yearFrom,
+    yearTo,
+    basketOnly,
+    requireDoiForArticles,
+    joinScope: true,
   });
   if (!filter) return empty;
   const { where, params: scopeParams, searchQuery, joins } = filter;
@@ -612,7 +700,7 @@ export async function listItems({
     const [countRow, pageRows] = await Promise.all([
       queryOne(
         `SELECT COUNT(*)::int AS cnt FROM items i ${scopeJoins} WHERE ${whereSql}`,
-        countParams
+        countParams,
       ),
       query(`WITH ${pageCte} ${hydrateSql('page_items')}`, listParams),
     ]);
@@ -636,12 +724,29 @@ export async function listItems({
  * Payload is tiny (8-char keys) so this stays cheap even for large libraries.
  */
 export async function listItemKeys({
-  type, journal, journals, collection, search, includeDeleted = false,
-  yearFrom, yearTo, basketOnly = false, requireDoiForArticles = false,
+  type,
+  journal,
+  journals,
+  collection,
+  search,
+  includeDeleted = false,
+  yearFrom,
+  yearTo,
+  basketOnly = false,
+  requireDoiForArticles = false,
 } = {}) {
   const filter = await _buildItemFilter({
-    type, journal, journals, collection, search, includeDeleted,
-    yearFrom, yearTo, basketOnly, requireDoiForArticles, joinScope: true,
+    type,
+    journal,
+    journals,
+    collection,
+    search,
+    includeDeleted,
+    yearFrom,
+    yearTo,
+    basketOnly,
+    requireDoiForArticles,
+    joinScope: true,
   });
   if (!filter) return [];
   const { where, params, searchQuery, joins } = filter;
@@ -654,9 +759,9 @@ export async function listItemKeys({
   }
   const rows = await query(
     `${searchHitsCte}SELECT i.key FROM items i ${searchJoin} ${joins.join(' ')} WHERE ${where.join(' AND ')} ORDER BY i."dateAdded" DESC`,
-    params
+    params,
   );
-  return rows.map(r => r.key);
+  return rows.map((r) => r.key);
 }
 
 /**
@@ -674,7 +779,8 @@ export async function findItemByDoi(doi) {
   // Also match DOI values that still carry a doi.org URL prefix in storage.
   const key = normalized.toLowerCase();
   const wlPlaceholders = JOURNAL_WHITELIST.map((_, i) => `$${i + 4}`).join(',');
-  return queryOne(`
+  return queryOne(
+    `
     SELECT i.*
     FROM items i
     JOIN "itemData" d ON d."itemID" = i."itemID" AND d."fieldID" = $1
@@ -695,14 +801,17 @@ export async function findItemByDoi(doi) {
       )
     ORDER BY i."dateModified" DESC
     LIMIT 1
-  `, [doiFieldId, key, jfid, ...JOURNAL_WHITELIST]);
+  `,
+    [doiFieldId, key, jfid, ...JOURNAL_WHITELIST],
+  );
 }
 
 /**
  * First PDF attachment key for a parent item, or null.
  */
 export async function findPdfAttachmentByItemId(parentItemId) {
-  const row = await queryOne(`
+  const row = await queryOne(
+    `
     SELECT i.key
     FROM "itemAttachments" a
     JOIN items i ON i."itemID" = a."itemID"
@@ -715,7 +824,9 @@ export async function findPdfAttachmentByItemId(parentItemId) {
       )
     ORDER BY i."dateAdded" ASC
     LIMIT 1
-  `, [parentItemId]);
+  `,
+    [parentItemId],
+  );
   return row?.key ?? null;
 }
 
@@ -726,7 +837,8 @@ export async function listJournals() {
   // Preserve whitelist order while calculating all journal buckets and the
   // virtual UNFILED bucket in one statement. The previous implementation ran
   // one COUNT per journal, which multiplied remote-database latency by 12.
-  return query(`
+  return query(
+    `
     WITH targets AS (
       SELECT name, ord
       FROM unnest($2::text[]) WITH ORDINALITY AS target(name, ord)
@@ -762,7 +874,9 @@ export async function listJournals() {
       SELECT $3::text, "itemCount", 2147483647::bigint FROM unfiled
     ) buckets
     ORDER BY ord
-  `, [jfid, JOURNAL_WHITELIST, UNFILED]);
+  `,
+    [jfid, JOURNAL_WHITELIST, UNFILED],
+  );
 }
 
 export async function listUnfiledWithFulltextDone({ page = 1, pageSize = 100 } = {}) {
@@ -777,12 +891,15 @@ export async function listUnfiledWithFulltextDone({ page = 1, pageSize = 100 } =
   )`;
   const baseParams = [jfid, ...JOURNAL_WHITELIST];
 
-  const totalRow = await queryOne(`
+  const totalRow = await queryOne(
+    `
     SELECT COUNT(*)::int AS cnt
     FROM items i
     JOIN "itemFullText" ft ON ft."itemID" = i."itemID" AND ft.state = 'done'
     WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${unfiledClause}
-  `, baseParams);
+  `,
+    baseParams,
+  );
 
   const limit = Math.max(1, pageSize);
   const offset = Math.max(0, (Math.max(1, page) - 1) * limit);
@@ -791,7 +908,8 @@ export async function listUnfiledWithFulltextDone({ page = 1, pageSize = 100 } =
   const limitParam = baseParams.length + 2;
   const offsetParam = baseParams.length + 3;
 
-  const rows = await query(`
+  const rows = await query(
+    `
     SELECT i."itemID", i.key, i."itemTypeID",
       (SELECT v.value FROM "itemData" d JOIN "itemDataValues" v ON v."valueID"=d."valueID"
        WHERE d."itemID"=i."itemID" AND d."fieldID"=$${titleParam}) AS title
@@ -800,16 +918,19 @@ export async function listUnfiledWithFulltextDone({ page = 1, pageSize = 100 } =
     WHERE i.deleted = 0 AND i."parentItemID" IS NULL AND ${unfiledClause}
     ORDER BY i."dateAdded" DESC
     LIMIT $${limitParam} OFFSET $${offsetParam}
-  `, [...baseParams, tfid, limit, offset]);
+  `,
+    [...baseParams, tfid, limit, offset],
+  );
 
   return { items: rows, total: totalRow.cnt };
 }
 
 export async function setItemDeleted(itemId, deleted) {
-  await execute(
-    'UPDATE items SET deleted=$1, "dateModified"=$2 WHERE "itemID"=$3',
-    [deleted ? 1 : 0, nowUtc(), itemId]
-  );
+  await execute('UPDATE items SET deleted=$1, "dateModified"=$2 WHERE "itemID"=$3', [
+    deleted ? 1 : 0,
+    nowUtc(),
+    itemId,
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -817,38 +938,48 @@ export async function setItemDeleted(itemId, deleted) {
 // ---------------------------------------------------------------------------
 export async function setItemField(itemId, fieldId, value, client = null) {
   const valueId = await getOrCreateValueId(String(value), client);
-  await execute(`
+  await execute(
+    `
     INSERT INTO "itemData"("itemID", "fieldID", "valueID") VALUES ($1, $2, $3)
     ON CONFLICT ("itemID", "fieldID") DO UPDATE SET "valueID" = EXCLUDED."valueID"
-  `, [itemId, fieldId, valueId], client);
+  `,
+    [itemId, fieldId, valueId],
+    client,
+  );
 }
 
 export async function deleteItemField(itemId, fieldId, client = null) {
   await execute(
     'DELETE FROM "itemData" WHERE "itemID"=$1 AND "fieldID"=$2',
     [itemId, fieldId],
-    client
+    client,
   );
 }
 
 export async function getItemFields(itemId) {
-  return query(`
+  return query(
+    `
     SELECT f."fieldName" AS name, v.value AS value
     FROM "itemData" d
     JOIN fields f ON f."fieldID" = d."fieldID"
     JOIN "itemDataValues" v ON v."valueID" = d."valueID"
     WHERE d."itemID" = $1
-  `, [itemId]);
+  `,
+    [itemId],
+  );
 }
 
 export async function getItemField(itemId, fieldName) {
   const fid = await fieldIdByName(fieldName);
   if (fid == null) return null;
-  const row = await queryOne(`
+  const row = await queryOne(
+    `
     SELECT v.value FROM "itemData" d
     JOIN "itemDataValues" v ON v."valueID" = d."valueID"
     WHERE d."itemID"=$1 AND d."fieldID"=$2
-  `, [itemId, fid]);
+  `,
+    [itemId, fid],
+  );
   return row?.value ?? null;
 }
 
@@ -862,7 +993,7 @@ export async function findCreatorId({ firstName, lastName, fieldMode }, client =
        AND "lastName" IS NOT DISTINCT FROM $2
        AND "fieldMode"=$3`,
     [firstName ?? null, lastName ?? null, fieldMode],
-    client
+    client,
   );
   return row?.creatorID ?? null;
 }
@@ -873,7 +1004,7 @@ export async function getOrCreateCreatorId({ firstName, lastName, fieldMode }, c
   const row = await queryOne(
     'INSERT INTO creators("firstName", "lastName", "fieldMode") VALUES ($1, $2, $3) RETURNING "creatorID"',
     [firstName ?? null, lastName ?? null, fieldMode],
-    client
+    client,
   );
   return row.creatorID;
 }
@@ -883,27 +1014,35 @@ export async function setItemCreators(itemId, creators) {
     await execute('DELETE FROM "itemCreators" WHERE "itemID"=$1', [itemId], client);
     const seen = new Set();
     for (const c of creators) {
-      const cid = await getOrCreateCreatorId({
-        firstName: c.firstName ?? null,
-        lastName: c.lastName ?? null,
-        fieldMode: c.fieldMode ?? 0,
-      }, client);
-      const ctid = (await creatorTypeIdByName(c.creatorType))
-        ?? (await creatorTypeIdByName('author'));
+      const cid = await getOrCreateCreatorId(
+        {
+          firstName: c.firstName ?? null,
+          lastName: c.lastName ?? null,
+          fieldMode: c.fieldMode ?? 0,
+        },
+        client,
+      );
+      const ctid =
+        (await creatorTypeIdByName(c.creatorType)) ?? (await creatorTypeIdByName('author'));
       const key = `${cid}:${ctid}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      await execute(`
+      await execute(
+        `
         INSERT INTO "itemCreators"("itemID", "creatorID", "creatorTypeID", "orderIndex")
         VALUES ($1, $2, $3, $4)
         ON CONFLICT DO NOTHING
-      `, [itemId, cid, ctid, c.orderIndex ?? 0], client);
+      `,
+        [itemId, cid, ctid, c.orderIndex ?? 0],
+        client,
+      );
     }
   });
 }
 
 export async function getItemCreators(itemId) {
-  return query(`
+  return query(
+    `
     SELECT c."creatorID" AS id, c."firstName", c."lastName", c."fieldMode",
            ct."creatorType", ic."orderIndex"
     FROM "itemCreators" ic
@@ -911,23 +1050,37 @@ export async function getItemCreators(itemId) {
     JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
     WHERE ic."itemID" = $1
     ORDER BY ic."orderIndex"
-  `, [itemId]);
+  `,
+    [itemId],
+  );
 }
 
 // ---------------------------------------------------------------------------
 // attachments
 // ---------------------------------------------------------------------------
-export async function insertAttachment({
-  itemId, parentItemId, linkMode, contentType, charset, path, md5, mtime, syncState = null,
-}, client = null) {
+export async function insertAttachment(
+  { itemId, parentItemId, linkMode, contentType, charset, path, md5, mtime, syncState = null },
+  client = null,
+) {
   const mtimeInt = mtime == null ? null : Math.round(Number(mtime));
-  await execute(`
+  await execute(
+    `
     INSERT INTO "itemAttachments"("itemID", "parentItemID", "linkMode", "contentType", charset, path, "syncState", md5, mtime)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-  `, [
-    itemId, parentItemId ?? null, linkMode, contentType ?? null, charset ?? null,
-    path ?? null, syncState, md5 ?? null, mtimeInt,
-  ], client);
+  `,
+    [
+      itemId,
+      parentItemId ?? null,
+      linkMode,
+      contentType ?? null,
+      charset ?? null,
+      path ?? null,
+      syncState,
+      md5 ?? null,
+      mtimeInt,
+    ],
+    client,
+  );
 }
 
 export async function getAttachment(itemId) {

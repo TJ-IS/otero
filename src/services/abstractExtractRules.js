@@ -4,15 +4,23 @@
  */
 
 const ABSTRACT_HEADING = /^(abstract|summary|synopsis)\.?$/i;
-const STOP_HEADING = /^(keywords?|key words|introduction|1\b|i\b|article info|article history|acknowledgements?|references|copyright)\b/i;
-const BOILERPLATE = /taylor & francis makes every effort|please scroll down for article|to cite this article:|to link to this article:|is an assistant professor|received (his|her|their) ph\.?d/i;
+const STOP_HEADING =
+  /^(keywords?|key words|introduction|1\b|i\b|article info|article history|acknowledgements?|references|copyright)\b/i;
+const BOILERPLATE =
+  /taylor & francis makes every effort|please scroll down for article|to cite this article:|to link to this article:|is an assistant professor|received (his|her|their) ph\.?d/i;
 
 export function unsqueezeSpacedLetters(text) {
-  return String(text || '').replace(/\b(?:[A-Za-z]\s+){3,}[A-Za-z]\b/g, (m) => m.replace(/\s+/g, ''));
+  return String(text || '').replace(/\b(?:[A-Za-z]\s+){3,}[A-Za-z]\b/g, (m) =>
+    m.replace(/\s+/g, ''),
+  );
 }
 
 export function normalizeHeading(text) {
-  return unsqueezeSpacedLetters(String(text || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).trim();
+  return unsqueezeSpacedLetters(
+    String(text || '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' '),
+  ).trim();
 }
 
 export function isAbstractHeading(text) {
@@ -39,7 +47,8 @@ export function isUsableAbstract(text) {
   return true;
 }
 
-const BAD_OPEN = /^(of |and |or |as |that |which |who |whose |where |when |than |then |also |however |thus |therefore |way,|notions |data |metrics |variables\.|framework,|statistics |articles )/i;
+const BAD_OPEN =
+  /^(of |and |or |as |that |which |who |whose |where |when |than |then |also |however |thus |therefore |way,|notions |data |metrics |variables\.|framework,|statistics |articles )/i;
 const TABLE_NOISE = /\b(quantile|minimum first|measurement \(cm\)|study distance measure)\b/i;
 
 /** Repair MinerU ligature splits and drop publisher footers. */
@@ -148,8 +157,10 @@ export function extractAbstractFromPlain(text) {
 }
 
 export function extractAbstract({ blocks, markdown, plainText } = {}) {
-  return extractAbstractFromBlocks(blocks)
-    || extractAbstractFromMarkdown(markdown)
-    || extractAbstractFromPlain(plainText)
-    || null;
+  return (
+    extractAbstractFromBlocks(blocks) ||
+    extractAbstractFromMarkdown(markdown) ||
+    extractAbstractFromPlain(plainText) ||
+    null
+  );
 }

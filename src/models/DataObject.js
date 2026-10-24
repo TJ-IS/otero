@@ -14,12 +14,24 @@ export class DataObject {
     this._changed = new Set();
   }
 
-  get id() { return this._id; }
-  get key() { return this._key; }
-  get dateAdded() { return this._dateAdded; }
-  get dateModified() { return this._dateModified; }
-  get version() { return this._version; }
-  get deleted() { return Boolean(this._deleted); }
+  get id() {
+    return this._id;
+  }
+  get key() {
+    return this._key;
+  }
+  get dateAdded() {
+    return this._dateAdded;
+  }
+  get dateModified() {
+    return this._dateModified;
+  }
+  get version() {
+    return this._version;
+  }
+  get deleted() {
+    return Boolean(this._deleted);
+  }
 
   /** Subclass override hook. */
   toJSON() {

@@ -38,10 +38,7 @@ test('buildAgentSkillsIndex digest matches the supplied markdown', () => {
 for (const prefix of prefixes) {
   test(`${prefix} index digest matches the same-host SKILL.md`, async () => {
     const host = 'skills.example.test';
-    const indexRes = await request(app)
-      .get(`${prefix}/index.json`)
-      .set('Host', host)
-      .expect(200);
+    const indexRes = await request(app).get(`${prefix}/index.json`).set('Host', host).expect(200);
     const skillRes = await request(app)
       .get(`${prefix}/otero-open-api/SKILL.md`)
       .set('Host', host)

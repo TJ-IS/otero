@@ -19,13 +19,13 @@ services:
     container_name: otero
     restart: unless-stopped
     ports:
-      - "4321:3000"
+      - '4321:3000'
     volumes:
       - ./data:/app/data
     # Reach a PostgreSQL running on the Docker host via host.docker.internal.
     # On Linux this maps the name to the host gateway.
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'
     # Inject app config (DATABASE_URL, S3/R2, MinerU, OpenAI, auth, …) from .env.
     env_file:
       - .env
@@ -42,8 +42,8 @@ services:
     logging:
       driver: json-file
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
 networks:
   otero-net:

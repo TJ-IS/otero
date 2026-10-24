@@ -8,11 +8,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
 } from '@/components/ui/dialog';
-import {
-  Tabs, TabsList, TabsTrigger, TabsContent,
-} from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -30,11 +32,33 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { Save, Trash2, FileText, Plus, X, ExternalLink, Copy, Check, ChevronUp, ChevronDown, Sparkles, Loader2, Wand2, Braces, Globe } from 'lucide-react';
+import {
+  Save,
+  Trash2,
+  FileText,
+  Plus,
+  X,
+  ExternalLink,
+  Copy,
+  Check,
+  ChevronUp,
+  ChevronDown,
+  Sparkles,
+  Loader2,
+  Wand2,
+  Braces,
+  Globe,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/api/client';
 import { useAsync } from '@/hooks/useAsync';
-import { ITEM_TYPES, ITEM_TYPE_LABELS, itemTitle, ALLOWED_PUBLICATION_TITLES, UNFILED } from '@/lib/items';
+import {
+  ITEM_TYPES,
+  ITEM_TYPE_LABELS,
+  itemTitle,
+  ALLOWED_PUBLICATION_TITLES,
+  UNFILED,
+} from '@/lib/items';
 import { CalibratePanel } from './CalibratePanel';
 import { CrossrefPanel } from './CrossrefPanel';
 import { ItemPublicCard } from './ItemPublicCard';
@@ -44,7 +68,9 @@ import { useAuth } from '@/contexts/AuthContext';
 // Lazy-load the full-text viewer: it pulls in react-markdown + remark-gfm +
 // remark-math + rehype-katex + katex CSS (~heavy). Only needed when the user
 // opens the "全文" tab.
-const FullTextView = lazy(() => import('./FullTextView').then(m => ({ default: m.FullTextView })));
+const FullTextView = lazy(() =>
+  import('./FullTextView').then((m) => ({ default: m.FullTextView })),
+);
 
 // Field definitions by type. The union of all sections for each type MUST
 // match the DB schema (src/db/seed.js ITEM_TYPES[].fields) so that every
@@ -113,9 +139,19 @@ const CREATOR_TYPES = ['author', 'editor', 'translator', 'contributor'];
 
 // Fields that should span the full row in the two-column grid (long content).
 const FULL_WIDTH_FIELDS = new Set([
-  'title', 'abstractNote', 'extra', 'url',
-  'publicationTitle', 'bookTitle', 'conferenceName', 'proceedingsTitle',
-  'publisher', 'university', 'repository', 'place', 'series',
+  'title',
+  'abstractNote',
+  'extra',
+  'url',
+  'publicationTitle',
+  'bookTitle',
+  'conferenceName',
+  'proceedingsTitle',
+  'publisher',
+  'university',
+  'repository',
+  'place',
+  'series',
 ]);
 
 // Derive an external jump URL for identifier fields (DOI / url). Returns null
@@ -133,19 +169,21 @@ const Field = memo(function Field({ name, value, onChange, multiline, readOnly }
   const href = useMemo(() => fieldHref(name, value), [name, value]);
   return (
     <div className={FULL_WIDTH_FIELDS.has(name) ? 'col-span-2' : ''}>
-      <Label className="text-xs text-muted-foreground">{t(`field.${name}`, { defaultValue: name })}</Label>
+      <Label className="text-xs text-muted-foreground">
+        {t(`field.${name}`, { defaultValue: name })}
+      </Label>
       <div className="relative mt-1">
         {multiline ? (
           <Textarea
             value={value || ''}
-            onChange={e => onChange(e.target.value)}
+            onChange={(e) => onChange(e.target.value)}
             readOnly={readOnly}
             className={`min-h-[100px] text-sm ${href ? 'pr-8' : ''} ${readOnly ? 'bg-muted/50 cursor-not-allowed' : ''}`}
           />
         ) : (
           <Input
             value={value || ''}
-            onChange={e => onChange(e.target.value)}
+            onChange={(e) => onChange(e.target.value)}
             readOnly={readOnly}
             className={`h-8 text-sm ${href ? 'pr-8' : ''} ${readOnly ? 'bg-muted/50 cursor-not-allowed' : ''}`}
           />
@@ -157,7 +195,7 @@ const Field = memo(function Field({ name, value, onChange, multiline, readOnly }
             rel="noreferrer"
             className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
             title={t('detail.jump')}
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <ExternalLink className="size-3.5" />
           </a>
@@ -198,7 +236,9 @@ function ExportModal({ open, onOpenChange, format, content }) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>{t('detail.exportTitle', { format: format === 'bibtex' ? 'BibTeX' : 'RIS' })}</DialogTitle>
+          <DialogTitle>
+            {t('detail.exportTitle', { format: format === 'bibtex' ? 'BibTeX' : 'RIS' })}
+          </DialogTitle>
         </DialogHeader>
         <div className="flex-1 overflow-auto rounded-sm border border-border/80 bg-muted/30 p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
           {content || t('common:loadingDots')}
@@ -217,12 +257,28 @@ function ExportModal({ open, onOpenChange, format, content }) {
   );
 }
 
-export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChanged, onDirtyChange }) {
+export const ItemDetail = memo(function ItemDetail({
+  itemKey,
+  onDeleted,
+  onChanged,
+  onDirtyChange,
+}) {
   const { t } = useTranslation(['item', 'common']);
   const { canEdit, ready } = useAuth();
-  const { data: item, error, loading, refresh } = useAsync((signal) => api.getItem(itemKey, { signal }), [itemKey]);
-  const { data: attachments } = useAsync((signal) => api.getItemAttachments(itemKey, { signal }), [itemKey]);
-  const { data: fulltext, refresh: refreshFulltext } = useAsync((signal) => api.getFulltext(itemKey, { signal }), [itemKey]);
+  const {
+    data: item,
+    error,
+    loading,
+    refresh,
+  } = useAsync((signal) => api.getItem(itemKey, { signal }), [itemKey]);
+  const { data: attachments } = useAsync(
+    (signal) => api.getItemAttachments(itemKey, { signal }),
+    [itemKey],
+  );
+  const { data: fulltext, refresh: refreshFulltext } = useAsync(
+    (signal) => api.getFulltext(itemKey, { signal }),
+    [itemKey],
+  );
 
   const [draft, setDraft] = useState(null);
   const [creatorsDraft, setCreatorsDraft] = useState([]);
@@ -258,7 +314,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     setCreatorsDraft(item.creators || []);
     setDirty(false);
     setTab('detail');
-    const pdfs = (attachments || []).filter(a => (a.contentType || '').includes('pdf'));
+    const pdfs = (attachments || []).filter((a) => (a.contentType || '').includes('pdf'));
     setActivePdfKey(pdfs[0]?.key || null);
   }, [item, attachments]);
 
@@ -276,7 +332,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     return () => window.removeEventListener('beforeunload', handler);
   }, [dirty]);
 
-  const pdfAttachments = (attachments || []).filter(a => (a.contentType || '').includes('pdf'));
+  const pdfAttachments = (attachments || []).filter((a) => (a.contentType || '').includes('pdf'));
 
   useEffect(() => {
     if (tab !== 'pdf' || !activePdfKey || !itemKey || !canEdit) {
@@ -284,14 +340,17 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
       return undefined;
     }
     let cancelled = false;
-    api.getItemPdfUrl(itemKey, { attachment: activePdfKey })
+    api
+      .getItemPdfUrl(itemKey, { attachment: activePdfKey })
       .then((result) => {
         if (!cancelled) setSignedPdfUrl(result.absoluteUrl || result.url || null);
       })
       .catch(() => {
         if (!cancelled) setSignedPdfUrl(null);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [tab, activePdfKey, itemKey, canEdit]);
 
   const openSignedPdf = async () => {
@@ -312,7 +371,12 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
       </div>
     );
   }
-  if (error) return <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">{t('common:loadFailed', { message: error.message })}</div>;
+  if (error)
+    return (
+      <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">
+        {t('common:loadFailed', { message: error.message })}
+      </div>
+    );
   if (!canEdit) {
     if (!item) return null;
     return (
@@ -325,14 +389,14 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
   const setField = (name, value) => {
     if (!canEdit) return;
-    setDraft(d => {
+    setDraft((d) => {
       const fields = { ...d.fields, [name]: value };
       // Clearing DOI on a journalArticle must drop it back to UNFILED.
       if (
-        d.itemType === 'journalArticle'
-        && name === 'DOI'
-        && !value
-        && fields.publicationTitle !== UNFILED
+        d.itemType === 'journalArticle' &&
+        name === 'DOI' &&
+        !value &&
+        fields.publicationTitle !== UNFILED
       ) {
         fields.publicationTitle = UNFILED;
       }
@@ -342,7 +406,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   };
   const setItemType = (value) => {
     if (!canEdit) return;
-    setDraft(d => {
+    setDraft((d) => {
       const fields = { ...d.fields };
       if (value === 'journalArticle' && !fields.DOI && fields.publicationTitle !== UNFILED) {
         fields.publicationTitle = UNFILED;
@@ -353,17 +417,20 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
   };
   const setCreator = (idx, patch) => {
     if (!canEdit) return;
-    setCreatorsDraft(list => list.map((c, i) => i === idx ? { ...c, ...patch } : c));
+    setCreatorsDraft((list) => list.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
     setDirty(true);
   };
   const addCreator = () => {
     if (!canEdit) return;
-    setCreatorsDraft(list => [...list, { firstName: '', lastName: '', creatorType: 'author', fieldMode: 0 }]);
+    setCreatorsDraft((list) => [
+      ...list,
+      { firstName: '', lastName: '', creatorType: 'author', fieldMode: 0 },
+    ]);
     setDirty(true);
   };
   const removeCreator = (idx) => {
     if (!canEdit) return;
-    setCreatorsDraft(list => list.filter((_, i) => i !== idx));
+    setCreatorsDraft((list) => list.filter((_, i) => i !== idx));
     setDirty(true);
   };
   const moveCreator = (idx, dir) => {
@@ -544,7 +611,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
     }
     // AIS Basket: if CrossRef filled a real journal but DOI is present, keep it.
     // If somehow DOI missing after apply, force UNFILED.
-    if ((!newFields.DOI) && draft.itemType === 'journalArticle') {
+    if (!newFields.DOI && draft.itemType === 'journalArticle') {
       newFields.publicationTitle = UNFILED;
     }
     const nextType = itemType || draft.itemType;
@@ -582,7 +649,9 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
       {/* Header with actions */}
       <div className="flex flex-wrap items-start gap-3 border-b border-border/80 p-4 pr-14">
         <div className="min-w-0 flex-1">
-          <div className="truncate font-display text-base font-semibold" title={itemTitle(item)}>{itemTitle(item)}</div>
+          <div className="truncate font-display text-base font-semibold" title={itemTitle(item)}>
+            {itemTitle(item)}
+          </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
             {ITEM_TYPE_LABELS[item.itemType] || item.itemType}
           </div>
@@ -601,9 +670,11 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               disabled={parseBusy || fulltextActive}
               title={parseTitle}
             >
-              {fulltextActive || parseBusy
-                ? <Loader2 className="size-3.5 animate-spin" />
-                : <Sparkles className="size-3.5" />}
+              {fulltextActive || parseBusy ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="size-3.5" />
+              )}
             </Button>
           )}
           {canEdit && pdfAttachments.length > 0 && (
@@ -612,19 +683,42 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               variant="outline"
               onClick={triggerCalibrate}
               disabled={calibrateLoading || fulltextState !== 'done'}
-              title={fulltextState !== 'done' ? t('fulltext.titleCalibrateNeed') : t('fulltext.titleCalibrate')}
+              title={
+                fulltextState !== 'done'
+                  ? t('fulltext.titleCalibrateNeed')
+                  : t('fulltext.titleCalibrate')
+              }
             >
-              {calibrateLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Wand2 className="size-3.5" />}
+              {calibrateLoading ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Wand2 className="size-3.5" />
+              )}
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={() => openExport('bibtex')} title={t('fulltext.exportBibtex')}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => openExport('bibtex')}
+            title={t('fulltext.exportBibtex')}
+          >
             <Braces className="size-3.5" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => openExport('ris')} title={t('fulltext.exportRis')}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => openExport('ris')}
+            title={t('fulltext.exportRis')}
+          >
             <FileText className="size-3.5" />
           </Button>
           {canEdit && (
-            <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)} title={t('common:delete')}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setDeleteOpen(true)}
+              title={t('common:delete')}
+            >
               <Trash2 className="size-3.5" />
             </Button>
           )}
@@ -641,14 +735,33 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <Tabs
+        value={tab}
+        onValueChange={setTab}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
         <TabsList className="mx-4 mt-1 h-auto w-auto justify-start rounded-none border-b border-border/80 bg-transparent p-0">
-          <TabsTrigger value="detail" className="rounded-none border-b-2 border-transparent px-1 py-2 shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none">{t('detail.tabDetail')}</TabsTrigger>
+          <TabsTrigger
+            value="detail"
+            className="rounded-none border-b-2 border-transparent px-1 py-2 shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none"
+          >
+            {t('detail.tabDetail')}
+          </TabsTrigger>
           {pdfAttachments.length > 0 && (
-            <TabsTrigger value="pdf" className="ml-5 rounded-none border-b-2 border-transparent px-1 py-2 shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none">{t('detail.tabPdf')}</TabsTrigger>
+            <TabsTrigger
+              value="pdf"
+              className="ml-5 rounded-none border-b-2 border-transparent px-1 py-2 shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none"
+            >
+              {t('detail.tabPdf')}
+            </TabsTrigger>
           )}
           {pdfAttachments.length > 0 && (
-            <TabsTrigger value="fulltext" className="ml-5 rounded-none border-b-2 border-transparent px-1 py-2 shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none">{t('detail.tabFulltext')}</TabsTrigger>
+            <TabsTrigger
+              value="fulltext"
+              className="ml-5 rounded-none border-b-2 border-transparent px-1 py-2 shadow-none data-[state=active]:border-brand data-[state=active]:bg-transparent data-[state=active]:text-brand data-[state=active]:shadow-none"
+            >
+              {t('detail.tabFulltext')}
+            </TabsTrigger>
           )}
         </TabsList>
 
@@ -661,20 +774,24 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                   <div className="col-span-2">
                     <Label className="text-xs text-muted-foreground">{t('detail.type')}</Label>
                     <Select value={draft.itemType} onValueChange={setItemType} disabled={!canEdit}>
-                      <SelectTrigger className="mt-1 h-8 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="mt-1 h-8 text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
                       <SelectContent>
-                        {ITEM_TYPES.map(type => (
-                          <SelectItem key={type} value={type}>{ITEM_TYPE_LABELS[type] || type}</SelectItem>
+                        {ITEM_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {ITEM_TYPE_LABELS[type] || type}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  {fields.basic?.map(name => (
+                  {fields.basic?.map((name) => (
                     <Field
                       key={name}
                       name={name}
                       value={draft.fields[name]}
-                      onChange={v => setField(name, v)}
+                      onChange={(v) => setField(name, v)}
                       readOnly={!canEdit}
                     />
                   ))}
@@ -684,20 +801,26 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               {fields.publication && fields.publication.length > 0 && (
                 <Section title={t('detail.publication')}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
-                    {fields.publication.map(name => (
+                    {fields.publication.map((name) =>
                       name === 'publicationTitle' ? (
                         <div key={name} className="col-span-2">
-                          <Label className="text-xs text-muted-foreground">{t('detail.journal')}</Label>
+                          <Label className="text-xs text-muted-foreground">
+                            {t('detail.journal')}
+                          </Label>
                           <Select
                             value={draft.fields.publicationTitle || ''}
-                            onValueChange={v => setField('publicationTitle', v)}
+                            onValueChange={(v) => setField('publicationTitle', v)}
                             disabled={doiMissing || !canEdit}
                           >
                             <SelectTrigger className="mt-1 h-8 text-sm">
-                              <SelectValue placeholder={doiMissing ? t('common:unfiled') : t('detail.selectJournal')} />
+                              <SelectValue
+                                placeholder={
+                                  doiMissing ? t('common:unfiled') : t('detail.selectJournal')
+                                }
+                              />
                             </SelectTrigger>
                             <SelectContent>
-                              {ALLOWED_PUBLICATION_TITLES.map(j => (
+                              {ALLOWED_PUBLICATION_TITLES.map((j) => (
                                 <SelectItem key={j} value={j}>
                                   {j === UNFILED ? t('common:unfiled') : j}
                                 </SelectItem>
@@ -715,11 +838,11 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           key={name}
                           name={name}
                           value={draft.fields[name]}
-                          onChange={v => setField(name, v)}
+                          onChange={(v) => setField(name, v)}
                           readOnly={!canEdit}
                         />
-                      )
-                    ))}
+                      ),
+                    )}
                   </div>
                 </Section>
               )}
@@ -727,15 +850,17 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               {fields.identifiers && fields.identifiers.length > 0 && (
                 <Section title={t('detail.identifiers')}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
-                    {fields.identifiers.map(name => (
+                    {fields.identifiers.map((name) =>
                       name === 'DOI' ? (
                         <div key={name} className="col-span-2">
-                          <Label className="text-xs text-muted-foreground">{t(`field.${name}`, { defaultValue: name })}</Label>
+                          <Label className="text-xs text-muted-foreground">
+                            {t(`field.${name}`, { defaultValue: name })}
+                          </Label>
                           <div className="mt-1 flex items-center gap-1.5">
                             <div className="relative flex-1 min-w-0">
                               <Input
                                 value={draft.fields.DOI || ''}
-                                onChange={e => setField('DOI', e.target.value)}
+                                onChange={(e) => setField('DOI', e.target.value)}
                                 readOnly={!canEdit}
                                 className={`h-8 text-sm pr-8 ${!canEdit ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                               />
@@ -746,7 +871,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                                   rel="noreferrer"
                                   className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center text-muted-foreground hover:text-foreground"
                                   title={t('detail.jumpDoi')}
-                                  onClick={e => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <ExternalLink className="size-3.5" />
                                 </a>
@@ -761,9 +886,11 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                                 disabled={crossrefLoading || !(draft.fields.DOI || '').trim()}
                                 title={t('crossref.resolveTitle')}
                               >
-                                {crossrefLoading
-                                  ? <Loader2 className="size-3.5 animate-spin" />
-                                  : <Globe className="size-3.5" />}
+                                {crossrefLoading ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <Globe className="size-3.5" />
+                                )}
                                 <span className="ml-1 text-xs">CrossRef</span>
                               </Button>
                             )}
@@ -774,11 +901,11 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                           key={name}
                           name={name}
                           value={draft.fields[name]}
-                          onChange={v => setField(name, v)}
+                          onChange={(v) => setField(name, v)}
                           readOnly={!canEdit}
                         />
-                      )
-                    ))}
+                      ),
+                    )}
                   </div>
                 </Section>
               )}
@@ -788,7 +915,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                   <Field
                     name="abstractNote"
                     value={draft.fields.abstractNote}
-                    onChange={v => setField('abstractNote', v)}
+                    onChange={(v) => setField('abstractNote', v)}
                     multiline
                     readOnly={!canEdit}
                   />
@@ -813,27 +940,35 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                         <Input
                           placeholder={t('detail.lastName')}
                           value={c.lastName || ''}
-                          onChange={e => setCreator(idx, { lastName: e.target.value, fieldMode: 0 })}
+                          onChange={(e) =>
+                            setCreator(idx, { lastName: e.target.value, fieldMode: 0 })
+                          }
                           readOnly={!canEdit}
                           className={`h-8 text-sm ${!canEdit ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                         />
                         <Input
                           placeholder={t('detail.firstName')}
                           value={c.firstName || ''}
-                          onChange={e => setCreator(idx, { firstName: e.target.value, fieldMode: 0 })}
+                          onChange={(e) =>
+                            setCreator(idx, { firstName: e.target.value, fieldMode: 0 })
+                          }
                           readOnly={!canEdit}
                           className={`h-8 text-sm ${!canEdit ? 'bg-muted/50 cursor-not-allowed' : ''}`}
                         />
                         <div className="col-span-2">
                           <Select
                             value={c.creatorType || 'author'}
-                            onValueChange={v => setCreator(idx, { creatorType: v })}
+                            onValueChange={(v) => setCreator(idx, { creatorType: v })}
                             disabled={!canEdit}
                           >
-                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="h-8 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
                             <SelectContent>
-                              {CREATOR_TYPES.map(ctype => (
-                                <SelectItem key={ctype} value={ctype}>{ctype}</SelectItem>
+                              {CREATOR_TYPES.map((ctype) => (
+                                <SelectItem key={ctype} value={ctype}>
+                                  {ctype}
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -882,12 +1017,12 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               {fields.other && fields.other.length > 0 && (
                 <Section title={t('detail.other')}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-2">
-                    {fields.other.map(name => (
+                    {fields.other.map((name) => (
                       <Field
                         key={name}
                         name={name}
                         value={draft.fields[name]}
-                        onChange={v => setField(name, v)}
+                        onChange={(v) => setField(name, v)}
                         multiline={name === 'extra'}
                         readOnly={!canEdit}
                       />
@@ -899,20 +1034,22 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
               {/* Attachments */}
               <Section title={t('detail.attachments')}>
                 <div className="divide-y divide-border border-y border-border">
-                  {(attachments || []).map(a => {
+                  {(attachments || []).map((a) => {
                     const isPdf = (a.contentType || '').includes('pdf');
                     const filename = a.path ? a.path.split('/').pop() : a.key;
                     return (
                       <button
                         key={a.key}
-                        onClick={() => isPdf ? openPreview(a.key) : undefined}
+                        onClick={() => (isPdf ? openPreview(a.key) : undefined)}
                         disabled={!isPdf}
                         className="flex w-full items-center gap-2 px-1 py-2 text-left text-sm transition-colors enabled:hover:bg-accent/50 disabled:cursor-default"
                         title={filename}
                       >
                         <FileText className="size-4 shrink-0 text-muted-foreground" />
                         <span className="flex-1 truncate text-xs">{filename}</span>
-                        <Badge variant="secondary" className="font-normal">{a.contentType || 'file'}</Badge>
+                        <Badge variant="secondary" className="font-normal">
+                          {a.contentType || 'file'}
+                        </Badge>
                         {isPdf && <ExternalLink className="size-3 text-muted-foreground" />}
                       </button>
                     );
@@ -936,7 +1073,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {pdfAttachments.map(a => (
+                    {pdfAttachments.map((a) => (
                       <SelectItem key={a.key} value={a.key} className="text-xs">
                         {a.path ? a.path.split('/').pop() : a.key}
                       </SelectItem>
@@ -971,7 +1108,13 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
 
         {pdfAttachments.length > 0 && (
           <TabsContent value="fulltext" className="min-h-0 flex-1 overflow-hidden mt-2">
-            <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted-foreground">{t('common:loadingDots')}</div>}>
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  {t('common:loadingDots')}
+                </div>
+              }
+            >
               <FullTextView itemKey={item.key} hasPdf={pdfAttachments.length > 0} />
             </Suspense>
           </TabsContent>
@@ -989,9 +1132,7 @@ export const ItemDetail = memo(function ItemDetail({ itemKey, onDeleted, onChang
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t('detail.deleteTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('detail.deleteDesc')}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{t('detail.deleteDesc')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>

@@ -19,8 +19,14 @@ In-text citation cards use a keyframe enter. Rapid hover/focus across citations 
 }
 
 @keyframes citation-tooltip-enter {
-  from { opacity: 0; transform: var(--citation-translate) scale(0.97); }
-  to { opacity: 1; transform: var(--citation-translate) scale(1); }
+  from {
+    opacity: 0;
+    transform: var(--citation-translate) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: var(--citation-translate) scale(1);
+  }
 }
 ```
 

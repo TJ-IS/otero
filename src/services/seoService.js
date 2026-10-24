@@ -3,7 +3,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from '../config.js';
 import { query } from '../db/connection.js';
-import { appendDoiRequiredForArticles, appendItemScopeFilters, fieldIdByName } from '../repositories/itemRepo.js';
+import {
+  appendDoiRequiredForArticles,
+  appendItemScopeFilters,
+  fieldIdByName,
+} from '../repositories/itemRepo.js';
 import { getAuthorDetail } from '../repositories/authorRepo.js';
 import { Item } from '../models/Item.js';
 import { getOpenItemByKey, OpenApiError } from './openApiService.js';
@@ -78,7 +82,9 @@ export function escapeHtml(value) {
 }
 
 export function truncate(text, max = 160) {
-  const s = String(text ?? '').replace(/\s+/g, ' ').trim();
+  const s = String(text ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (s.length <= max) return s;
   return `${s.slice(0, max - 1).trimEnd()}…`;
 }
@@ -105,15 +111,18 @@ function readSpaIndexHtml() {
 /**
  * Inject title/meta/JSON-LD into the SPA index and optional crawlable body in #root.
  */
-export function injectSpaShell(html, {
-  title,
-  description,
-  canonicalPath,
-  robots = 'index, follow',
-  ogType = 'website',
-  jsonLd = null,
-  bodyHtml = '',
-} = {}) {
+export function injectSpaShell(
+  html,
+  {
+    title,
+    description,
+    canonicalPath,
+    robots = 'index, follow',
+    ogType = 'website',
+    jsonLd = null,
+    bodyHtml = '',
+  } = {},
+) {
   const canonical = absoluteUrl(canonicalPath || '/');
   const image = ogImageUrl();
   const safeTitle = escapeHtml(title || 'Otero');
@@ -329,7 +338,9 @@ ${entries.join('\n')}
 }
 
 function buildSitemapIndex(locs) {
-  const body = locs.map((loc) => `  <sitemap>\n    <loc>${xmlEscape(loc)}</loc>\n  </sitemap>`).join('\n');
+  const body = locs
+    .map((loc) => `  <sitemap>\n    <loc>${xmlEscape(loc)}</loc>\n  </sitemap>`)
+    .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${body}
@@ -355,11 +366,13 @@ export async function buildSitemapXml(which = 'index') {
   const cached = getCachedSitemap(sitemapCacheKey(which));
   if (cached) return cached;
 
-  const staticEntries = STATIC_PAGES.map((p) => urlEntry({
-    loc: absoluteUrl(p.path),
-    changefreq: p.changefreq,
-    priority: p.priority,
-  }));
+  const staticEntries = STATIC_PAGES.map((p) =>
+    urlEntry({
+      loc: absoluteUrl(p.path),
+      changefreq: p.changefreq,
+      priority: p.priority,
+    }),
+  );
 
   if (which === 'static') {
     return setCachedSitemap(sitemapCacheKey(which), buildUrlset(staticEntries));
@@ -367,23 +380,27 @@ export async function buildSitemapXml(which = 'index') {
 
   if (which === 'items') {
     const items = await listSitemapItems();
-    const itemEntries = items.slice(0, SITEMAP_URL_LIMIT).map((row) => urlEntry({
-      loc: absoluteUrl(`/items/${row.key}`),
-      lastmod: formatW3cDate(row.dateModified),
-      changefreq: 'monthly',
-      priority: '0.7',
-    }));
+    const itemEntries = items.slice(0, SITEMAP_URL_LIMIT).map((row) =>
+      urlEntry({
+        loc: absoluteUrl(`/items/${row.key}`),
+        lastmod: formatW3cDate(row.dateModified),
+        changefreq: 'monthly',
+        priority: '0.7',
+      }),
+    );
     return setCachedSitemap(sitemapCacheKey(which), buildUrlset(itemEntries));
   }
 
   if (which === 'authors') {
     const authors = await listSitemapAuthors();
-    const authorEntries = authors.slice(0, SITEMAP_URL_LIMIT).map((row) => urlEntry({
-      loc: absoluteUrl(`/authors/${row.id}`),
-      lastmod: formatW3cDate(row.dateModified),
-      changefreq: 'monthly',
-      priority: '0.6',
-    }));
+    const authorEntries = authors.slice(0, SITEMAP_URL_LIMIT).map((row) =>
+      urlEntry({
+        loc: absoluteUrl(`/authors/${row.id}`),
+        lastmod: formatW3cDate(row.dateModified),
+        changefreq: 'monthly',
+        priority: '0.6',
+      }),
+    );
     return setCachedSitemap(sitemapCacheKey(which), buildUrlset(authorEntries));
   }
 
@@ -391,10 +408,10 @@ export async function buildSitemapXml(which = 'index') {
 }
 
 const DEFAULT_DESCRIPTION =
-  'Otero is a read-only literature library and Open API for the AIS Senior Scholars\' Basket of Journals — search articles, authors, and corpus statistics.';
+  "Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics.";
 
 const PORTAL_DESCRIPTION =
-  'Otero is a research portal for the AIS Senior Scholars\' Basket of Journals: explore corpus statistics, browse 11 leading information systems journals, search literature, and use the read-only Open API.';
+  "Otero is a research portal for the AIS Senior Scholars' Basket of Journals: explore corpus statistics, browse 11 leading information systems journals, search literature, and use the read-only Open API.";
 
 function websiteSearchAction() {
   return {
@@ -458,12 +475,13 @@ function journalsJsonLd() {
 }
 
 function journalsBodyHtml() {
-  const items = JOURNAL_META.map((journal) => (
-    `<li><a href="/library?journal=${encodeURIComponent(journal.name)}">${escapeHtml(journal.name)}</a> (${escapeHtml(journal.abbr)})</li>`
-  )).join('');
+  const items = JOURNAL_META.map(
+    (journal) =>
+      `<li><a href="/library?journal=${encodeURIComponent(journal.name)}">${escapeHtml(journal.name)}</a> (${escapeHtml(journal.abbr)})</li>`,
+  ).join('');
   return [
     '<article>',
-    '<h1>AIS Senior Scholars\' Basket of Journals</h1>',
+    "<h1>AIS Senior Scholars' Basket of Journals</h1>",
     `<p>${escapeHtml(JOURNALS_DESCRIPTION)}</p>`,
     `<ol>${items}</ol>`,
     '<p><a href="/library">Browse the literature library</a></p>',
@@ -477,7 +495,7 @@ function webApiJsonLd() {
     '@type': 'WebAPI',
     name: 'Otero Open API',
     description:
-      'Read-only HTTP API for AIS Senior Scholars\' Basket literature: search articles and authors, fetch metadata and structured full text, export citations, and query corpus stats.',
+      "Read-only HTTP API for AIS Senior Scholars' Basket literature: search articles and authors, fetch metadata and structured full text, export citations, and query corpus stats.",
     url: absoluteUrl('/docs/api'),
     documentation: absoluteUrl('/api/open/v1/SKILL.md'),
     provider: {
@@ -509,12 +527,8 @@ function scholarlyArticleJsonLd(item) {
     datePublished: year || undefined,
     abstract: fields.abstractNote || undefined,
     author: authors.length ? authors : undefined,
-    isPartOf: journal
-      ? { '@type': 'Periodical', name: journal }
-      : undefined,
-    identifier: doi
-      ? { '@type': 'PropertyValue', propertyID: 'DOI', value: doi }
-      : undefined,
+    isPartOf: journal ? { '@type': 'Periodical', name: journal } : undefined,
+    identifier: doi ? { '@type': 'PropertyValue', propertyID: 'DOI', value: doi } : undefined,
   };
   return Object.fromEntries(Object.entries(data).filter(([, v]) => v != null));
 }
@@ -537,10 +551,7 @@ function itemBodyHtml(item) {
   const year = yearOf(fields.date);
   const abstract = fields.abstractNote || '';
   const doi = fields.DOI || fields.doi || '';
-  const parts = [
-    `<article>`,
-    `<h1>${escapeHtml(title)}</h1>`,
-  ];
+  const parts = [`<article>`, `<h1>${escapeHtml(title)}</h1>`];
   if (authors) parts.push(`<p><strong>Authors:</strong> ${escapeHtml(authors)}</p>`);
   if (journal || year) {
     parts.push(
@@ -584,7 +595,8 @@ const PAGE_COPY = {
   },
   library: {
     title: 'Literature library | Otero',
-    description: 'Browse and filter the AIS Senior Scholars\' Basket of Journals literature collection in Otero.',
+    description:
+      "Browse and filter the AIS Senior Scholars' Basket of Journals literature collection in Otero.",
     path: '/library',
     body: `<article><h1>Otero literature library</h1><p>Browse non-deleted top-level literature items from the 11 AIS Senior Scholars' Basket journals. Filter by journal, type, collection, or search phrase.</p><p><a href="/">Back to the research portal</a> · <a href="/journals">AIS Basket journals</a> · <a href="/search">Search the library</a></p></article>`,
   },
@@ -597,7 +609,7 @@ const PAGE_COPY = {
   },
   search: {
     title: 'Search | Otero',
-    description: 'Search AIS Senior Scholars\' Basket articles and metadata in Otero.',
+    description: "Search AIS Senior Scholars' Basket articles and metadata in Otero.",
     path: '/search',
     body: `<article><h1>Search Otero</h1><p>Search AIS Senior Scholars' Basket articles by title, abstract, authors, and full text when available.</p></article>`,
   },
@@ -612,13 +624,14 @@ const PAGE_COPY = {
   docsAgents: {
     title: 'Agent Skill | Otero',
     description:
-      'Install Otero\'s Open API skill with npx skills add https://ais-basket.xyz so agents can search AIS Basket literature.',
+      "Install Otero's Open API skill with npx skills add https://ais-basket.xyz so agents can search AIS Basket literature.",
     path: '/docs/agents',
     body: `<article><h1>Otero for Agents</h1><p>Install the Otero Open API skill with <code>npx skills add https://ais-basket.xyz</code> (the https:// prefix is required). Agents can then search the AIS Basket library, fetch items and full text, and export citations. Discovery lives at <a href="/.well-known/agent-skills/index.json">/.well-known/agent-skills/index.json</a>; the live skill is also at <a href="/api/open/v1/SKILL.md">/api/open/v1/SKILL.md</a>.</p></article>`,
   },
   dashboard: {
     title: 'Dashboard | Otero',
-    description: 'Corpus overview for the AIS Senior Scholars\' Basket library: coverage, journals, timeline, and author networks.',
+    description:
+      "Corpus overview for the AIS Senior Scholars' Basket library: coverage, journals, timeline, and author networks.",
     path: '/dashboard',
     body: `<article><h1>Otero Dashboard</h1><p>Explore AIS Basket corpus coverage, journals, publication timeline, and author collaboration graphs.</p></article>`,
   },
@@ -648,9 +661,12 @@ function shellFromCopy(key, overrides = {}) {
     canonicalPath: overrides.canonicalPath || copy.path,
     robots: overrides.robots || copy.robots || 'index, follow',
     ogType: overrides.ogType || 'website',
-    jsonLd: overrides.jsonLd !== undefined
-      ? overrides.jsonLd
-      : (typeof copy.jsonLd === 'function' ? copy.jsonLd() : null),
+    jsonLd:
+      overrides.jsonLd !== undefined
+        ? overrides.jsonLd
+        : typeof copy.jsonLd === 'function'
+          ? copy.jsonLd()
+          : null,
     bodyHtml: overrides.bodyHtml || copy.body || '',
   });
 }
@@ -674,11 +690,11 @@ export async function renderSpaShellForRequest(req) {
       const fields = item.fields || {};
       const title = fields.title || 'Untitled';
       const desc = truncate(
-        fields.abstractNote
-          || [creatorDisplay(item.creators?.[0]), fields.publicationTitle, yearOf(fields.date)]
+        fields.abstractNote ||
+          [creatorDisplay(item.creators?.[0]), fields.publicationTitle, yearOf(fields.date)]
             .filter(Boolean)
-            .join(' · ')
-          || title,
+            .join(' · ') ||
+          title,
         160,
       );
       return {
@@ -715,10 +731,7 @@ export async function renderSpaShellForRequest(req) {
       .map((it) => it.toJSON())
       .filter((it) => whitelist.has(it.fields?.publicationTitle))
       .sort((a, b) => (b.fields?.date || '').localeCompare(a.fields?.date || ''));
-    const desc = truncate(
-      `${detail.name} — ${items.length} AIS Basket paper(s) in Otero.`,
-      160,
-    );
+    const desc = truncate(`${detail.name} — ${items.length} AIS Basket paper(s) in Otero.`, 160);
     return {
       status: 200,
       html: injectSpaShell(html, {

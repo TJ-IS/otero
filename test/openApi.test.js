@@ -11,7 +11,13 @@ const createdKeys = [];
 const tag = `open-api-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 let app;
 
-async function makeItem({ title, journal = JOURNAL_WHITELIST[0], date = '2024', doi, creator } = {}) {
+async function makeItem({
+  title,
+  journal = JOURNAL_WHITELIST[0],
+  date = '2024',
+  doi,
+  creator,
+} = {}) {
   const item = new Item();
   await item.setItemType('journalArticle');
   item.setField('title', title || tag);
@@ -47,9 +53,7 @@ test('open item endpoints expose Basket items by key and reject unfiled items', 
   });
   const hidden = await makeItem({ title: `${tag} hidden`, journal: `Outside Journal ${tag}` });
 
-  const detail = await request(app)
-    .get(`/api/open/v1/items/${visible.key}`)
-    .expect(200);
+  const detail = await request(app).get(`/api/open/v1/items/${visible.key}`).expect(200);
   assert.equal(detail.body.item.key, visible.key);
   assert.equal(detail.body.item.fields.title, `${tag} visible`);
 
@@ -98,12 +102,13 @@ test('open PDF, markdown and structure endpoints return stable availability stat
     path: `attachments/${tag}.pdf`,
   });
 
-  const pdf = await request(app)
-    .get(`/api/open/v1/items/${item.key}/pdf-url`)
-    .expect(200);
+  const pdf = await request(app).get(`/api/open/v1/items/${item.key}/pdf-url`).expect(200);
   assert.equal(pdf.body.itemKey, item.key);
   assert.equal(pdf.body.attachmentKey, attachment.key);
-  assert.match(pdf.body.absoluteUrl, new RegExp(`/api/attachments/${attachment.key}/file\\?exp=\\d+&sig=`));
+  assert.match(
+    pdf.body.absoluteUrl,
+    new RegExp(`/api/attachments/${attachment.key}/file\\?exp=\\d+&sig=`),
+  );
   assert.ok(pdf.body.expiresAt);
   assert.ok(pdf.body.ttlSec > 0);
 
@@ -111,17 +116,13 @@ test('open PDF, markdown and structure endpoints return stable availability stat
   const signed = await request(app).get(pdf.body.url);
   assert.ok(signed.status === 200 || signed.body?.error === 'file missing');
 
-  const structure = await request(app)
-    .get(`/api/open/v1/items/${item.key}/structure`)
-    .expect(200);
+  const structure = await request(app).get(`/api/open/v1/items/${item.key}/structure`).expect(200);
   assert.equal(structure.body.itemKey, item.key);
   assert.equal(structure.body.state, 'idle');
   assert.deepEqual(structure.body.outline, []);
   assert.deepEqual(structure.body.references, []);
 
-  const markdown = await request(app)
-    .get(`/api/open/v1/items/${item.key}/markdown`)
-    .expect(404);
+  const markdown = await request(app).get(`/api/open/v1/items/${item.key}/markdown`).expect(404);
   assert.equal(markdown.body.state, 'idle');
 });
 

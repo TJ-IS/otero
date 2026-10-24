@@ -19,9 +19,10 @@ export function headingId(children) {
     .replace(/<[^>]+>/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-  return text
-    .toLowerCase()
-    .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
-    .replace(/^-|-$/g, '')
-    || 'heading';
+  return (
+    text
+      .toLowerCase()
+      .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+      .replace(/^-|-$/g, '') || 'heading'
+  );
 }

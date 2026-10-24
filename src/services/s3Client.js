@@ -37,7 +37,7 @@ export async function ensureBucket() {
     if (!createBucket) {
       throw new Error(
         `S3 bucket "${bucket}" not found at ${config.storage.s3.endpoint}. ` +
-        `Create it in the provider console, or set S3_CREATE_BUCKET=true for local bootstrap.`
+          `Create it in the provider console, or set S3_CREATE_BUCKET=true for local bootstrap.`,
       );
     }
     await client.makeBucket(bucket, config.storage.s3.region || 'auto');
@@ -76,7 +76,9 @@ export async function deleteObject(objectName) {
   try {
     const client = getS3Client();
     await client.removeObject(config.storage.s3.bucket, objectName);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 /**
@@ -89,7 +91,7 @@ export async function listObjectNames(prefix) {
   return new Promise((resolve, reject) => {
     const names = [];
     const stream = client.listObjectsV2(bucket, prefix, true);
-    stream.on('data', obj => names.push(obj.name));
+    stream.on('data', (obj) => names.push(obj.name));
     stream.on('end', () => resolve(names));
     stream.on('error', reject);
   });
@@ -103,6 +105,6 @@ export async function deleteObjectsWithPrefix(prefix) {
   const bucket = config.storage.s3.bucket;
   const names = await listObjectNames(prefix);
   if (names.length === 0) return;
-  const objectsList = names.map(name => ({ name }));
+  const objectsList = names.map((name) => ({ name }));
   await client.removeObjects(bucket, objectsList);
 }

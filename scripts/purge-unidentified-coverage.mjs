@@ -82,12 +82,16 @@ function collectUnidentified(targetKeys, library) {
 }
 
 function printReport({ collected, missing }) {
-  console.log(`unidentified collected=${collected.length} missing=${missing.length} drop=${collected.length + missing.length}`);
+  console.log(
+    `unidentified collected=${collected.length} missing=${missing.length} drop=${collected.length + missing.length}`,
+  );
   console.log('\n=== collected (soft-delete) ===');
   for (const row of collected) {
     const recoverable = normalizeJournalName(row.publicationTitle);
     const flag = recoverable ? ` RECOVERABLE→${recoverable}` : '';
-    console.log(`${row.itemKey}\t${row.doi}\t${row.classified}\t${(row.publicationTitle || '(no journal)').slice(0, 80)}${flag}`);
+    console.log(
+      `${row.itemKey}\t${row.doi}\t${row.classified}\t${(row.publicationTitle || '(no journal)').slice(0, 80)}${flag}`,
+    );
     console.log(`  ${(row.title || '(no title)').slice(0, 100)}`);
   }
   console.log('\n=== missing (drop from target list only) ===');
@@ -123,10 +127,14 @@ try {
 
   const recoverable = groups.collected.filter((r) => normalizeJournalName(r.publicationTitle));
   if (recoverable.length) {
-    console.error(`\nABORT: ${recoverable.length} collected item(s) have a normalizable Basket journal name. Fix metadata instead of deleting.`);
+    console.error(
+      `\nABORT: ${recoverable.length} collected item(s) have a normalizable Basket journal name. Fix metadata instead of deleting.`,
+    );
     process.exitCode = 1;
   } else if (!APPLY) {
-    console.log('\ndry-run only. Re-run with --apply to soft-delete collected items and rewrite target_dois.txt.');
+    console.log(
+      '\ndry-run only. Re-run with --apply to soft-delete collected items and rewrite target_dois.txt.',
+    );
   } else {
     console.log('\n=== apply ===');
     for (const row of groups.collected) {
@@ -138,10 +146,7 @@ try {
       await item.delete(false);
       console.log(`deleted ${row.itemKey}`);
     }
-    const dropKeys = [
-      ...groups.collected.map((r) => r.doi),
-      ...groups.missing,
-    ];
+    const dropKeys = [...groups.collected.map((r) => r.doi), ...groups.missing];
     const rewritten = rewriteTargetList(dropKeys);
     console.log(`target_dois.txt removed=${rewritten.removed} remaining=${rewritten.remaining}`);
   }

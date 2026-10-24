@@ -29,11 +29,9 @@ export function errorHandler(err, req, res, next) {
 
   console.error(`[error] ${method} ${path}`, err);
 
-  const responseStatus = Number.isInteger(err?.status) && err.status >= 500 && err.status <= 599
-    ? err.status
-    : 500;
-  const message = process.env.NODE_ENV === 'production'
-    ? 'internal error'
-    : (err?.message || 'internal error');
+  const responseStatus =
+    Number.isInteger(err?.status) && err.status >= 500 && err.status <= 599 ? err.status : 500;
+  const message =
+    process.env.NODE_ENV === 'production' ? 'internal error' : err?.message || 'internal error';
   return res.status(responseStatus).json({ error: message });
 }

@@ -4,8 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  ArrowLeft, FileText, BookOpen,
-  GraduationCap, BookMarked, Presentation, File,
+  ArrowLeft,
+  FileText,
+  BookOpen,
+  GraduationCap,
+  BookMarked,
+  Presentation,
+  File,
 } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
 import { api } from '@/api/client';
@@ -53,21 +58,19 @@ export const AuthorPage = memo(function AuthorPage() {
 
       <main id="main-content" tabIndex={-1} className="flex-1">
         <div className="mx-auto w-full max-w-page px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-          {loading && (
-            <LoadingSkeleton variant="lines" className="py-8" />
-          )}
+          {loading && <LoadingSkeleton variant="lines" className="py-8" />}
 
           {error && (
             <ErrorState
               message={t('common:loadFailed', { message: error.message })}
-              action={(
+              action={
                 <Button variant="outline" size="sm" asChild>
                   <Link to="/dashboard/authors">
                     <ArrowLeft className="size-4" />
                     {t('page.backToGraph')}
                   </Link>
                 </Button>
-              )}
+              }
             />
           )}
 
@@ -78,14 +81,14 @@ export const AuthorPage = memo(function AuthorPage() {
                 eyebrow={t('page.author')}
                 title={data.name}
                 description={t('page.totalPapers', { count: data.items.length })}
-                actions={(
+                actions={
                   <Button variant="outline" size="sm" asChild>
                     <Link to="/dashboard/authors">
                       <ArrowLeft className="size-4" />
                       {t('page.backToGraph')}
                     </Link>
                   </Button>
-                )}
+                }
               />
 
               {data.items.length === 0 ? (
@@ -117,7 +120,10 @@ export const AuthorPage = memo(function AuthorPage() {
                           </span>
                         )}
                         <span className="tabular-nums">{volumeIssuePages(it.fields) || ''}</span>
-                        <Badge variant="secondary" className="inline-flex items-center gap-1 font-normal">
+                        <Badge
+                          variant="secondary"
+                          className="inline-flex items-center gap-1 font-normal"
+                        >
                           {TYPE_ICONS[it.itemType]}
                           {ITEM_TYPE_LABELS[it.itemType] || it.itemType}
                         </Badge>
