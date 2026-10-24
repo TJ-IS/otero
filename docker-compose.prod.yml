@@ -1,0 +1,74 @@
+# Production deployment: pulls a prebuilt multi-arch image from Docker Hub.
+# Use this file instead of docker-compose.yml on a server that should not
+# need the source tree or a local Docker build.
+#
+#   cp .env.prod.example .env   # fill in secrets
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# See docs/deploy.md for details.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: otero-postgres
+    restart: unless-stopped
+    ports:
+      # Host access for local tooling. Inside the compose network other
+      # services reach it as hostname `postgres:5432`.
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-otero}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-otero}
+      - POSTGRES_DB=${POSTGRES_DB:-otero}
+    networks:
+      - otero-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-otero} -d ${POSTGRES_DB:-otero}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  otero:
+    # Pin OTERO_IMAGE_TAG (e.g. a v* tag or sha-<short>) for reproducible
+    # deploys and easy rollbacks; `latest` is the default.
+    image: sitdownkevin/otero:${OTERO_IMAGE_TAG:-latest}
+    container_name: otero
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "4321:3000"
+    volumes:
+      - ./data:/app/data
+    # Inject app config (S3/R2, MinerU, OpenAI, auth, …) from .env.
+    env_file:
+      - .env
+    # Container-specific overrides; takes precedence over env_file.
+    environment:
+      - NODE_ENV=production
+      - OTERO_PORT=3000
+      - OTERO_HOST=0.0.0.0
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://ais-basket.xyz}
+      # Object storage (S3_*) comes from .env — do not hard-override here.
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-otero}:${POSTGRES_PASSWORD:-otero}@postgres:5432/${POSTGRES_DB:-otero}
+    networks:
+      - otero-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  otero-net:
+    name: otero-net
+    driver: bridge
