@@ -52,7 +52,9 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm --prefix web ci
 
       - name: Run migrations
         run: npm run migrate
