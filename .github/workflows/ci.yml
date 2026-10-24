@@ -105,13 +105,11 @@ jobs:
           npm --prefix web run lint || status=1
           exit $status
 
-  # Non-blocking for the same reason as lint: Prettier has not been run over
-  # the repository yet. Remove `continue-on-error: true` and rename the job
-  # once `npm run format` has been applied in a dedicated commit.
+  # Blocking: the tree was normalised with prettier in a dedicated commit, so
+  # any new formatting drift is a genuine failure worth stopping the merge for.
   format-check:
-    name: Format check (non-blocking)
+    name: Format check
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
