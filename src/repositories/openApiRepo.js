@@ -175,22 +175,26 @@ export async function getOpenFacets(filters = {}) {
 export async function getOpenOverviewStats() {
   const { sql, params } = await buildOpenWhere();
   const row = await queryOne(`
+    WITH matched AS MATERIALIZED (
+      SELECT i."itemID"
+      FROM items i
+      WHERE ${sql}
+    )
     SELECT
-      COUNT(DISTINCT i."itemID")::int AS "totalItems",
+      COUNT(DISTINCT m."itemID")::int AS "totalItems",
       COUNT(DISTINCT ic."creatorID") FILTER (WHERE ct."creatorType" = 'author')::int AS "totalAuthors",
-      COUNT(DISTINCT i."itemID") FILTER (WHERE doi_d."itemID" IS NOT NULL)::int AS "withDoi",
-      COUNT(DISTINCT i."itemID") FILTER (WHERE pdf."parentItemID" IS NOT NULL)::int AS "withPdf",
-      COUNT(DISTINCT i."itemID") FILTER (WHERE ft."itemID" IS NOT NULL)::int AS "withMarkdown"
-    FROM items i
-    LEFT JOIN "itemCreators" ic ON ic."itemID" = i."itemID"
+      COUNT(DISTINCT m."itemID") FILTER (WHERE doi_d."itemID" IS NOT NULL)::int AS "withDoi",
+      COUNT(DISTINCT m."itemID") FILTER (WHERE pdf."parentItemID" IS NOT NULL)::int AS "withPdf",
+      COUNT(DISTINCT m."itemID") FILTER (WHERE ft."itemID" IS NOT NULL)::int AS "withMarkdown"
+    FROM matched m
+    LEFT JOIN "itemCreators" ic ON ic."itemID" = m."itemID"
     LEFT JOIN "creatorTypes" ct ON ct."creatorTypeID" = ic."creatorTypeID"
-    LEFT JOIN "itemData" doi_d ON doi_d."itemID" = i."itemID"
+    LEFT JOIN "itemData" doi_d ON doi_d."itemID" = m."itemID"
       AND doi_d."fieldID" = (SELECT "fieldID" FROM fields WHERE "fieldName" = 'DOI')
     LEFT JOIN (SELECT DISTINCT "parentItemID" FROM "itemAttachments" WHERE path IS NOT NULL
       AND (lower(COALESCE("contentType", '')) LIKE '%pdf%' OR lower(path) LIKE '%.pdf')) pdf
-      ON pdf."parentItemID" = i."itemID"
-    LEFT JOIN "itemFullText" ft ON ft."itemID" = i."itemID" AND ft.state = 'done'
-    WHERE ${sql}
+      ON pdf."parentItemID" = m."itemID"
+    LEFT JOIN "itemFullText" ft ON ft."itemID" = m."itemID" AND ft.state = 'done'
   `, params);
   return { ...row, journalCount: JOURNAL_WHITELIST.length };
 }
