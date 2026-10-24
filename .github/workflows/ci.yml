@@ -65,16 +65,10 @@ jobs:
       - name: Run tests
         run: npm test
 
-  # Non-blocking on purpose: the existing codebase has not been cleaned up
-  # for lint yet, so a red status here should be visible without preventing
-  # merges. To make lint required later:
-  #   1. remove `continue-on-error: true` below;
-  #   2. rename the job to drop "(non-blocking)";
-  #   3. mark the "Lint" check as required in the repository branch protection.
+  # Blocking: both linters are clean, so a new warning is a regression.
   lint:
-    name: Lint (non-blocking)
+    name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout
