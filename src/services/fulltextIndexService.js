@@ -11,7 +11,8 @@ import { getFullTextRow, getFullTextRowByKey } from '../repositories/fulltextRep
 export function markdownToPlain(md) {
   if (!md) return '';
   let s = String(md);
-  // Postgres text/tsvector reject NUL bytes.
+  // Postgres text/tsvector reject NUL bytes; stripping them is intentional.
+  // eslint-disable-next-line no-control-regex
   s = s.replace(/\u0000/g, '');
   s = s.replace(/```[\s\S]*?```/g, ' ');
   s = s.replace(/!\[[^\]]*]\([^)]*\)/g, ' ');

@@ -303,12 +303,12 @@ export const ItemPage = memo(function ItemPage() {
     [structure?.publisherStamp?.lines],
   );
 
-  const figures = structure?.figures || [];
-  const tables = structure?.tables || [];
-  const equations = structure?.equations || [];
-  const charts = structure?.charts || [];
-  const references = structure?.references || [];
-  const footnotes = structure?.footnotes || [];
+  const figures = useMemo(() => structure?.figures || [], [structure]);
+  const tables = useMemo(() => structure?.tables || [], [structure]);
+  const equations = useMemo(() => structure?.equations || [], [structure]);
+  const charts = useMemo(() => structure?.charts || [], [structure]);
+  const references = useMemo(() => structure?.references || [], [structure]);
+  const footnotes = useMemo(() => structure?.footnotes || [], [structure]);
   const outline = structure?.outline || [];
 
   const assetTabs = useMemo(() => {

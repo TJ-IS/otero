@@ -22,10 +22,6 @@ export function storagePathForKey(key, ext = 'pdf') {
   return path.join(key.slice(0, 2), `${key}.${ext}`);
 }
 
-function absPathForKey(key, ext = 'pdf') {
-  return path.join(config.storageDir, storagePathForKey(key, ext));
-}
-
 function md5ofBuffer(buf) {
   return crypto.createHash('md5').update(buf).digest('hex');
 }

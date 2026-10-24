@@ -1,7 +1,7 @@
 import { config } from '../../config.js';
 
 const ARXIV_ID_RE = /\b(?:arXiv:?)?(\d{4}\.\d{4,5}(?:v\d+)?)\b/i;
-const OLD_ARXIV_RE = /\b([a-z\-]+\/\d{7}(?:v\d+)?)\b/i;
+const OLD_ARXIV_RE = /\b([a-z-]+\/\d{7}(?:v\d+)?)\b/i;
 
 /** Extract the first plausible arXiv id from arbitrary text. */
 export function extractArxivId(text) {

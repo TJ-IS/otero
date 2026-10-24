@@ -4,13 +4,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import request from 'supertest';
 import { prepareTestDb, closeDb } from './helpers/pg.js';
 import { buildApp } from '../src/api/server.js';
-import {
-  generateNonce,
-  buildSignMessage,
-  signToken,
-  verifyToken,
-  isEditor,
-} from '../src/api/middleware/auth.js';
+import { buildSignMessage, signToken, verifyToken, isEditor } from '../src/api/middleware/auth.js';
 import { config } from '../src/config.js';
 import { setAccountRole } from '../src/repositories/accountRepo.js';
 

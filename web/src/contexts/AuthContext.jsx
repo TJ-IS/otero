@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getAddress, isAddress } from 'viem';
+import { getAddress } from 'viem';
 import { api, setAuthToken, getAuthToken } from '../api/client.js';
 
 const STORAGE_KEY = 'otero:auth:v1';
@@ -62,6 +62,16 @@ export function AuthProvider({ children }) {
     restore();
   }, [restore]);
 
+  const logout = useCallback(() => {
+    setAuthToken(null);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+    setAddress(null);
+    setCanEdit(false);
+    setRole(null);
+  }, []);
+
   useEffect(() => {
     if (!window.ethereum) return;
     const handleAccounts = (accounts) => {
@@ -75,7 +85,7 @@ export function AuthProvider({ children }) {
     return () => {
       window.ethereum.removeListener?.('accountsChanged', handleAccounts);
     };
-  }, [address]);
+  }, [address, logout]);
 
   const login = useCallback(async () => {
     setConnecting(true);
@@ -96,16 +106,6 @@ export function AuthProvider({ children }) {
     } finally {
       setConnecting(false);
     }
-  }, []);
-
-  const logout = useCallback(() => {
-    setAuthToken(null);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {}
-    setAddress(null);
-    setCanEdit(false);
-    setRole(null);
   }, []);
 
   const value = {

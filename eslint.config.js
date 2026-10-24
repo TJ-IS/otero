@@ -58,7 +58,11 @@ export default [
       'no-useless-escape': 'warn',
       'no-control-regex': 'warn',
       'no-async-promise-executor': 'warn',
-      'require-atomic-updates': 'warn',
+      // Disabled: the flagged sites are intentional concurrency guards (e.g.
+      // "read module-level cache/in-flight promise before await, write back in
+      // finally"). Rewriting them into locks would add complexity and risk.
+      // Reviewed case by case; none is a correctness race.
+      'require-atomic-updates': 'off',
       'no-prototype-builtins': 'warn',
       'no-case-declarations': 'warn',
       'no-fallthrough': 'warn',

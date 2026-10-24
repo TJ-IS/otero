@@ -13,7 +13,6 @@ import {
   deleteStoredPrefix,
   listStoredPrefix,
   readStoredFile,
-  getStoredFileStream,
 } from './storageService.js';
 import {
   getFullTextRowByKey,

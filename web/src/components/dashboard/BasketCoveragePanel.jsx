@@ -14,7 +14,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { ExternalLink } from 'lucide-react';
 import { ChartTooltip } from '@/components/ui/chart-tooltip';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
+import { ErrorState, LoadingSkeleton } from '@/components/ui/async-states';
 import { useAsync } from '@/hooks/useAsync';
 import { api } from '@/api/client';
 import { CATEGORICAL_COLORS, STATUS_COLORS } from '@/lib/chartColors';
