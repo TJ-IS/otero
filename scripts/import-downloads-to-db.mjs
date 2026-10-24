@@ -55,7 +55,7 @@ function collectPdfDirs() {
   return DEFAULT_DIRS;
 }
 
-function logPathFor(dirs) {
+function logPathFor(_dirs) {
   if (DIR_ARG) {
     const inDir = path.join(DIR_ARG, 'import-to-db-log.jsonl');
     try {

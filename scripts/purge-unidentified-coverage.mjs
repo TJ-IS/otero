@@ -15,7 +15,6 @@ import { classifyJournal, UNFILED } from '../src/services/journalWhitelist.js';
 import { doiCompareKey, getTargetDoiKeys } from '../src/services/targetDois.js';
 import { basketJournalOrder, inferJournalFromDoi } from '../src/services/targetDoiMeta.js';
 import { normalizeJournalName } from '../src/services/extractService.js';
-import { getDoiCoverageBreakdown } from '../src/repositories/statsRepo.js';
 
 const ROOT = path.join(dirnameFromMeta(import.meta.url), '..');
 const TARGET_PATH = path.join(ROOT, 'target_dois.txt');

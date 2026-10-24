@@ -407,9 +407,6 @@ export async function buildSitemapXml(which = 'index') {
   throw new Error(`Unknown sitemap variant: ${which}`);
 }
 
-const DEFAULT_DESCRIPTION =
-  "Otero is a read-only literature library and Open API for the AIS Senior Scholars' Basket of Journals — search articles, authors, and corpus statistics.";
-
 const PORTAL_DESCRIPTION =
   "Otero is a research portal for the AIS Senior Scholars' Basket of Journals: explore corpus statistics, browse 11 leading information systems journals, search literature, and use the read-only Open API.";
 

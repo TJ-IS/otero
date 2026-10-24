@@ -140,7 +140,7 @@ export function extractAbstractFromMarkdown(markdown) {
 export function extractAbstractFromPlain(text) {
   if (!text) return null;
   const window = unsqueezeSpacedLetters(String(text).slice(0, 8000));
-  const re = /\b(ABSTRACT|Abstract|abstract|SUMMARY|Summary|synopsis)\s*[:.\-]?\s+/g;
+  const re = /\b(ABSTRACT|Abstract|abstract|SUMMARY|Summary|synopsis)\s*[:.-]?\s+/g;
   let match;
   while ((match = re.exec(window))) {
     const at = match.index;

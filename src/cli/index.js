@@ -131,7 +131,6 @@ program
       console.log(`Submitted: state=${r.state} batchId=${r.mineruBatchId || '-'}`);
       if (opts.wait) {
         console.log('Polling until done...');
-        // eslint-disable-next-line no-constant-condition
         while (true) {
           await new Promise((r) => setTimeout(r, 3000));
           await pollOnce();

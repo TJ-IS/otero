@@ -156,7 +156,7 @@ export function StorageReconciliationPanel() {
   const [deleting, setDeleting] = useState(false);
   const [deleteResult, setDeleteResult] = useState(null);
 
-  const orphanInR2 = data?.orphanInR2 || [];
+  const orphanInR2 = useMemo(() => data?.orphanInR2 || [], [data]);
   const missingInR2 = data?.missingInR2 || [];
   const summary = data?.summary;
 

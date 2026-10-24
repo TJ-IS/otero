@@ -12,7 +12,6 @@ function requestPath(req) {
  * message; unexpected errors are logged with request context and never leak
  * `err.message` (or a stack) to clients in production.
  */
-// eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, next) {
   if (res.headersSent) return next(err);
 

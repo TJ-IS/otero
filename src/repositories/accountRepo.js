@@ -1,5 +1,5 @@
 import { getAddress, isAddress } from 'viem';
-import { query, queryOne, execute } from '../db/connection.js';
+import { query, queryOne } from '../db/connection.js';
 import { nowUtc } from '../db/connection.js';
 import { config } from '../config.js';
 

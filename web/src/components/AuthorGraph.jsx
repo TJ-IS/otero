@@ -122,7 +122,7 @@ export function AuthorGraph() {
     return () => controller.abort();
   }, [debouncedFilters, yearError, yearFrom, yearTo]);
 
-  const nodes = graph?.nodes || [];
+  const nodes = useMemo(() => graph?.nodes || [], [graph]);
   const searchMatches = useMemo(() => {
     const normalized = searchQuery.trim().toLocaleLowerCase();
     if (!normalized) return [];

@@ -22,7 +22,6 @@ import { Attachment } from '../src/models/Attachment.js';
 import { generateKey } from '../src/utils/key.js';
 import { normalizeDoi } from '../src/utils/doi.js';
 import { normalizeJournalName } from '../src/services/extractService.js';
-import { JOURNAL_WHITELIST } from '../src/services/journalWhitelist.js';
 import { importPdf } from '../src/services/importService.js';
 import {
   enqueueBatchParse,
