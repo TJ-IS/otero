@@ -33,7 +33,7 @@
 - **LLM 能力**：题录校准、字段抽取、条目对话（OpenAI 兼容 API）。
 - **导出**：BibTeX / RIS。
 - **编辑鉴权**：以太坊钱包签名登录；白名单地址可写，其余只读。
-- **Docker**：本地开发 compose 自带 `postgres` + `otero`；生产 compose 只跑 `otero`，数据库自备。前端构建产物由后端静态托管。
+- **Docker**：本地开发与生产 compose 都只跑 `otero`，数据库自备（PostgreSQL 18）。前端构建产物由后端静态托管。
 
 ## 技术栈
 
@@ -41,14 +41,13 @@
 | ---- | ---------------------------------------------------------------------------------------- |
 | 后端 | Node.js ≥ 20（ESM）、Express、`pg`、pdfjs-dist、adm-zip、zod、`minio`（S3 SDK，对接 R2） |
 | 前端 | Vite + React + shadcn/ui + Tailwind；recharts / d3-force / KaTeX                         |
-| 数据 | PostgreSQL 16；对象存储 filesystem 或 Cloudflare R2                                      |
+| 数据 | PostgreSQL 18；对象存储 filesystem 或 Cloudflare R2                                      |
 | 外部 | MinerU、DeepSeek/OpenAI 兼容 LLM、CrossRef / arXiv / OpenLibrary                         |
 
 ## 目录结构
 
 ```
 data/                 运行时数据（gitignored）
-  postgres/           本地开发 compose 的 PostgreSQL 数据文件（生产自备）
   storage/            STORAGE_TYPE=filesystem 时的 PDF / 全文
 src/
   db/                 connection、schema.postgres.sql、migrate、seed
@@ -73,12 +72,8 @@ Dockerfile / docker-compose.yml / docker-entrypoint.sh
 复制 `.env.example` 为 `.env`。完整键名以 `src/config.js` 为准，常用项：
 
 ```env
-# PostgreSQL（必填）
+# PostgreSQL 18（必填，唯一数据库配置入口）
 DATABASE_URL=postgresql://otero:otero-secret-change-me@127.0.0.1:5432/otero
-POSTGRES_USER=otero
-POSTGRES_PASSWORD=otero-secret-change-me
-POSTGRES_DB=otero
-POSTGRES_PORT=5432
 
 # 对象存储：filesystem | s3（R2 等）
 STORAGE_TYPE=s3
@@ -121,7 +116,7 @@ OTERO_HOST=127.0.0.1
 ### 本地开发
 
 ```bash
-docker compose up -d postgres   # 或自备 PostgreSQL
+# 先准备你自己的 PostgreSQL 18，并在 .env 中填好 DATABASE_URL
 cp .env.example .env            # 填 DATABASE_URL、存储与 Token
 npm install
 npm run migrate                 # 应用 schema.postgres.sql
@@ -143,16 +138,16 @@ cd web && npm install && npm run dev
 ### Docker（一键）
 
 ```bash
-# 根目录准备好 .env（含 S3/R2、MinerU、AUTH 等；compose 会覆盖 DATABASE_URL 指向服务名 postgres）
+# 根目录准备好 .env（含 DATABASE_URL、S3/R2、MinerU、AUTH 等；数据库由你自备）
 docker compose up -d --build
 # 宿主访问 http://localhost:4321 （映射容器 3000）
 ```
 
-`./data` 挂载到容器 `/app/data`（含 `postgres/` 与可选 `storage/`）。入口脚本会先 `migrate` + `seed` 再启动。
+`./data` 挂载到容器 `/app/data`（含可选 `storage/`，不含数据库）。入口脚本会先 `migrate` + `seed` 再启动。
 
 ### 生产部署（Docker 镜像）
 
-服务器只需 Docker Engine + Docker Compose，**不需要 Node.js、不需要 clone 源码或在本地构建**，但需要**自备一个可访问的 PostgreSQL 16+**（schema v6，应用启动时自动迁移）。GitHub Actions 会把多架构镜像（`linux/amd64` + `linux/arm64`）推送到 Docker Hub 的 `sitdownkevin/otero`；服务器按自身架构自动拉取。
+服务器只需 Docker Engine + Docker Compose，**不需要 Node.js、不需要 clone 源码或在本地构建**，但需要**自备一个可访问的 PostgreSQL 18**（schema v6，应用启动时自动迁移），连接方式由 `.env` 的 `DATABASE_URL` 提供。GitHub Actions 会把多架构镜像（`linux/amd64` + `linux/arm64`）推送到 Docker Hub 的 `sitdownkevin/otero`；服务器按自身架构自动拉取。
 
 ```bash
 mkdir -p /opt/otero && cd /opt/otero
@@ -250,9 +245,9 @@ npx skills update
 
 ## 备份与数据
 
-| 组件       | 位置                                                           | 备份建议                                  |
-| ---------- | -------------------------------------------------------------- | ----------------------------------------- |
-| 元数据     | PostgreSQL（本地 compose 为 `data/postgres/`；生产为自备实例） | `pg_dump` / `pg_restore`                  |
-| PDF + 全文 | R2 bucket，或 `data/storage/`（filesystem）                    | R2 侧版本/复制；本地则打包 `data/storage` |
+| 组件       | 位置                                        | 备份建议                                  |
+| ---------- | ------------------------------------------- | ----------------------------------------- |
+| 元数据     | 自备的 PostgreSQL 18 实例                   | `pg_dump` / `pg_restore`                  |
+| PDF + 全文 | R2 bucket，或 `data/storage/`（filesystem） | R2 侧版本/复制；本地则打包 `data/storage` |
 
 历史「SQLite + 本地 MinIO」迁移脚本与文档已移除；勿再按旧流程操作。

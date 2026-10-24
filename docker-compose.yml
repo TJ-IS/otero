@@ -1,38 +1,18 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: otero-postgres
-    restart: unless-stopped
-    ports:
-      # Host access for local tooling. Inside the compose network other
-      # services reach it as hostname `postgres:5432`.
-      - '${POSTGRES_PORT:-5432}:5432'
-    volumes:
-      - ./data/postgres:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_USER=${POSTGRES_USER:-otero}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-otero}
-      - POSTGRES_DB=${POSTGRES_DB:-otero}
-    networks:
-      - otero-net
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-otero} -d ${POSTGRES_DB:-otero}']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   otero:
     build: .
     container_name: otero
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
     ports:
       - '4321:3000'
     volumes:
       - ./data:/app/data
-    # Inject app config (S3/R2, MinerU, OpenAI, auth, …) from .env.
+    # Let the container reach a PostgreSQL running on the host via
+    # host.docker.internal. There is no bundled database any more, so this is
+    # the common local setup.
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    # Inject app config (DATABASE_URL, S3/R2, MinerU, OpenAI, auth, …) from .env.
     env_file:
       - .env
     # Container-specific overrides; takes precedence over env_file.
@@ -41,8 +21,8 @@ services:
       - OTERO_PORT=3000
       - OTERO_HOST=0.0.0.0
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://ais-basket.xyz}
+      # DATABASE_URL comes from .env — run your own PostgreSQL 18.
       # Object storage (S3_*) comes from .env — do not hard-override here.
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-otero}:${POSTGRES_PASSWORD:-otero}@postgres:5432/${POSTGRES_DB:-otero}
     networks:
       - otero-net
 

@@ -38,7 +38,7 @@ focused.
 
 `.github/workflows/ci.yml` has three jobs:
 
-1. `Test` — blocking. Starts PostgreSQL 16, runs migrations, seeds the
+1. `Test` — blocking. Starts PostgreSQL 18, runs migrations, seeds the
    schema, then runs `npm test`.
 2. `Lint (non-blocking)` — runs the backend and frontend linters.
 3. `Format check (non-blocking)` — runs `npm run format:check`.
