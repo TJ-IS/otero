@@ -1,0 +1,12 @@
+name: probe
+on: workflow_dispatch
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          echo "=== pwd ==="; pwd
+          echo "=== ls test/ ==="; ls -la test/ | head -8
+          echo "=== find ==="; find test -name "*.test.js" | head -5
+          echo "=== node version ==="; node -v
