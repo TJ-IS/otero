@@ -33,7 +33,7 @@
 - **LLM 能力**：题录校准、字段抽取、条目对话（OpenAI 兼容 API）。
 - **导出**：BibTeX / RIS。
 - **编辑鉴权**：以太坊钱包签名登录；白名单地址可写，其余只读。
-- **Docker**：`postgres` + `otero`；前端构建产物由后端静态托管。
+- **Docker**：本地开发 compose 自带 `postgres` + `otero`；生产 compose 只跑 `otero`，数据库自备。前端构建产物由后端静态托管。
 
 ## 技术栈
 
@@ -48,7 +48,7 @@
 
 ```
 data/                 运行时数据（gitignored）
-  postgres/           Docker 卷：PostgreSQL 数据文件
+  postgres/           本地开发 compose 的 PostgreSQL 数据文件（生产自备）
   storage/            STORAGE_TYPE=filesystem 时的 PDF / 全文
 src/
   db/                 connection、schema.postgres.sql、migrate、seed
@@ -150,6 +150,27 @@ docker compose up -d --build
 
 `./data` 挂载到容器 `/app/data`（含 `postgres/` 与可选 `storage/`）。入口脚本会先 `migrate` + `seed` 再启动。
 
+### 生产部署（Docker 镜像）
+
+服务器只需 Docker Engine + Docker Compose，**不需要 Node.js、不需要 clone 源码或在本地构建**，但需要**自备一个可访问的 PostgreSQL 16+**（schema v6，应用启动时自动迁移）。GitHub Actions 会把多架构镜像（`linux/amd64` + `linux/arm64`）推送到 Docker Hub 的 `sitdownkevin/otero`；服务器按自身架构自动拉取。
+
+```bash
+mkdir -p /opt/otero && cd /opt/otero
+curl -fsSLO https://raw.githubusercontent.com/TJ-IS/otero/main/docker-compose.prod.yml
+curl -fsSL https://raw.githubusercontent.com/TJ-IS/otero/main/.env.prod.example -o .env
+chmod 600 .env
+# 编辑 .env：至少填写 DATABASE_URL、OTERO_AUTH_SECRET 及各项外部服务密钥
+docker compose -f docker-compose.prod.yml up -d
+```
+
+- 数据库：不在 compose 内，由 `.env` 的 `DATABASE_URL` 指向你自备的 PostgreSQL（同机可用 `host.docker.internal`）。
+- 数据卷：`./data` 用于 filesystem 存储与运行时数据（不含数据库）。
+- 迁移：入口脚本在容器启动时自动执行 `migrate` + `seed`，无需手动操作。
+- 升级：`docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d`。
+- 回滚：在 `.env` 中把 `OTERO_IMAGE_TAG` 固定/改回具体版本（如 `1.2.3` 或 `sha-<短 SHA>`；git tag `v1.2.3` 对应的镜像标签是 `1.2.3`）后重新 `pull` + `up -d`。
+
+完整步骤（首次部署、升级、备份、回滚注意事项）见 [`docs/deploy.md`](docs/deploy.md)。
+
 ## 使用方式
 
 ### CLI
@@ -231,7 +252,7 @@ npx skills update
 
 | 组件 | 位置 | 备份建议 |
 |------|------|----------|
-| 元数据 | PostgreSQL（Docker 下为 `data/postgres/`） | `pg_dump` / `pg_restore` |
+| 元数据 | PostgreSQL（本地 compose 为 `data/postgres/`；生产为自备实例） | `pg_dump` / `pg_restore` |
 | PDF + 全文 | R2 bucket，或 `data/storage/`（filesystem） | R2 侧版本/复制；本地则打包 `data/storage` |
 
 历史「SQLite + 本地 MinIO」迁移脚本与文档已移除；勿再按旧流程操作。

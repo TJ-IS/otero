@@ -1,0 +1,51 @@
+# Production deployment: pulls a prebuilt multi-arch image from Docker Hub.
+# Use this file instead of docker-compose.yml on a server that should not
+# need the source tree or a local Docker build.
+#
+# PostgreSQL is NOT part of this compose file. Run your own PostgreSQL 16+
+# and point DATABASE_URL in .env at it.
+#
+#   cp .env.prod.example .env   # fill in secrets, including DATABASE_URL
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# See docs/deploy.md for details.
+
+services:
+  otero:
+    # Pin OTERO_IMAGE_TAG (e.g. a v* tag or sha-<short>) for reproducible
+    # deploys and easy rollbacks; `latest` is the default.
+    image: sitdownkevin/otero:${OTERO_IMAGE_TAG:-latest}
+    container_name: otero
+    restart: unless-stopped
+    ports:
+      - "4321:3000"
+    volumes:
+      - ./data:/app/data
+    # Reach a PostgreSQL running on the Docker host via host.docker.internal.
+    # On Linux this maps the name to the host gateway.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Inject app config (DATABASE_URL, S3/R2, MinerU, OpenAI, auth, …) from .env.
+    env_file:
+      - .env
+    # Container-specific overrides; takes precedence over env_file.
+    environment:
+      - NODE_ENV=production
+      - OTERO_PORT=3000
+      - OTERO_HOST=0.0.0.0
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-https://ais-basket.xyz}
+      # DATABASE_URL comes from .env — the database lives outside this compose file.
+      # Object storage (S3_*) comes from .env — do not hard-override here.
+    networks:
+      - otero-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  otero-net:
+    name: otero-net
+    driver: bridge
