@@ -1,5 +1,5 @@
 import { query, queryOne } from '../db/connection.js';
-import { appendDoiRequiredForArticles } from './itemRepo.js';
+import { appendDoiRequiredForArticles, fieldIdByName } from './itemRepo.js';
 import { JOURNAL_WHITELIST } from '../services/journalWhitelist.js';
 
 function placeholders(values, params) {
@@ -93,12 +93,65 @@ async function buildOpenWhere({ q, journal, journals, yearFrom, yearTo, type } =
   return { sql: where.join(' AND '), params };
 }
 
+/**
+ * Build the same three search predicates as buildOpenWhere(), but driven from
+ * the hit side so the trgm / GIN indexes can be used instead of probing every
+ * Basket item with correlated EXISTS subqueries.
+ */
+async function buildOpenSearchHitsCte(needle, params, p) {
+  const likeParam = p++;
+  const ftsParam = p++;
+  params.push(`%${needle}%`, needle);
+  const fieldIds = [];
+  for (const name of ['title', 'abstractNote', 'publicationTitle', 'DOI']) {
+    const id = await fieldIdByName(name);
+    if (id != null) fieldIds.push(id);
+  }
+  const fieldParams = fieldIds.length
+    ? fieldIds.map((id) => {
+        params.push(id);
+        return `$${p++}`;
+      }).join(',')
+    : 'NULL';
+  return {
+    cte: `search_hits AS MATERIALIZED (
+      SELECT u."itemID"
+      FROM (
+        SELECT ft."itemID"
+        FROM "itemFullText" ft
+        WHERE ft.state = 'done'
+          AND ft.tsv @@ plainto_tsquery('simple', $${ftsParam})
+        UNION
+        SELECT d."itemID"
+        FROM "itemData" d
+        JOIN "itemDataValues" v ON v."valueID" = d."valueID"
+        WHERE d."fieldID" IN (${fieldParams})
+          AND v.value ILIKE $${likeParam}
+        UNION
+        SELECT ic."itemID"
+        FROM "itemCreators" ic
+        JOIN creators c ON c."creatorID" = ic."creatorID"
+        WHERE (COALESCE(c."firstName", '') || ' ' || COALESCE(c."lastName", '')) ILIKE $${likeParam}
+      ) u
+    )`,
+    join: `JOIN search_hits sh ON sh."itemID" = i."itemID"`,
+    p,
+  };
+}
+
 export async function getOpenFacets(filters = {}) {
-  const { sql, params } = await buildOpenWhere(filters);
+  const needle = filters.q == null ? '' : String(filters.q).trim();
+  const { sql, params } = await buildOpenWhere(needle ? { ...filters, q: undefined } : filters);
+  const searchHits = needle
+    ? await buildOpenSearchHitsCte(needle, params, params.length + 1)
+    : null;
+  const withPrefix = searchHits ? `${searchHits.cte},` : '';
+  const matchedFrom = searchHits ? `items i\n      ${searchHits.join}` : 'items i';
   const bundled = await queryOne(`
-    WITH matched AS MATERIALIZED (
+    WITH ${withPrefix}
+    matched AS MATERIALIZED (
       SELECT i."itemID", i."itemTypeID"
-      FROM items i
+      FROM ${matchedFrom}
       WHERE ${sql}
     ),
     field_rows AS (
