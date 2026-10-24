@@ -9,7 +9,7 @@
 
 ## 前置条件
 
-- **自备 PostgreSQL 16 及以上**（原容器内使用 `postgres:16-alpine`）。应用使用 **schema v6**，首次启动会自动建表并记录版本；更高版本的 PostgreSQL 也可以。
+- **自备 PostgreSQL 18**：数据库与连接方式（`DATABASE_URL`）均由你提供，compose 不启动任何数据库容器。应用使用 **schema v6**，首次启动会自动建表并记录版本。
 - 数据库、用户和库名需要**提前创建**好，并确保运行容器的服务器能通过网络访问它（防火墙、`listen_addresses`、`pg_hba.conf` 均已放行）。
 - 建议为应用用户预装 `pg_trgm` 扩展（`CREATE EXTENSION IF NOT EXISTS pg_trgm;`）。若没有权限，迁移会打印警告并跳过三元组索引，功能可用但模糊搜索会变慢。
 - 不需要在服务器上安装 Node.js，也不需要 `git clone` 源码或本地构建镜像。
@@ -125,7 +125,7 @@ pg_dump -h <DB_HOST> -p 5432 -U <DB_USER> -d <DB_NAME> \
 pg_dump "$DATABASE_URL" -Fc -f backup-$(date +%F).dump
 ```
 
-建议使用与服务端同版本或更高版本的 `pg_dump`（PostgreSQL 16+）。
+建议使用与服务端一致或更高版本的 `pg_dump`（PostgreSQL 18）。
 
 ```bash
 # PDF / 全文：使用 R2 时走 R2 侧备份；使用 filesystem 时打包 ./data/storage
@@ -136,13 +136,13 @@ tar czf storage-$(date +%F).tar.gz data/storage
 
 ## 7. 首次部署与升级的区别
 
-|          | 首次部署                                                      | 升级                                     |
-| -------- | ------------------------------------------------------------- | ---------------------------------------- |
-| 前置条件 | 已有可访问的 PostgreSQL 16+，目录中只有 compose 文件和 `.env` | 已有 `.env`、`./data` 和存有数据的数据库 |
-| Postgres | 用户预先创建库/用户，应用自动建表                             | 复用同一数据库                           |
-| 迁移     | 建表 + seed                                                   | 只应用新增迁移（幂等命令照常执行）       |
-| 命令     | `docker compose -f docker-compose.prod.yml up -d`             | `pull` 后再 `up -d`                      |
-| 数据     | 从零开始                                                      | 保留，升级前建议 `pg_dump`               |
+|          | 首次部署                                                     | 升级                                     |
+| -------- | ------------------------------------------------------------ | ---------------------------------------- |
+| 前置条件 | 已有可访问的 PostgreSQL 18，目录中只有 compose 文件和 `.env` | 已有 `.env`、`./data` 和存有数据的数据库 |
+| Postgres | 用户预先创建库/用户，应用自动建表                            | 复用同一数据库                           |
+| 迁移     | 建表 + seed                                                  | 只应用新增迁移（幂等命令照常执行）       |
+| 命令     | `docker compose -f docker-compose.prod.yml up -d`            | `pull` 后再 `up -d`                      |
+| 数据     | 从零开始                                                     | 保留，升级前建议 `pg_dump`               |
 
 ## 8. 常见问题（自备数据库）
 

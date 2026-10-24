@@ -2,7 +2,7 @@
 # Use this file instead of docker-compose.yml on a server that should not
 # need the source tree or a local Docker build.
 #
-# PostgreSQL is NOT part of this compose file. Run your own PostgreSQL 16+
+# PostgreSQL is NOT part of this compose file. Run your own PostgreSQL 18
 # and point DATABASE_URL in .env at it.
 #
 #   cp .env.prod.example .env   # fill in secrets, including DATABASE_URL
