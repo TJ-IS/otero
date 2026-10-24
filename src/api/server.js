@@ -22,6 +22,7 @@ import { adminRouter } from './routes/admin.js';
 import { seoRouter, spaSeoFallback } from './routes/seo.js';
 import { wellKnownSkillsRouter } from './routes/wellKnownSkills.js';
 import { canonicalHostRedirect } from './middleware/canonicalHost.js';
+import { errorHandler } from './middleware/errorHandler.js';
 import { optionalAuth, editorWriteGate, requireEditor } from './middleware/auth.js';
 import { activityLogMiddleware } from './middleware/activityLog.js';
 import { activityRouter } from './routes/activity.js';
@@ -78,11 +79,7 @@ export function buildApp() {
   }
   app.get(/^\/(?!api|health).*/, spaSeoFallback);
 
-  // eslint-disable-next-line no-unused-vars
-  app.use((err, _req, res, _next) => {
-    console.error(err);
-    res.status(500).json({ error: err.message || 'internal error' });
-  });
+  app.use(errorHandler);
 
   return app;
 }
